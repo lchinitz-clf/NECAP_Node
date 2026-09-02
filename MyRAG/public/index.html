@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>local-rag</title>
+<style>
+  :root {
+    color-scheme: light;
+    --border: #d4d4d8;
+    --muted: #71717a;
+    --bg-soft: #f4f4f5;
+    --ok: #15803d;
+    --ok-bg: #f0fdf4;
+    --low: #b45309;
+    --low-bg: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    max-width: 760px;
+    margin: 2.5rem auto;
+    padding: 0 1.25rem;
+    color: #18181b;
+    background: #fff;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+  p.sub { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
+  p.hint { color: var(--muted); font-size: 0.8rem; margin: 0.3rem 0 0; }
+
+  section.card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem 1.3rem;
+    margin: 1.25rem 0;
+  }
+
+  form { display: flex; flex-direction: column; gap: 0.85rem; }
+  label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem; }
+  textarea, input[type="text"], input[type="number"], select {
+    width: 100%;
+    font: inherit;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 4.5rem; }
+
+  .row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+  .row input, .row select { width: 100%; }
+
+  button {
+    align-self: flex-start;
+    padding: 0.6rem 1.2rem;
+    background: #18181b;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { background: #a1a1aa; cursor: default; }
+
+  .btn-remove {
+    padding: 0.3rem 0.65rem;
+    background: transparent;
+    color: var(--low);
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .btn-remove:hover { background: var(--low-bg); }
+  .btn-remove:disabled { background: transparent; color: var(--muted); border-color: var(--border); }
+
+  .status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+  .error {
+    display: none;
+    background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+    padding: 0.75rem 0.9rem; border-radius: 6px; font-size: 0.9rem; margin-top: 0.5rem;
+    white-space: pre-wrap;
+  }
+
+  #embedResult {
+    display: none;
+    background: var(--ok-bg);
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+
+  input[type="file"] {
+    width: 100%;
+    font: inherit;
+    padding: 0.4rem 0;
+  }
+
+  progress {
+    width: 100%;
+    height: 0.65rem;
+    accent-color: #18181b;
+  }
+
+  #result { display: none; margin-top: 1.5rem; }
+  #answer {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  #confidenceNote { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0.4rem; }
+  #lengthNote {
+    display: none;
+    background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
+    padding: 0.6rem 0.9rem; border-radius: 6px; font-size: 0.85rem; margin-top: 0.6rem;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.3rem; }
+  th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  tr.meets td:first-child::before { content: "●"; color: var(--ok); margin-right: 0.4rem; }
+  tr.below td:first-child::before { content: "●"; color: var(--low); margin-right: 0.4rem; }
+  tr.below { color: var(--muted); }
+  td.score-meets { color: var(--ok); font-weight: 600; }
+  td.score-below { color: var(--low); }
+</style>
+</head>
+<body>
+
+<h1 id="appNameHeading">local-rag</h1>
+<p class="sub">Everything below operates within a single workspace — pick or create one first.</p>
+
+<section class="card">
+  <h2>Workspace</h2>
+  <label for="workspace">Workspace name</label>
+  <input type="text" id="workspace" list="workspaceList" placeholder="e.g. ma-climate-plan" autocomplete="off" />
+  <datalist id="workspaceList"></datalist>
+  <p class="hint">
+    Pick an existing one from the list, or type a new name to create it —
+    it's created automatically the first time you embed a document into it.
+    Letters, numbers, hyphens, and underscores only. Use separate workspaces
+    to keep unrelated document sets (e.g. a Massachusetts plan vs. a Vermont
+    plan) from ever being searched together.
+  </p>
+</section>
+
+<section class="card" id="documentsWrap" style="display:none;">
+  <h2>Documents in this workspace</h2>
+  <p class="hint" id="documentsEmpty"></p>
+  <table>
+    <thead>
+      <tr><th>Document</th><th>Chunks</th><th>Pages</th><th></th></tr>
+    </thead>
+    <tbody id="documentsBody"></tbody>
+  </table>
+  <p class="error" id="documentsError"></p>
+</section>
+
+<section class="card">
+  <h2>1. Embed a document</h2>
+  <form id="embedForm">
+    <div>
+      <label for="pdfFile">Document (PDF, DOCX, or TXT)</label>
+      <input type="file" id="pdfFile" accept=".pdf,.docx,.txt" required />
+      <p class="hint">
+        Uploaded to the server and saved under this workspace before
+        extraction starts — the same flow this UI will use once the
+        server isn't your own computer anymore.
+      </p>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="maxWords">Chunk size (words)</label>
+        <input type="number" id="maxWords" value="300" min="20" max="1000" step="10" />
+      </div>
+      <div>
+        <label for="overlapWords">Chunk overlap (words)</label>
+        <input type="number" id="overlapWords" value="40" min="0" max="500" step="5" />
+      </div>
+    </div>
+    <p class="hint">
+      Smaller chunks retrieve more precisely but carry less surrounding
+      context per match; overlap repeats a few trailing words at the
+      start of the next chunk so a sentence spanning a boundary isn't
+      lost entirely. A fixed internal 1800-character cap per chunk
+      always applies underneath this setting too, to stay safely under
+      the embedding model's context limit — so raising chunk size much
+      past ~300-400 words on ordinary prose won't actually produce
+      bigger chunks, only smaller ones (below that) will take effect.
+      Applies to this one document; existing embedded documents in this
+      workspace keep whatever size they were embedded with.
+    </p>
+
+    <button type="submit" id="embedSubmitBtn">Embed into workspace</button>
+    <div class="status" id="embedStatus"></div>
+    <div id="embedProgressWrap" style="display:none;">
+      <progress id="embedProgressBar"></progress>
+    </div>
+    <div class="error" id="embedError"></div>
+    <div id="embedResult"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>2. Ask a question</h2>
+  <form id="queryForm">
+    <div>
+      <label for="question">Question</label>
+      <textarea id="question" required placeholder="What does the plan say about offshore wind?"></textarea>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="chatModel">Chat model</label>
+        <select id="chatModel"></select>
+        <p class="hint" id="chatModelHint"></p>
+      </div>
+      <div>
+        <label for="topK">Chunks to retrieve (topK)</label>
+        <input type="number" id="topK" value="5" min="1" max="20" step="1" />
+      </div>
+      <div>
+        <label for="threshold">Confidence threshold (score)</label>
+        <input type="number" id="threshold" value="0.55" min="0" max="1" step="0.01" />
+      </div>
+      <div>
+        <label for="temperature">Temperature</label>
+        <input type="number" id="temperature" value="0.2" min="0" max="1.5" step="0.05" />
+        <p class="hint">
+          Lower (0) sticks closely to the retrieved chunks and answers
+          the same way every time; higher gets more varied and creative
+          but more prone to drifting from the source text — for
+          document Q&amp;A, low is usually right.
+        </p>
+      </div>
+      <div>
+        <label for="maxTokens">Max answer length (tokens)</label>
+        <input type="number" id="maxTokens" placeholder="no limit" min="1" max="4000" step="50" />
+        <p class="hint">
+          Leave blank for no cap (the model stops on its own, or when it
+          runs out of context). Set this to bound how long generation
+          can run — useful on modest local hardware, or to stop a model
+          from rambling well past a direct answer.
+        </p>
+      </div>
+    </div>
+
+    <button type="submit" id="submitBtn">Ask</button>
+    <div class="status" id="status"></div>
+    <div id="queryProgressWrap" style="display:none;">
+      <progress id="queryProgressBar"></progress>
+    </div>
+    <div class="error" id="error"></div>
+  </form>
+
+  <div id="result">
+    <div id="answer"></div>
+    <div id="lengthNote"></div>
+
+    <div id="confidenceNote"></div>
+    <table>
+      <thead>
+        <tr><th>Source</th><th>Chunk</th><th>Score</th></tr>
+      </thead>
+      <tbody id="sourcesBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  // Loads public/config.json — a small, separate file kept deliberately
+  // outside this HTML so renaming the app doesn't mean hand-editing
+  // markup. { "appName": "..." } is the only field read today; the
+  // "local-rag" in <title> and <h1> above is just the fallback shown
+  // if this fetch fails or the file's missing, not a second place that
+  // needs updating. Runs first, before anything else on the page.
+  async function applyConfig() {
+    try {
+      const res = await fetch('/config.json', { cache: 'no-store' });
+      const config = await res.json();
+      if (config.appName) {
+        document.title = config.appName;
+        document.getElementById('appNameHeading').textContent = config.appName;
+      }
+    } catch (err) {
+      console.warn('Could not load config.json, using default name:', err);
+    }
+  }
+  applyConfig();
+
+  const workspaceInput = document.getElementById('workspace');
+  const workspaceList = document.getElementById('workspaceList');
+
+  // Loads the list of existing workspaces into the datalist, so the
+  // workspace field behaves like a combo box: pick one that's there,
+  // or just type a name that isn't yet and it'll be created on first
+  // embed. Called on page load and again after a successful embed
+  // (which may have just created a brand new workspace).
+  async function refreshWorkspaces() {
+    try {
+      const res = await fetch('/workspaces');
+      const data = await res.json();
+      workspaceList.innerHTML = '';
+      for (const id of data.workspaces || []) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        workspaceList.appendChild(opt);
+      }
+    } catch (err) {
+      // Non-fatal — the field still works as a plain text input even
+      // if this fetch fails (e.g. server briefly restarting).
+      console.warn('Could not load workspace list:', err);
+    }
+  }
+  refreshWorkspaces();
+
+  // The server's own hardcoded fallback (see ollamaClient.js's chat()
+  // default) — pre-selecting it when it's in the pulled-models list
+  // just makes the picker's starting state match what would happen
+  // anyway if you left it alone.
+  const SERVER_DEFAULT_CHAT_MODEL = 'llama3.1:8b';
+
+  const chatModelSelect = document.getElementById('chatModel');
+  const chatModelHint = document.getElementById('chatModelHint');
+
+  // Loads models actually pulled into this Ollama installation (GET
+  // /models -> Ollama's /api/tags) into the chat-model dropdown. This
+  // list includes embedding models too — Ollama doesn't label which
+  // is which — so nomic-embed-text (or similar) may show up here; it's
+  // harmless to leave in since Ollama will just error clearly if you
+  // try to use it as a chat model, this UI doesn't try to guess.
+  async function refreshModels() {
+    try {
+      const res = await fetch('/models');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load models');
+
+      const models = data.models || [];
+      chatModelSelect.innerHTML = '';
+
+      if (models.length === 0) {
+        const opt = document.createElement('option');
+        opt.textContent = 'No models found — pull one with "ollama pull"';
+        opt.disabled = true;
+        opt.selected = true;
+        chatModelSelect.appendChild(opt);
+        chatModelHint.textContent = '';
+        return;
+      }
+
+      for (const name of models) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        chatModelSelect.appendChild(opt);
+      }
+
+      if (models.includes(SERVER_DEFAULT_CHAT_MODEL)) {
+        chatModelSelect.value = SERVER_DEFAULT_CHAT_MODEL;
+      }
+      chatModelHint.textContent = '';
+    } catch (err) {
+      console.warn('Could not load model list:', err);
+      chatModelSelect.innerHTML = '';
+      const opt = document.createElement('option');
+      opt.textContent = 'Could not load models';
+      opt.disabled = true;
+      opt.selected = true;
+      chatModelSelect.appendChild(opt);
+      chatModelHint.textContent = 'Is Ollama running? Falling back to the server default if you ask a question anyway.';
+    }
+  }
+  refreshModels();
+
+  function getWorkspaceId() {
+    return workspaceInput.value.trim();
+  }
+
+  function requireWorkspace(errorEl) {
+    const id = getWorkspaceId();
+    if (!id) {
+      errorEl.textContent = 'Enter or pick a workspace name above first.';
+      errorEl.style.display = 'block';
+      return null;
+    }
+    return id;
+  }
+
+  // ---- Documents-in-workspace list ----
+
+  const documentsWrap = document.getElementById('documentsWrap');
+  const documentsEmpty = document.getElementById('documentsEmpty');
+  const documentsBody = document.getElementById('documentsBody');
+  const documentsError = document.getElementById('documentsError');
+
+  // Shows what's actually embedded (grouped by source filename) in
+  // whatever workspace is currently entered above, with a Remove
+  // button per document. Also doubles as the easiest way to spot an
+  // accidental duplicate embed: the same document showing roughly
+  // double its usual chunk count is that happening.
+  async function refreshDocuments() {
+    const id = getWorkspaceId();
+    if (!id) {
+      documentsWrap.style.display = 'none';
+      return;
+    }
+
+    try {
+      const res = await fetch(`/workspaces/${encodeURIComponent(id)}/documents`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load documents');
+
+      documentsWrap.style.display = 'block';
+      documentsBody.innerHTML = '';
+      documentsError.style.display = 'none';
+
+      if (data.documents.length === 0) {
+        documentsEmpty.textContent = `No documents embedded in workspace "${id}" yet.`;
+        return;
+      }
+
+      documentsEmpty.textContent = '';
+      for (const doc of data.documents) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(doc.sourceFile)}</td>
+          <td>${doc.chunks}</td>
+          <td>${doc.numPages != null ? doc.numPages : '—'}</td>
+          <td><button type="button" class="btn-remove" data-source="${escapeHtml(doc.sourceFile)}">Remove</button></td>
+        `;
+        documentsBody.appendChild(tr);
+      }
+    } catch (err) {
+      // Non-fatal — an invalid/incomplete workspace name typed
+      // mid-edit will 400 here transiently, which is fine; just hide
+      // the section rather than showing an error for that.
+      console.warn('Could not load documents:', err);
+      documentsWrap.style.display = 'none';
+    }
+  }
+
+  // Debounced on typing (rather than firing on every keystroke), and
+  // also handles picking a suggestion from the workspace datalist,
+  // since selecting one fires an "input" event too.
+  let documentsDebounce = null;
+  workspaceInput.addEventListener('input', () => {
+    clearTimeout(documentsDebounce);
+    documentsDebounce = setTimeout(refreshDocuments, 400);
+  });
+
+  // One delegated listener on the table body handles every Remove
+  // button, including ones added after a later refresh — no need to
+  // re-attach a handler per row.
+  documentsBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.btn-remove');
+    if (!btn) return;
+
+    const sourceFile = btn.dataset.source;
+    const workspaceId = getWorkspaceId();
+    if (!workspaceId) return;
+
+    if (!confirm(
+      `Remove "${sourceFile}" from workspace "${workspaceId}"?\n\n` +
+      `This deletes its chunks from the search index. If it was uploaded ` +
+      `through this app, its uploaded file is deleted too. If it was ` +
+      `embedded from a path on the server (via /embed), only the index ` +
+      `entries are removed — the original file is left alone.`
+    )) {
+      return;
+    }
+
+    btn.disabled = true;
+    documentsError.style.display = 'none';
+
+    try {
+      const res = await fetch(
+        `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+      // The delete itself succeeded either way, but a recorded upload
+      // path that somehow failed to resolve inside this workspace's
+      // uploads/ directory (or failed to unlink for some other reason)
+      // is surfaced rather than silently swallowed — see fileErrors on
+      // deleteDocument() in src/store.js.
+      if (data.fileErrors && data.fileErrors.length) {
+        documentsError.textContent = data.fileErrors.join(' ');
+        documentsError.style.display = 'block';
+      }
+      refreshDocuments();
+    } catch (err) {
+      documentsError.textContent = err.message;
+      documentsError.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
+
+  // ---- Embed form ----
+
+  const embedForm = document.getElementById('embedForm');
+  const embedStatus = document.getElementById('embedStatus');
+  const embedError = document.getElementById('embedError');
+  const embedResult = document.getElementById('embedResult');
+  const embedSubmitBtn = document.getElementById('embedSubmitBtn');
+  const embedProgressWrap = document.getElementById('embedProgressWrap');
+  const embedProgressBar = document.getElementById('embedProgressBar');
+
+  /**
+   * Uploads a file to /workspaces/:id/upload-and-embed and reads back
+   * the streamed newline-delimited JSON progress events as they
+   * arrive, calling onEvent() for each one. The server can only fail
+   * cleanly (a normal HTTP error status) *before* it starts streaming
+   * — a bad workspace id, wrong file type, etc. Once streaming has
+   * begun, a failure shows up as one of the events themselves
+   * ({type: "error"}), not as an HTTP error, since the response
+   * headers already committed to 200. This function surfaces both
+   * cases the same way: by throwing.
+   */
+  async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEvent) {
+    const formData = new FormData();
+    formData.append('file', file);
+    // Omit blank/cleared fields entirely rather than sending an empty
+    // string — the server treats a missing field as "use chunker.js's
+    // own default," same convention /query's chatModel/temperature use
+    // for a JSON body.
+    if (maxWords !== undefined) formData.append('maxWords', maxWords);
+    if (overlapWords !== undefined) formData.append('overlapWords', overlapWords);
+
+    const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}/upload-and-embed`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      let message = `Request failed: ${res.status}`;
+      try {
+        const data = await res.json();
+        message = data.error || message;
+      } catch {
+        // Body wasn't JSON — fall back to the generic message above.
+      }
+      throw new Error(message);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalEvent = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+        if (!line) continue;
+        const event = JSON.parse(line);
+        onEvent(event);
+        if (event.type === 'done' || event.type === 'error') finalEvent = event;
+      }
+    }
+
+    if (!finalEvent) throw new Error('Server closed the connection before finishing.');
+    if (finalEvent.type === 'error') throw new Error(finalEvent.error);
+    return finalEvent;
+  }
+
+  embedForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    embedError.style.display = 'none';
+    embedResult.style.display = 'none';
+
+    const workspaceId = requireWorkspace(embedError);
+    if (!workspaceId) return;
+
+    const fileInput = document.getElementById('pdfFile');
+    const file = fileInput.files[0];
+    if (!file) {
+      embedError.textContent = 'Choose a file first.';
+      embedError.style.display = 'block';
+      return;
+    }
+
+    // Same "blank/non-numeric field means let the server default
+    // apply" convention as temperature above, for the same reason: an
+    // empty string sent as-is would either be silently coerced to a
+    // useless 0 or rejected, neither of which is "no opinion, just use
+    // chunker.js's default."
+    const readOptionalPositiveInt = (id) => {
+      const raw = document.getElementById(id).value;
+      return raw === '' || Number.isNaN(Number(raw)) ? undefined : Number(raw);
+    };
+    const maxWords = readOptionalPositiveInt('maxWords');
+    const overlapWords = readOptionalPositiveInt('overlapWords');
+
+    embedSubmitBtn.disabled = true;
+    embedProgressWrap.style.display = 'block';
+    embedProgressBar.removeAttribute('value'); // indeterminate until "start" arrives
+    embedStatus.textContent = 'Uploading and extracting text…';
+
+    try {
+      const result = await embedWithProgress(workspaceId, file, maxWords, overlapWords, (event) => {
+        if (event.type === 'start') {
+          embedProgressBar.max = event.totalChunks;
+          embedProgressBar.value = 0;
+          // numPages is null for file types without a real page count
+          // (.docx, .txt) — only PDFs have one.
+          const pageInfo = event.numPages != null ? ` (${event.numPages} pages)` : '';
+          embedStatus.textContent =
+            `Embedding "${event.sourceFile}"${pageInfo}: 0 / ${event.totalChunks} chunks`;
+        } else if (event.type === 'progress') {
+          embedProgressBar.value = event.chunksEmbedded;
+          const pct = Math.round((event.chunksEmbedded / event.totalChunks) * 100);
+          embedStatus.textContent =
+            `Embedding: ${event.chunksEmbedded} / ${event.totalChunks} chunks (${pct}%)`;
+        }
+      });
+
+      const resultPageInfo = result.numPages != null ? ` (${result.numPages} pages)` : '';
+      embedResult.textContent =
+        `Embedded ${result.chunksEmbedded} chunks from "${result.originalName}"${resultPageInfo} ` +
+        `into workspace "${result.workspaceId}". ` +
+        `That workspace now has ${result.totalStored} chunks total.`;
+      embedResult.style.display = 'block';
+      embedStatus.textContent = '';
+      fileInput.value = '';
+      refreshWorkspaces();
+      refreshDocuments();
+    } catch (err) {
+      embedError.textContent = err.message;
+      embedError.style.display = 'block';
+      embedStatus.textContent = '';
+    } finally {
+      embedSubmitBtn.disabled = false;
+      embedProgressWrap.style.display = 'none';
+    }
+  });
+
+  // ---- Query form ----
+
+  const form = document.getElementById('queryForm');
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const resultEl = document.getElementById('result');
+  const answerEl = document.getElementById('answer');
+  const lengthNote = document.getElementById('lengthNote');
+  const sourcesBody = document.getElementById('sourcesBody');
+  const confidenceNote = document.getElementById('confidenceNote');
+  const submitBtn = document.getElementById('submitBtn');
+  const queryProgressWrap = document.getElementById('queryProgressWrap');
+
+  // The threshold is a purely client-side display filter: the server
+  // always returns its topK closest chunks regardless of how weak the
+  // match is (this is intentional — see /query in index.js). This UI
+  // is what decides, for display purposes, which of those returned
+  // chunks are worth calling "confident" matches versus noise the
+  // model was still handed as context. It doesn't change what the
+  // model saw, only how we label the sources here.
+  function renderSources(sources, threshold) {
+    sourcesBody.innerHTML = '';
+    const meets = sources.filter((s) => s.score >= threshold);
+
+    if (sources.length === 0) {
+      confidenceNote.textContent = 'No documents have been embedded yet in this workspace.';
+    } else if (meets.length === 0) {
+      confidenceNote.textContent =
+        `None of the ${sources.length} retrieved chunks met your confidence threshold ` +
+        `(${threshold.toFixed(2)}) — treat this answer with caution, it may be based on weak or irrelevant matches.`;
+    } else {
+      confidenceNote.textContent =
+        `${meets.length} of ${sources.length} retrieved chunks met your confidence threshold (${threshold.toFixed(2)}).`;
+    }
+
+    for (const s of sources) {
+      const tr = document.createElement('tr');
+      const ok = s.score >= threshold;
+      tr.className = ok ? 'meets' : 'below';
+      tr.innerHTML = `
+        <td>${escapeHtml(s.sourceFile)}</td>
+        <td>${s.chunkIndex}</td>
+        <td class="${ok ? 'score-meets' : 'score-below'}">${s.score.toFixed(4)}</td>
+      `;
+      sourcesBody.appendChild(tr);
+    }
+
+    resultEl.style.display = 'block';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /**
+   * Same NDJSON-over-fetch pattern as embedWithProgress() above,
+   * pointed at /query/stream instead. onEvent fires for each line as
+   * it arrives: {type:"sources",...}, then a run of {type:"token",...}
+   * as the answer is generated, ending in {type:"done",...} or
+   * {type:"error",...}.
+   */
+  async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, onEvent) {
+    const res = await fetch('/query/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // chatModel/temperature/maxTokens undefined (nothing usable
+      // selected, or the field was cleared) just omits that key from
+      // the JSON body entirely, and /query/stream's own default
+      // (ollamaClient.js's chat()) takes over server-side — for
+      // maxTokens specifically, that default is "no cap."
+      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens }),
+    });
+
+    if (!res.ok) {
+      let message = `Request failed: ${res.status}`;
+      try {
+        const data = await res.json();
+        message = data.error || message;
+      } catch {
+        // Not JSON — fall back to the generic message above.
+      }
+      throw new Error(message);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalEvent = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+        if (!line) continue;
+        const event = JSON.parse(line);
+        onEvent(event);
+        if (event.type === 'done' || event.type === 'error') finalEvent = event;
+      }
+    }
+
+    if (!finalEvent) throw new Error('Server closed the connection before finishing.');
+    if (finalEvent.type === 'error') throw new Error(finalEvent.error);
+    return finalEvent;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    errorEl.style.display = 'none';
+    resultEl.style.display = 'none';
+    sourcesBody.innerHTML = '';
+    confidenceNote.textContent = '';
+    answerEl.textContent = '';
+    lengthNote.style.display = 'none';
+    lengthNote.textContent = '';
+
+    const workspaceId = requireWorkspace(errorEl);
+    if (!workspaceId) return;
+
+    const question = document.getElementById('question').value.trim();
+    const topK = Number(document.getElementById('topK').value) || 5;
+    const threshold = Number(document.getElementById('threshold').value) || 0;
+    const chatModel = chatModelSelect.value || undefined;
+    // Unlike topK/threshold, 0 is a meaningful, valid temperature (as
+    // deterministic as the model gets) — so this can't fall back to a
+    // default with `|| ...` the way those do, since `0 || x` would
+    // wrongly become x. An empty or non-numeric field instead becomes
+    // undefined, which omits the key from the request body and lets
+    // the server's own default apply.
+    const rawTemperature = document.getElementById('temperature').value;
+    const temperature = rawTemperature === '' || Number.isNaN(Number(rawTemperature))
+      ? undefined
+      : Number(rawTemperature);
+    // Blank is the normal state here (no placeholder value to fall
+    // back on) and means exactly what it looks like: no cap.
+    const rawMaxTokens = document.getElementById('maxTokens').value;
+    const maxTokens = rawMaxTokens === '' || Number.isNaN(Number(rawMaxTokens))
+      ? undefined
+      : Number(rawMaxTokens);
+    if (!question) return;
+
+    submitBtn.disabled = true;
+    statusEl.textContent = 'Embedding question and searching stored chunks…';
+
+    let gotAnyToken = false;
+
+    try {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, (event) => {
+        if (event.type === 'sources') {
+          // Retrieval is fast — this fires almost immediately, well
+          // before the answer is ready, so the sources table (and the
+          // confidence-threshold coloring) shows up right away instead
+          // of waiting on generation too.
+          renderSources(event.sources, threshold);
+          if (event.sources.length) {
+            statusEl.textContent = 'Generating answer…';
+            // There's an unavoidable gap here — however long the model
+            // takes to produce its first fragment — with no percentage
+            // to show (we don't know the answer's eventual length), so
+            // this is an indeterminate bar: not "X% done," just "still
+            // alive, still working." It's for that gap specifically;
+            // once real text starts appearing below, that's a stronger
+            // liveness signal than any bar, so it disappears then.
+            queryProgressWrap.style.display = 'block';
+          } else {
+            statusEl.textContent = '';
+          }
+        } else if (event.type === 'token') {
+          // Live "typing" effect: each fragment Ollama generates gets
+          // appended as it arrives, instead of the answer box staying
+          // blank until everything is done.
+          gotAnyToken = true;
+          queryProgressWrap.style.display = 'none';
+          answerEl.textContent += event.text;
+          resultEl.style.display = 'block';
+        }
+      });
+
+      // Covers the "no documents embedded yet" case: "done" fires with
+      // a ready-made answer and no sources/tokens were ever streamed.
+      if (!gotAnyToken) {
+        answerEl.textContent = finalEvent.answer;
+        renderSources(finalEvent.sources || [], threshold);
+      }
+
+      // doneReason "length" means Ollama cut generation short instead of
+      // reaching a natural stop — but that has two possible causes that
+      // look identical from here, so distinguish them using whatever
+      // this request itself sent: if maxTokens was set, that's almost
+      // certainly why (working as configured); if it was left blank
+      // ("no limit" — nothing was sent), the far more likely explanation
+      // is Ollama's own num_ctx context-window ceiling being exhausted
+      // by the prompt + retrieved chunks + answer combined, which this
+      // app doesn't set and isn't the same thing as maxTokens at all.
+      if (finalEvent.doneReason === 'length') {
+        lengthNote.textContent = maxTokens !== undefined
+          ? `Cut off at the max answer length you set (${maxTokens} tokens). Raise or clear that field for a longer answer.`
+          : 'Cut off before finishing, even with no max answer length set — this is almost always Ollama’s own context window (num_ctx) running out, not this app’s max-answer-length setting. Try a lower "Chunks to retrieve (topK)" to leave more room for the answer, or increase num_ctx for this model in Ollama.';
+        lengthNote.style.display = 'block';
+      }
+
+      statusEl.textContent = '';
+      queryProgressWrap.style.display = 'none';
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      statusEl.textContent = '';
+      queryProgressWrap.style.display = 'none';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>

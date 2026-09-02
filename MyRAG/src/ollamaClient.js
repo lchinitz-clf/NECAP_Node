@@ -1,0 +1,190 @@
+/**
+ * Thin wrapper around Ollama's local HTTP API. Nothing fancy — just
+ * plain fetch calls to the same endpoints AnythingLLM has been using
+ * under the hood this whole time (http://localhost:11434).
+ */
+
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+
+/**
+ * Embeds a single string of text into a vector.
+ *
+ * Ollama's embedding endpoint defaults to a 512-token context window,
+ * regardless of what the model itself supports (nomic-embed-text can
+ * handle up to 8192). Unlike chat models, this does NOT appear to be
+ * overridable per-request — passing options.num_ctx here is harmless
+ * to leave in (in case a future Ollama version or a different
+ * embedding model does respect it) but should NOT be relied on. The
+ * real fix is upstream: chunker.js's default chunk size is kept
+ * comfortably under 512 tokens so we never hit this ceiling at all.
+ *
+ * @param {string} text
+ * @param {string} model - e.g. "nomic-embed-text"
+ * @param {number} numCtx - context window to request, in tokens (see caveat above).
+ * @returns {Promise<number[]>}
+ */
+async function embed(text, model = 'nomic-embed-text', numCtx = 2048) {
+  let res;
+  try {
+    res = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt: text, options: { num_ctx: numCtx } }),
+    });
+  } catch (err) {
+    throw new Error(
+      `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(`Ollama /api/embeddings failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  return data.embedding;
+}
+
+/**
+ * Sends a chat-style request to a local Ollama model and returns the
+ * full generated text.
+ *
+ * By default this waits for the whole response (stream: false) — fine
+ * for scripted/PowerShell use, where you just want one JSON object
+ * back. Pass onToken to switch to Ollama's streaming mode instead:
+ * Ollama then sends the answer back as a series of small NDJSON lines
+ * (each one a fragment of the message) as the model generates them,
+ * and onToken(piece) is called once per fragment as they arrive — this
+ * is what makes a live "typing" UI possible instead of one long silent
+ * wait. Either way, the function's return value is the same: the full
+ * answer text, accumulated from the fragments in streaming mode.
+ *
+ * @param {Array<{role: string, content: string}>} messages
+ * @param {object} opts
+ * @param {string} [opts.model] - e.g. "llama3.1:8b"
+ * @param {number} [opts.temperature]
+ * @param {number} [opts.maxTokens] - caps how many tokens the model may
+ *   generate, passed through as Ollama's `num_predict`. Left out of the
+ *   request entirely when omitted (rather than defaulted here), so
+ *   Ollama's own default (-1, meaning "no explicit cap, generate until
+ *   a natural stop or the model's context window runs out") applies —
+ *   same "absence means don't override" convention temperature would
+ *   ideally follow too, though temperature's default of 0.2 predates
+ *   this and is left as-is to avoid changing existing behavior.
+ * @param {(piece: string) => void} [opts.onToken] - if provided, switches
+ *   to streaming mode and is called once per fragment of generated text.
+ * @returns {Promise<{text: string, doneReason: string|undefined}>} `text`
+ *   is the full answer, same as this always returned before. `doneReason`
+ *   is Ollama's own explanation for why generation stopped — normally
+ *   `"stop"` (the model reached a natural end, e.g. hit its own
+ *   end-of-turn token), or `"length"` if it was cut off by a limit
+ *   instead: either `maxTokens`/`num_predict` above if that was set, OR,
+ *   just as commonly, Ollama's `num_ctx` context-window ceiling being
+ *   exhausted by the prompt + answer combined — that one is NOT
+ *   controlled by maxTokens at all, isn't set anywhere in this file, and
+ *   so is silently using Ollama's own default (2048 tokens for many
+ *   models unless the Modelfile says otherwise) regardless of what the
+ *   model itself could support. A caller can't tell those two "length"
+ *   causes apart from doneReason alone — only from whether it itself
+ *   passed maxTokens.
+ */
+async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken } = {}) {
+  const streaming = typeof onToken === 'function';
+  const options = { temperature };
+  if (maxTokens !== undefined) options.num_predict = maxTokens;
+  let res;
+  try {
+    res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: streaming,
+        options,
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(`Ollama /api/chat failed: ${res.status} ${await res.text()}`);
+  }
+
+  if (!streaming) {
+    const data = await res.json();
+    return { text: data.message.content, doneReason: data.done_reason };
+  }
+
+  // Streaming mode: Ollama's response body is itself newline-delimited
+  // JSON, one object per fragment, e.g.
+  //   {"message":{"role":"assistant","content":"Off"},"done":false}
+  //   {"message":{"role":"assistant","content":"shore"},"done":false}
+  //   ...
+  //   {"message":{"role":"assistant","content":""},"done":true,"done_reason":"stop",...}
+  // Same "buffer partial lines across reads" approach as the /embed
+  // streaming route on our own server — a chunk from the network can
+  // split a JSON line in the middle, so we only parse once we've seen
+  // a full line.
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let full = '';
+  let doneReason;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newlineIdx;
+    while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIdx).trim();
+      buffer = buffer.slice(newlineIdx + 1);
+      if (!line) continue;
+      const obj = JSON.parse(line);
+      const piece = obj.message && obj.message.content;
+      if (piece) {
+        full += piece;
+        onToken(piece);
+      }
+      if (obj.done) doneReason = obj.done_reason;
+    }
+  }
+
+  return { text: full, doneReason };
+}
+
+/**
+ * Lists models currently pulled in this Ollama installation (via
+ * `ollama pull`) — this is what lets a UI offer a real, accurate list
+ * of chat models instead of a hardcoded guess. Ollama doesn't expose
+ * "this one's for chat, that one's for embeddings" as metadata, so
+ * this returns everything you've pulled, embedding models included;
+ * picking an embedding model here as a chat model will just fail
+ * loudly when you try to use it, since it was never built to generate
+ * text.
+ * @returns {Promise<string[]>}
+ */
+async function listModels() {
+  let res;
+  try {
+    res = await fetch(`${OLLAMA_BASE_URL}/api/tags`);
+  } catch (err) {
+    throw new Error(
+      `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(`Ollama /api/tags failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  return (data.models || []).map((m) => m.name);
+}
+
+module.exports = { embed, chat, listModels };
