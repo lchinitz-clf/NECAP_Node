@@ -66,6 +66,26 @@ Endpoints:
   `fileDeleted` so a caller can tell which happened. See the comment
   on `deleteDocument()` in `src/store.js` for the full reasoning and
   the path-containment guardrail around the actual unlink.
+- `DELETE /workspaces/:workspaceId` — wipes an entire workspace: every
+  chunk in its store.json, every uploaded file under
+  `workspaces/<id>/uploads/`, and the workspace directory itself, e.g.
+  `{ "workspaceId": "ma-climate-plan", "existed": true }` (`existed` is
+  `false`, not an error, if that workspace id had no directory to begin
+  with). This is the blunt "start this workspace over from nothing"
+  recovery tool — see "Workspace maintenance" below. There is no
+  confirmation built into the endpoint itself; the browser UI asks
+  before ever sending this request.
+- `POST /workspaces/:workspaceId/rebuild-index` — discards store.json
+  and rebuilds it from scratch by re-extracting, re-chunking, and
+  re-embedding every file currently sitting in
+  `workspaces/<id>/uploads/`. Body is optional JSON:
+  `{ "embedModel": "...", "maxWords": 300, "overlapWords": 40 }`
+  (same meaning and defaults as `/embed`). Streamed as
+  newline-delimited JSON, same pattern as
+  `/workspaces/:id/upload-and-embed` — see "Workspace maintenance"
+  below for the full event shapes, the two real limitations on what
+  this can recover, and the all-or-nothing guarantee around when
+  store.json actually gets overwritten.
 - `POST /ingest` — extract + chunk a document, no embeddings, no
   workspace needed (useful for inspecting chunk boundaries before
   committing to embedding a document).
@@ -207,6 +227,25 @@ model generation involved), then the answer types itself out as
 Ollama generates it, instead of the page sitting on one static "this
 can take a while" line with nothing else to look at.
 
+A "Stop" button next to "Ask" is enabled for exactly as long as a
+request is in flight. Clicking it doesn't just make the browser stop
+displaying more tokens — it actually cancels generation on the Ollama
+side too, so a slow model on modest hardware really does stop burning
+CPU/GPU the moment you click it, rather than finishing an answer
+nobody's going to see. This works because `/query/stream` keeps one
+HTTP connection open for the whole request: the browser aborts its own
+fetch, Express notices the connection close (via `res.on('close', ...)`
+on the response — not `req`, whose own `'close'` event fires as soon as
+the request body arrives and says nothing about whether the client is
+still around, which turned out to be an early false start while
+building this), and that in turn aborts the server's own in-flight
+request to Ollama, for both the question-embedding step and the answer
+generation step, whichever is running when you click Stop. Whatever
+partial answer had already streamed in stays on screen — it isn't
+cleared — the same way stopping a response in Claude Desktop leaves the
+partial text in place. See the comment on the `/query/stream` route in
+`index.js` for the full mechanics.
+
 ### Viewing a chunk's text
 
 Each row in the sources table shows which chunk of which document was
@@ -225,6 +264,75 @@ with text that's only useful the moment someone actually wants to read
 it. Fetching it lazily, one chunk at a time, only when someone clicks,
 keeps normal query responses lean and costs nothing extra for the
 common case of never opening a single source.
+
+### Workspace maintenance
+
+The "Documents in this workspace" section has a "Workspace
+maintenance" area below its table with two blunt, destructive recovery
+tools, each requiring its own confirmation dialog before it does
+anything (there's no server-side confirmation — the UI is what asks):
+
+- **Delete this entire workspace** (`DELETE /workspaces/:workspaceId`)
+  removes everything — every chunk, every uploaded file, the workspace
+  directory itself. Use this when you'd rather just start a workspace
+  over than trust anything already in it.
+- **Rebuild index from uploaded files**
+  (`POST /workspaces/:workspaceId/rebuild-index`) discards store.json
+  and rebuilds it from scratch, by re-extracting, re-chunking, and
+  re-embedding every file already sitting in
+  `workspaces/<id>/uploads/`. Use this when store.json is missing,
+  looks corrupted, or you just don't trust that it still matches
+  what's actually here — as long as the documents themselves are still
+  uploaded, this puts the index back in sync with them.
+
+Two real limitations on what a rebuild can recover, worth knowing
+before relying on it:
+
+1. It only recovers documents that were **uploaded** through this app.
+   A document embedded via `POST /embed` (a path elsewhere on the
+   server) was never copied into the workspace's `uploads/` folder —
+   this app doesn't own that file and has no record of where it was
+   once store.json itself is gone. Those documents simply won't come
+   back. If you only ever use the browser UI's "Embed a document" form
+   (not the `/embed` API directly), this doesn't apply to you — the
+   upload form always exercises the uploaded-file path.
+2. Every uploaded file's original name is sanitized before being saved
+   to disk (non-alphanumeric characters become underscores — see the
+   upload route's `multer` config in `index.js`) and prefixed with a
+   timestamp; the literal original filename was only ever recorded in
+   store.json, not preserved on disk anywhere. A rebuild reconstructs
+   each document's name from its sanitized on-disk filename with the
+   timestamp prefix stripped off, so a document whose original name had
+   spaces or punctuation will come back with underscores in their place
+   instead. This is a real, unavoidable limitation of the
+   sanitize-on-upload design, not a bug.
+
+A rebuild is deliberately **all-or-nothing**: every file in the
+uploads folder is processed first, and store.json is only actually
+overwritten once, at the very end, after every file has succeeded. If
+something fails partway through (say, Ollama goes down while embedding
+the third of five files), the OLD store.json is left completely
+untouched rather than replaced with a half-finished index — the whole
+point of this feature is ending up with something trustworthy, so a
+rebuild that could silently leave a workspace worse off than before it
+ran would defeat that. See `rebuildWorkspaceIndex()` in
+`src/embedPipeline.js` for the implementation.
+
+Like uploading, a rebuild can take a while (every chunk of every file
+gets re-embedded from scratch), so its response streams back progress
+as newline-delimited JSON rather than one blocking response:
+```
+{"type":"file-start","sourceFile":"...","fileIndex":1,"totalFiles":3}
+{"type":"start","sourceFile":"...","numPages":12,"totalChunks":40}
+{"type":"progress","chunksEmbedded":1,"totalChunks":40}
+...
+{"type":"file-done","sourceFile":"...","chunksEmbedded":40}
+... (repeats per file)
+{"type":"done","workspaceId":"...","filesProcessed":3,"totalChunks":118,"documents":[...]}
+```
+or, if something fails partway through, `{"type":"error","error":"..."}`
+— which, per the all-or-nothing guarantee above, means the rebuild
+didn't happen at all, not that it happened incompletely.
 
 ## Comparing against an ideal proposal
 

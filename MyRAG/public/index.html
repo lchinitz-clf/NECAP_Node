@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -75,6 +76,30 @@
   }
   .btn-remove:hover { background: var(--low-bg); }
   .btn-remove:disabled { background: transparent; color: var(--muted); border-color: var(--border); }
+
+  .workspace-actions {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .workspace-actions h3 { font-size: 0.85rem; margin: 0 0 0.6rem; }
+  .workspace-actions .row > div { display: flex; flex-direction: column; align-items: flex-start; }
+
+  .btn-secondary {
+    background: transparent;
+    color: #18181b;
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg-soft); }
+
+  .btn-danger {
+    background: #fff;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+  .btn-danger:hover { background: #fef2f2; }
+
+  .button-row { display: flex; gap: 0.6rem; align-items: center; }
 
   .status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
   .error {
@@ -223,6 +248,42 @@
     <tbody id="documentsBody"></tbody>
   </table>
   <p class="error" id="documentsError"></p>
+
+  <div class="workspace-actions">
+    <h3>Workspace maintenance</h3>
+    <div class="row">
+      <div>
+        <button type="button" id="rebuildIndexBtn" class="btn-secondary">Rebuild index from uploaded files</button>
+        <p class="hint">
+          Discards store.json and rebuilds it from scratch by
+          re-extracting, re-chunking, and re-embedding every file
+          already uploaded into this workspace. Use this if the index
+          seems out of sync with what's actually here, or if
+          store.json is missing or looks wrong. Only recovers
+          documents that were <em>uploaded</em> through this app —
+          anything embedded from a path on the server via <code>POST
+          /embed</code> is not restored, since this app never copied
+          that file into the workspace. See the README for the full
+          details and limitations.
+        </p>
+        <div class="status" id="rebuildStatus"></div>
+        <div id="rebuildProgressWrap" style="display:none;">
+          <progress id="rebuildProgressBar"></progress>
+        </div>
+        <p class="error" id="rebuildError"></p>
+      </div>
+      <div>
+        <button type="button" id="deleteWorkspaceBtn" class="btn-danger">Delete this entire workspace</button>
+        <p class="hint">
+          Permanently removes every document, chunk, and uploaded file
+          in this workspace, and the workspace itself. This cannot be
+          undone.
+        </p>
+        <div class="status" id="deleteWorkspaceStatus"></div>
+        <p class="error" id="deleteWorkspaceError"></p>
+      </div>
+    </div>
+  </div>
 </section>
 
 <section class="card">
@@ -338,7 +399,10 @@
       </div>
     </div>
 
-    <button type="submit" id="submitBtn">Ask</button>
+    <div class="button-row">
+      <button type="submit" id="submitBtn">Ask</button>
+      <button type="button" id="stopBtn" class="btn-secondary" disabled>Stop</button>
+    </div>
     <div class="status" id="status"></div>
     <div id="queryProgressWrap" style="display:none;">
       <progress id="queryProgressBar"></progress>
@@ -655,6 +719,162 @@
     }
   });
 
+  // ---- Workspace maintenance: delete workspace / rebuild index ----
+  //
+  // Two blunt recovery tools, both requiring their own confirmation
+  // dialog since neither can be undone: wipe a workspace entirely
+  // (DELETE /workspaces/:id), or discard store.json and rebuild it
+  // from whatever's actually in the workspace's uploads folder (POST
+  // /workspaces/:id/rebuild-index). See the hint text next to each
+  // button, and the README, for what each one can and can't recover.
+
+  const deleteWorkspaceBtn = document.getElementById('deleteWorkspaceBtn');
+  const deleteWorkspaceStatus = document.getElementById('deleteWorkspaceStatus');
+  const deleteWorkspaceError = document.getElementById('deleteWorkspaceError');
+
+  deleteWorkspaceBtn.addEventListener('click', async () => {
+    const workspaceId = getWorkspaceId();
+    if (!workspaceId) return;
+
+    if (!confirm(
+      `Permanently delete the entire workspace "${workspaceId}"?\n\n` +
+      `This removes every document, every chunk in its search index, ` +
+      `and every uploaded file — the workspace itself will no longer ` +
+      `exist. This cannot be undone.`
+    )) {
+      return;
+    }
+
+    deleteWorkspaceBtn.disabled = true;
+    deleteWorkspaceError.style.display = 'none';
+    deleteWorkspaceStatus.textContent = 'Deleting workspace…';
+
+    try {
+      const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+      deleteWorkspaceStatus.textContent = `Workspace "${workspaceId}" deleted.`;
+      // The workspace is gone — clear the field so the UI doesn't sit
+      // there pointed at something that no longer exists, and refresh
+      // the (now shorter) list of workspaces below it.
+      workspaceInput.value = '';
+      documentsWrap.style.display = 'none';
+      refreshWorkspaces();
+    } catch (err) {
+      deleteWorkspaceError.textContent = err.message;
+      deleteWorkspaceError.style.display = 'block';
+    } finally {
+      deleteWorkspaceBtn.disabled = false;
+    }
+  });
+
+  const rebuildIndexBtn = document.getElementById('rebuildIndexBtn');
+  const rebuildStatus = document.getElementById('rebuildStatus');
+  const rebuildError = document.getElementById('rebuildError');
+  const rebuildProgressWrap = document.getElementById('rebuildProgressWrap');
+  const rebuildProgressBar = document.getElementById('rebuildProgressBar');
+
+  /**
+   * Same NDJSON-over-fetch pattern as embedWithProgress() below, but a
+   * plain JSON POST body (no file to upload — the server reads
+   * whatever's already in the workspace's uploads/ folder) and events
+   * that also include a "file-start"/"file-done" pair wrapping each
+   * document, since a rebuild processes a whole folder of files, not
+   * just one.
+   */
+  async function rebuildWithProgress(workspaceId, onEvent) {
+    const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}/rebuild-index`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      let message = `Request failed: ${res.status}`;
+      try {
+        const data = await res.json();
+        message = data.error || message;
+      } catch {
+        // Body wasn't JSON — fall back to the generic message above.
+      }
+      throw new Error(message);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalEvent = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+        if (!line) continue;
+        const event = JSON.parse(line);
+        onEvent(event);
+        if (event.type === 'done' || event.type === 'error') finalEvent = event;
+      }
+    }
+
+    if (!finalEvent) throw new Error('Server closed the connection before finishing.');
+    if (finalEvent.type === 'error') throw new Error(finalEvent.error);
+    return finalEvent;
+  }
+
+  rebuildIndexBtn.addEventListener('click', async () => {
+    const workspaceId = getWorkspaceId();
+    if (!workspaceId) return;
+
+    if (!confirm(
+      `Rebuild the search index for workspace "${workspaceId}" from its ` +
+      `uploaded files?\n\n` +
+      `This discards the current store.json and re-embeds every file ` +
+      `already uploaded into this workspace from scratch. Documents ` +
+      `embedded from a server path (via /embed, not uploaded through ` +
+      `this app) will NOT be restored. This cannot be undone.`
+    )) {
+      return;
+    }
+
+    rebuildIndexBtn.disabled = true;
+    rebuildError.style.display = 'none';
+    rebuildProgressWrap.style.display = 'block';
+    rebuildProgressBar.removeAttribute('value'); // indeterminate until the first file's "start" event arrives
+    rebuildStatus.textContent = 'Rebuilding…';
+
+    try {
+      const result = await rebuildWithProgress(workspaceId, (event) => {
+        if (event.type === 'file-start') {
+          rebuildStatus.textContent = `File ${event.fileIndex} / ${event.totalFiles}: extracting "${event.sourceFile}"…`;
+        } else if (event.type === 'start') {
+          rebuildProgressBar.max = event.totalChunks;
+          rebuildProgressBar.value = 0;
+          rebuildStatus.textContent = `Embedding "${event.sourceFile}": 0 / ${event.totalChunks} chunks`;
+        } else if (event.type === 'progress') {
+          rebuildProgressBar.value = event.chunksEmbedded;
+          rebuildStatus.textContent = `Embedding "${event.sourceFile || ''}": ${event.chunksEmbedded} / ${event.totalChunks} chunks`;
+        }
+      });
+
+      rebuildStatus.textContent =
+        `Rebuilt: ${result.filesProcessed} file(s), ${result.totalChunks} chunks total.`;
+      rebuildProgressWrap.style.display = 'none';
+      refreshDocuments();
+    } catch (err) {
+      rebuildError.textContent = err.message;
+      rebuildError.style.display = 'block';
+      rebuildProgressWrap.style.display = 'none';
+    } finally {
+      rebuildIndexBtn.disabled = false;
+    }
+  });
+
   // ---- Embed form ----
 
   const embedForm = document.getElementById('embedForm');
@@ -811,7 +1031,15 @@
   const sourcesBody = document.getElementById('sourcesBody');
   const confidenceNote = document.getElementById('confidenceNote');
   const submitBtn = document.getElementById('submitBtn');
+  const stopBtn = document.getElementById('stopBtn');
   const queryProgressWrap = document.getElementById('queryProgressWrap');
+
+  // Holds the AbortController for whichever /query/stream request is
+  // currently in flight, or null when none is. stopBtn's click handler
+  // aborts it; the submit handler creates a fresh one per request and
+  // clears this back to null once that request settles (success,
+  // error, or stop) — see both below.
+  let currentQueryController = null;
 
   // The threshold is a purely client-side display filter: the server
   // always returns its topK closest chunks regardless of how weak the
@@ -934,8 +1162,17 @@
    * it arrives: {type:"sources",...}, then a run of {type:"token",...}
    * as the answer is generated, ending in {type:"done",...} or
    * {type:"error",...}.
+   *
+   * @param {AbortSignal} [signal] - wired to stopBtn below. Aborting
+   *   this closes the fetch, which the /query/stream route on the
+   *   server notices (via Express's `res.on('close', ...)`) and uses
+   *   to cancel its own in-flight request to Ollama — so Stop actually
+   *   halts generation server-side, not just this tab's display of it.
+   *   When aborted, this function rejects with an AbortError (the
+   *   fetch spec's own name for it) rather than the usual thrown
+   *   Error; the caller below checks err.name to tell the two apart.
    */
-  async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, onEvent) {
+  async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, onEvent, signal) {
     const res = await fetch('/query/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -945,6 +1182,7 @@
       // takes over server-side — for maxTokens that's "no cap," for
       // idealTopicId that's "answer normally, no comparison."
       body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId }),
+      signal,
     });
 
     if (!res.ok) {
@@ -1033,9 +1271,12 @@
     }
 
     submitBtn.disabled = true;
+    stopBtn.disabled = false;
     statusEl.textContent = 'Embedding question and searching stored chunks…';
 
     let gotAnyToken = false;
+    const controller = new AbortController();
+    currentQueryController = controller;
 
     try {
       const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, (event) => {
@@ -1067,7 +1308,7 @@
           answerEl.textContent += event.text;
           resultEl.style.display = 'block';
         }
-      });
+      }, controller.signal);
 
       // Covers the "no documents embedded yet" case: "done" fires with
       // a ready-made answer and no sources/tokens were ever streamed.
@@ -1095,13 +1336,38 @@
       statusEl.textContent = '';
       queryProgressWrap.style.display = 'none';
     } catch (err) {
-      errorEl.textContent = err.message;
-      errorEl.style.display = 'block';
-      statusEl.textContent = '';
+      if (err.name === 'AbortError') {
+        // Stopped via stopBtn below — not an error, so no red error
+        // box. Whatever partial answer had already streamed into
+        // answerEl is deliberately left in place rather than cleared,
+        // same as Claude Desktop keeps a partial response after Stop.
+        statusEl.textContent = gotAnyToken
+          ? 'Stopped — the partial answer above is everything Ollama had generated so far.'
+          : 'Stopped before an answer was generated.';
+      } else {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+        statusEl.textContent = '';
+      }
       queryProgressWrap.style.display = 'none';
     } finally {
       submitBtn.disabled = false;
+      stopBtn.disabled = true;
+      currentQueryController = null;
     }
+  });
+
+  // stopBtn only aborts the browser's own fetch — but /query/stream on
+  // the server is listening for exactly that disconnect (via Express's
+  // res.on('close', ...)) and uses it to cancel its own in-flight
+  // request to Ollama, so this actually halts generation server-side,
+  // not just this tab's view of it. See the comment on that route in
+  // index.js.
+  stopBtn.addEventListener('click', () => {
+    if (!currentQueryController) return;
+    stopBtn.disabled = true; // avoid double-clicks while the abort is still settling
+    statusEl.textContent = 'Stopping…';
+    currentQueryController.abort();
   });
 </script>
 

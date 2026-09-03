@@ -89,6 +89,35 @@ function ensureWorkspaceDir(workspaceId) {
 }
 
 /**
+ * Deletes an entire workspace — its store.json, everything under
+ * uploads/, and the workspace directory itself — in one shot. This is
+ * the "start this workspace over from nothing" recovery path: unlike
+ * DELETE /workspaces/:workspaceId/documents/:sourceFile (store.js's
+ * deleteDocument, which removes one document at a time and carefully
+ * checks each uploadPath is actually inside this workspace before
+ * unlinking it), there's no need for that same per-file containment
+ * guardrail here — removing the whole directory tree in one recursive
+ * call can't accidentally reach outside it, since workspaceDir() above
+ * already refuses anything but a validated workspaceId before it ever
+ * builds a path.
+ *
+ * A workspace that didn't exist in the first place is not an error —
+ * the end state ("no directory for this id") is identical either way,
+ * so this just reports which case it was via `existed`.
+ *
+ * @param {string} workspaceId
+ * @returns {{existed: boolean}}
+ */
+function deleteWorkspace(workspaceId) {
+  const dir = workspaceDir(workspaceId); // throws on an invalid id, same as every other entry point
+  const existed = fs.existsSync(dir);
+  if (existed) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  return { existed };
+}
+
+/**
  * Lists existing workspace ids, for populating a UI picker. A
  * workspace "exists" here simply by having a directory under
  * workspaces/ — it doesn't need a store.json yet (e.g. once upload
@@ -114,4 +143,5 @@ module.exports = {
   ensureUploadsDir,
   ensureWorkspaceDir,
   listWorkspaces,
+  deleteWorkspace,
 };

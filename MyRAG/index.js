@@ -6,8 +6,8 @@ const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
 const { embed, chat, listModels } = require('./src/ollamaClient');
 const { search, listDocuments, getChunk, deleteDocument } = require('./src/store');
-const { embedDocumentIntoWorkspace } = require('./src/embedPipeline');
-const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir } = require('./src/workspace');
+const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
+const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { listTopicSummaries, getTopic, composeComparisonQuestion } = require('./src/idealProposals');
 
 const app = express();
@@ -169,6 +169,111 @@ app.delete('/workspaces/:workspaceId/documents/:sourceFile', (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * DELETE /workspaces/:workspaceId
+ *
+ * Wipes an entire workspace: every chunk in its store.json, every
+ * uploaded file under workspaces/<id>/uploads/, and the workspace
+ * directory itself — back to "this workspace has never existed,"
+ * matching how a workspace comes into being in the first place (the
+ * first successful embed into a name creates its directory). This is
+ * the blunt recovery tool for "something about this workspace's index
+ * is wrong and I just want to start over," as opposed to DELETE
+ * .../documents/:sourceFile above, which removes one document at a
+ * time. See deleteWorkspace() in workspace.js for why this doesn't
+ * need that route's per-file path-containment checks — deleting the
+ * whole directory tree in one recursive call can't reach outside it.
+ *
+ * Like the per-document delete, this only ever removes files this app
+ * itself owns (workspaces/<id>/uploads/) — any document that was
+ * embedded from an arbitrary server path via POST /embed only loses
+ * its index entries here, never its original file, which could be
+ * anywhere on disk. There is no confirmation step server-side; the
+ * browser UI asks before ever sending this request, and a script/API
+ * caller is expected to have already decided.
+ */
+app.delete('/workspaces/:workspaceId', (req, res) => {
+  const { workspaceId } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  try {
+    const result = deleteWorkspace(workspaceId);
+    res.json({ workspaceId, ...result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /workspaces/:workspaceId/rebuild-index
+ * Body (all optional): { "embedModel": "...", "maxWords": 300, "overlapWords": 40 }
+ *
+ * Rebuilds store.json from scratch, based solely on whatever files are
+ * actually sitting in workspaces/<id>/uploads/ right now — the
+ * recovery path for "store.json is missing, corrupted, or I just don't
+ * trust it still matches what's really here." See
+ * rebuildWorkspaceIndex() in embedPipeline.js for the full reasoning,
+ * and in particular two real limitations worth knowing before relying
+ * on this: it can only recover documents that were UPLOADED through
+ * this app (not ones embedded from an arbitrary server path via POST
+ * /embed — those are simply gone once store.json is), and a recovered
+ * document's name is reconstructed from its sanitized on-disk
+ * filename, which may not exactly match how it displayed before if the
+ * original name had spaces or punctuation.
+ *
+ * Like /workspaces/:id/upload-and-embed, this can take a while (every
+ * file gets fully re-embedded from scratch) so the response is
+ * streamed as newline-delimited JSON rather than one blocking response:
+ *   {"type":"file-start","sourceFile":"...","fileIndex":1,"totalFiles":3}
+ *   {"type":"start","sourceFile":"...","numPages":12,"totalChunks":40}
+ *   {"type":"progress","chunksEmbedded":1,"totalChunks":40}
+ *   ...
+ *   {"type":"file-done","sourceFile":"...","chunksEmbedded":40}
+ *   ... (repeats per file)
+ *   {"type":"done","workspaceId":"...","filesProcessed":3,"totalChunks":118,"documents":[...]}
+ * or, if something fails partway through:
+ *   {"type":"error","error":"..."}
+ * A partway failure does NOT touch the existing store.json — see the
+ * "deliberately all-or-nothing" note on rebuildWorkspaceIndex() — so
+ * an error here means the rebuild didn't happen, not that it happened
+ * incompletely.
+ */
+app.post('/workspaces/:workspaceId/rebuild-index', async (req, res) => {
+  const { workspaceId } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  let maxWords, overlapWords;
+  try {
+    maxWords = parsePositiveIntField(req.body.maxWords, 'maxWords');
+    overlapWords = parsePositiveIntField(req.body.overlapWords, 'overlapWords');
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  const { embedModel } = req.body;
+
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  if (res.flushHeaders) res.flushHeaders();
+
+  const send = (event) => res.write(JSON.stringify(event) + '\n');
+
+  try {
+    const result = await rebuildWorkspaceIndex(workspaceId, {
+      embedModel,
+      maxWords,
+      overlapWords,
+      onProgress: send,
+    });
+    send({ type: 'done', ...result });
+  } catch (err) {
+    console.error(err);
+    send({ type: 'error', error: err.message });
+  }
+  res.end();
 });
 
 /**
@@ -583,11 +688,45 @@ app.post('/query/stream', async (req, res) => {
 
   const effectiveQuestion = topic ? composeComparisonQuestion(topic, question) : question;
 
+  // Cancellation: if the browser's Stop button aborts its own fetch to
+  // this route (or the tab just closes, or the connection drops), Node
+  // fires 'close' on `res` — deliberately `res`, not `req`: `req`'s own
+  // 'close' fires as soon as the incoming request body has been fully
+  // received (practically immediately for a small JSON POST), which
+  // has nothing to do with whether the client is still around for the
+  // response, and would abort every request instantly. `res`'s 'close'
+  // is the one that only fires once the underlying connection actually
+  // terminates — either because we ourselves finished the response
+  // normally, or because the client genuinely went away early.
+  // Wiring that into an AbortController and threading its signal into
+  // every downstream Ollama call below — embed() for retrieval, chat()
+  // for generation — means Ollama itself is told to stop working, not
+  // just that this tab stopped listening; without that, the model
+  // would keep generating to completion on a server nobody's waiting
+  // on anymore. `clientGone` is the other half of this: once the
+  // connection is gone there's nowhere to send anything, so every
+  // response below checks it first rather than trying to write to (and
+  // possibly throwing on) a dead connection.
+  const controller = new AbortController();
+  let clientGone = false;
+  res.on('close', () => {
+    clientGone = true;
+    controller.abort();
+  });
+  // A write attempted after the connection is already gone can surface
+  // as an 'error' event on `res` rather than a thrown exception where
+  // it's called — left unhandled, that becomes an unhandled exception.
+  // clientGone above is what actually stops this route from attempting
+  // those writes; this just makes sure one that slips through anyway
+  // (an unavoidable small race, not a bug) can't crash the server.
+  res.on('error', () => {});
+
   let matches;
   try {
-    const queryVector = await embed(effectiveQuestion, embedModel);
+    const queryVector = await embed(effectiveQuestion, embedModel, undefined, controller.signal);
     matches = search(workspaceId, queryVector, topK);
   } catch (err) {
+    if (clientGone) return; // stopped before retrieval even finished — no one to report back to
     console.error(err);
     return res.status(500).json({ error: err.message });
   }
@@ -613,14 +752,19 @@ app.post('/query/stream', async (req, res) => {
       model: chatModel,
       temperature,
       maxTokens,
+      signal: controller.signal,
       onToken: (piece) => send({ type: 'token', text: piece }),
     });
     send({ type: 'done', answer, sources: sourcesSummary(matches), doneReason });
   } catch (err) {
-    console.error(err);
-    send({ type: 'error', error: err.message });
+    if (clientGone) {
+      console.log(`[query/stream] [${workspaceId}] stopped by client before finishing`);
+    } else {
+      console.error(err);
+      send({ type: 'error', error: err.message });
+    }
   } finally {
-    res.end();
+    if (!clientGone) res.end();
   }
 });
 

@@ -21,17 +21,26 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
  * @param {string} text
  * @param {string} model - e.g. "nomic-embed-text"
  * @param {number} numCtx - context window to request, in tokens (see caveat above).
+ * @param {AbortSignal} [signal] - lets a caller cancel this call
+ *   in-flight (e.g. /query/stream in index.js wires this to the
+ *   client's own connection closing — see the comment on that route).
+ *   Passed straight through to fetch(); an aborted call rejects with
+ *   an AbortError, which is deliberately rethrown as-is below rather
+ *   than wrapped in the "could not reach Ollama" message, since a
+ *   cancellation isn't a connection failure.
  * @returns {Promise<number[]>}
  */
-async function embed(text, model = 'nomic-embed-text', numCtx = 2048) {
+async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
   let res;
   try {
     res = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, prompt: text, options: { num_ctx: numCtx } }),
+      signal,
     });
   } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw new Error(
       `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
     );
@@ -73,6 +82,14 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048) {
  *   this and is left as-is to avoid changing existing behavior.
  * @param {(piece: string) => void} [opts.onToken] - if provided, switches
  *   to streaming mode and is called once per fragment of generated text.
+ * @param {AbortSignal} [opts.signal] - lets a caller cancel generation
+ *   in-flight, at Ollama itself, not just stop reading the response.
+ *   /query/stream in index.js wires this to the client's own HTTP
+ *   connection closing (see that route's comment for the full chain).
+ *   Passed straight through to fetch(); aborting mid-stream makes the
+ *   pending `reader.read()` below reject with an AbortError, which
+ *   propagates out of this function uncaught — same "let it surface
+ *   as-is" treatment the initial-connect catch block below gives it.
  * @returns {Promise<{text: string, doneReason: string|undefined}>} `text`
  *   is the full answer, same as this always returned before. `doneReason`
  *   is Ollama's own explanation for why generation stopped — normally
@@ -88,7 +105,7 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048) {
  *   causes apart from doneReason alone — only from whether it itself
  *   passed maxTokens.
  */
-async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken } = {}) {
+async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken, signal } = {}) {
   const streaming = typeof onToken === 'function';
   const options = { temperature };
   if (maxTokens !== undefined) options.num_predict = maxTokens;
@@ -103,8 +120,10 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
         stream: streaming,
         options,
       }),
+      signal,
     });
   } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw new Error(
       `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
     );

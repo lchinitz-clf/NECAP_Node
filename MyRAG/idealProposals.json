@@ -1,95 +1,64 @@
 {
     "defaultCompareInstruction": "Compare and contrast the proposal under review with the ideal proposal described above. For each attribute, note whether the reviewed proposal matches, falls short of, or exceeds the ideal, and flag anything the ideal calls for that the reviewed proposal does not appear to address at all.",
     "topics": [
-	{
-	    "id": "offshore-wind",
-	    "label": "Offshore Wind",
-	    "description": "Policy proposals for offshore wind development.",
-	    "compareInstruction": "Compare and contrast the proposal under review with the ideal offshore wind proposal described above. For each attribute, note whether the reviewed proposal matches, falls short of, or exceeds the ideal, and flag anything the ideal calls for that the reviewed proposal does not appear to address at all.",
-	    "attributes": [
-		{
-		    "name": "Transmission Systems",
-		    "proposal": "Work with neighboring states, federal agencies, and other relevant entities to develop a regional plan for offshore wind transmission."
-		},
-		{
-		    "name": "Education and Training",
-		    "proposal": "Advance education and training programs to grow a new offshore wind workforce."
-		},
-		{
-		    "name": "Supply Chains",
-		    "proposal": "Expand local supply chains to support the development of the offshore wind industry."
-		},
-		{
-		    "name": "Port Infrastructure",
-		    "proposal": "Support the redevelopment of and improvements to critical port infrastructure to support the offshore wind industry.  Should include specific funding proposals."
-		}
-	    ]
-	},
-	{
-	    "id": "transportation",
-	    "label": "Transportation",
-	    "description": "Policy proposals related to the transportation sector",
-	    "attributes": [
-		{
-		    "name": "EVs on the road",
-		    "proposal": "Set a specific target, or targets, for EVs on the road by certain dates."
-		},
-		{
-		    "name": "Charging stations",
-		    "proposal": "Set a specific target, or targets, for charging stations by certain dates."
-		},
-		{
-		    "name": "Single Occupancy Vehicles",
-		    "proposal": "Set specific goals for reducing single-occupancy vehicles on the roads by certain dates."
-		},
-		{
-		    "name": "Telework",
-		    "proposal": "Investigate, discuss the use of teleworking to reduce vehicular traffic."
-		},
-		{
-		    "name": "eBikes",
-		    "proposal": "Launch an eBike incentive program to promote eBike use."
-		},
-		{
-		    "name": "Bicycle Infratructure",
-		    "proposal": "Invest in bicycle and pedestrian infrastructure to increase utilization of non-vehicular modes of transportation."
-		},
-		{
-		    "name": "Multimodal Transportation",
-		    "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
-		}
-	    ]
-	},
-	{
-	    "id": "sea-level-rise",
-	    "label": "Sea Level Rise",
-	    "description": "Policy proposals related to sea level rise",
-	    "attributes": [
-		{
-		    "name": "Manage likely sea level rise",
-		    "proposal": "Commit to managing for (around) 1.5 feet of relative sea-level rise by 2050 and (around) 3.9 feet by 2100."
-		},
-		{
-		    "name": "Manage worst caese sea level rise",
-		    "proposal": "Consider preparing to manage for (around) 3 feet of relative sea-level rise by 2050 and (around) 8.8 feet by 2100."
-		},
-		{
-		    "name": "Develop regulations",
-		    "proposal": "Incorporate official state sea-level rise projections into regulations by 2022 and require regular updates to ensure the projections utilize the latest scientific data."
-		},
-		{
-		    "name": "Develop guidance",
-		    "proposal": "Develop guidance to support flood risk reductions for communities and state infrastructure."
-		},
-		{
-		    "name": "Deploy expertise",
-		    "proposal": "Establish cabinet-level leadership (for example, a state resilience officer) and coordination across state agencies and with nonprofits, university experts, and other partners."
-		},
-		{
-		    "name": "Funding",
-		    "proposal": "Increase funds to incentivize regional resilience planning and cooperation and the inclusion of climate resilience in local and regional plans, regulations, and capital-investment plans."
-		}
-	    ]
-	}
-    ]
+    {
+      "id": "offshore-wind",
+      "label": "Offshore Wind",
+      "description": "Policy proposals for offshore wind development.",
+      "compareInstruction": "Compare and contrast the proposal under review with the ideal offshore wind proposal described above. For each attribute, note whether the reviewed proposal matches, falls short of, or exceeds the ideal, and flag anything the ideal calls for that the reviewed proposal does not appear to address at all.",
+      "attributes": [
+        {
+          "name": "Transmission Systems",
+          "proposal": "Work with neighboring states, federal agencies, and other relevant entities to develop a regional plan for offshore wind transmission."
+        },
+        {
+          "name": "Education and Training",
+          "proposal": "Advance education and training programs to grow a new offshore wind workforce."
+        },
+        {
+          "name": "Supply Chains",
+          "proposal": "Expand local supply chains to support the development of the offshore wind industry."
+        },
+        {
+          "name": "Port Infrastructure",
+          "proposal": "Support the redevelopment of and improvements to critical port infrastructure to support the offshore wind industry.  Should include specific funding proposals."
+        }
+      ]
+    },
+    {
+      "id": "transportation",
+      "label": "Transportation",
+      "description": "Policy proposals related to the transportation sector",
+      "attributes": [
+        {
+          "name": "EVs on the road",
+          "proposal": "Set a specific target, or targets, for EVs on the road by certain dates."
+        },
+        {
+          "name": "Charging stations",
+          "proposal": "Set a specific target, or targets, for charging stations by certain dates."
+        },
+        {
+          "name": "Single Occupancy Vehicles",
+          "proposal": "Set specific goals for reducing single-occupancy vehicles on the roads by certain dates."
+        },
+        {
+          "name": "Telework",
+          "proposal": "Investigate, discuss the use of teleworking to reduce vehicular traffic."
+        },
+        {
+          "name": "eBikes",
+          "proposal": "Launch an eBike incentive program to promote eBike use."
+        },
+        {
+          "name": "Bicycle Infratructure",
+          "proposal": "Invest in bicycle and pedestrian infrastructure to increase utilization of non-vehicular modes of transportation."
+        },
+        {
+          "name": "Multimodal Transportation",
+          "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
+        }
+      ]
+    }
+  ]
 }
