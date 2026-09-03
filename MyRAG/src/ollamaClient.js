@@ -82,6 +82,32 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   this and is left as-is to avoid changing existing behavior.
  * @param {(piece: string) => void} [opts.onToken] - if provided, switches
  *   to streaming mode and is called once per fragment of generated text.
+ * @param {boolean} [opts.think] - for reasoning models (deepseek-r1,
+ *   qwen3, and others Ollama recognizes as "thinking" models): whether
+ *   the model may work through a chain-of-thought before answering.
+ *   Left out of the request entirely when omitted, same "absence means
+ *   don't override" convention maxTokens follows above — Ollama's own
+ *   default is to leave thinking ON for models that support it, same as
+ *   `ollama run` does, so omitting this preserves that. Passing `false`
+ *   explicitly is a genuine skip, not just a hidden/discarded step: per
+ *   Ollama's docs the model runs in a non-thinking mode and never
+ *   generates those tokens at all, so it's a real speed/compute win, not
+ *   only a display filter. This is a TOP-LEVEL field on the request body
+ *   below (a sibling of `model`/`messages`/`options`) — Ollama does NOT
+ *   treat it as a model runtime parameter the way temperature/num_predict
+ *   are, so it deliberately does not go inside `options`. Models that
+ *   don't support thinking at all just ignore it either way. Worth
+ *   knowing: `maxTokens`/`num_predict` above caps thinking and answer
+ *   tokens TOGETHER as one shared budget, not separately — a verbose
+ *   thinker can in principle exhaust the whole cap before producing any
+ *   real answer content, surfacing as `doneReason: "length"` with an
+ *   empty or truncated `text` despite `thinking` being non-empty. There
+ *   is currently no way to bound thinking on its own.
+ * @param {(piece: string) => void} [opts.onThinking] - streaming mode
+ *   only (has no effect without onToken too): called once per fragment
+ *   of the model's reasoning trace, kept entirely separate from onToken
+ *   — Ollama itself streams `message.thinking` deltas apart from
+ *   `message.content` deltas, reasoning first, then the actual answer.
  * @param {AbortSignal} [opts.signal] - lets a caller cancel generation
  *   in-flight, at Ollama itself, not just stop reading the response.
  *   /query/stream in index.js wires this to the client's own HTTP
@@ -90,8 +116,11 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   pending `reader.read()` below reject with an AbortError, which
  *   propagates out of this function uncaught — same "let it surface
  *   as-is" treatment the initial-connect catch block below gives it.
- * @returns {Promise<{text: string, doneReason: string|undefined}>} `text`
- *   is the full answer, same as this always returned before. `doneReason`
+ * @returns {Promise<{text: string, thinking: string, doneReason: string|undefined}>}
+ *   `text` is the full answer, same as this always returned before.
+ *   `thinking` is the full reasoning trace accumulated from
+ *   `message.thinking` fragments — an empty string for a model that
+ *   doesn't produce one, or when `think: false` was passed. `doneReason`
  *   is Ollama's own explanation for why generation stopped — normally
  *   `"stop"` (the model reached a natural end, e.g. hit its own
  *   end-of-turn token), or `"length"` if it was cut off by a limit
@@ -103,23 +132,26 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   models unless the Modelfile says otherwise) regardless of what the
  *   model itself could support. A caller can't tell those two "length"
  *   causes apart from doneReason alone — only from whether it itself
- *   passed maxTokens.
+ *   passed maxTokens. (See the `think` param above for a third
+ *   "length" cause specific to reasoning models: the shared
+ *   thinking+answer token budget being exhausted by thinking alone.)
  */
-async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken, signal } = {}) {
+async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
   const options = { temperature };
   if (maxTokens !== undefined) options.num_predict = maxTokens;
+  const body = { model, messages, stream: streaming, options };
+  // Top-level, not inside `options` — see the `think` doc comment above
+  // for why. Omitted entirely (not even `think: undefined`, which
+  // JSON.stringify would drop anyway, but being explicit about the
+  // reasoning here) unless the caller took a position on it.
+  if (think !== undefined) body.think = think;
   let res;
   try {
     res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: streaming,
-        options,
-      }),
+      body: JSON.stringify(body),
       signal,
     });
   } catch (err) {
@@ -135,23 +167,33 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
 
   if (!streaming) {
     const data = await res.json();
-    return { text: data.message.content, doneReason: data.done_reason };
+    return {
+      text: data.message.content,
+      thinking: (data.message && data.message.thinking) || '',
+      doneReason: data.done_reason,
+    };
   }
 
   // Streaming mode: Ollama's response body is itself newline-delimited
   // JSON, one object per fragment, e.g.
+  //   {"message":{"role":"assistant","content":"","thinking":"First,"},"done":false}
+  //   {"message":{"role":"assistant","content":"","thinking":" the"},"done":false}
+  //   ...
   //   {"message":{"role":"assistant","content":"Off"},"done":false}
   //   {"message":{"role":"assistant","content":"shore"},"done":false}
   //   ...
   //   {"message":{"role":"assistant","content":""},"done":true,"done_reason":"stop",...}
-  // Same "buffer partial lines across reads" approach as the /embed
-  // streaming route on our own server — a chunk from the network can
-  // split a JSON line in the middle, so we only parse once we've seen
-  // a full line.
+  // Ollama streams the reasoning first (as message.thinking deltas),
+  // then the answer (as message.content deltas) — a fragment is never
+  // both. Same "buffer partial lines across reads" approach as the
+  // /embed streaming route on our own server — a chunk from the
+  // network can split a JSON line in the middle, so we only parse
+  // once we've seen a full line.
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let full = '';
+  let fullThinking = '';
   let doneReason;
 
   while (true) {
@@ -165,6 +207,11 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
       buffer = buffer.slice(newlineIdx + 1);
       if (!line) continue;
       const obj = JSON.parse(line);
+      const thinkingPiece = obj.message && obj.message.thinking;
+      if (thinkingPiece) {
+        fullThinking += thinkingPiece;
+        if (onThinking) onThinking(thinkingPiece);
+      }
       const piece = obj.message && obj.message.content;
       if (piece) {
         full += piece;
@@ -174,7 +221,7 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
     }
   }
 
-  return { text: full, doneReason };
+  return { text: full, thinking: fullThinking, doneReason };
 }
 
 /**

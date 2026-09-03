@@ -580,7 +580,7 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId, think } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -630,9 +630,12 @@ app.post('/query', async (req, res) => {
     // interpreted, since only the caller knows whether it itself set
     // maxTokens (in which case "length" was requested) or not (in
     // which case "length" means Ollama's own context window ran out).
-    const { text: answer, doneReason } = await chat(messages, { model: chatModel, temperature, maxTokens });
+    const { text: answer, thinking, doneReason } = await chat(messages, { model: chatModel, temperature, maxTokens, think });
 
-    res.json({ answer, sources: sourcesSummary(matches), doneReason });
+    // `thinking` is only included when non-empty — a model that
+    // doesn't support it (or was asked not to via `think: false`)
+    // shouldn't clutter every response with an empty field.
+    res.json({ answer, sources: sourcesSummary(matches), doneReason, ...(thinking ? { thinking } : {}) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -653,7 +656,13 @@ app.post('/query', async (req, res) => {
  * succeeds, this sends the sources immediately:
  *   {"type":"sources","sources":[...]}
  * then switches Ollama's chat call into streaming mode and relays
- * each fragment of the answer as it's generated:
+ * each fragment of the answer as it's generated — for a reasoning
+ * model with thinking enabled (the default; see the `think` param on
+ * chat() in ollamaClient.js), its reasoning trace arrives first as its
+ * own event type, entirely separate from the answer text:
+ *   {"type":"thinking","text":"First,"}
+ *   {"type":"thinking","text":" the"}
+ *   ...
  *   {"type":"token","text":"Off"}
  *   {"type":"token","text":"shore"}
  *   ...
@@ -664,7 +673,7 @@ app.post('/query', async (req, res) => {
  *   {"type":"error","error":"..."}
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId, think } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -748,14 +757,19 @@ app.post('/query/stream', async (req, res) => {
 
   try {
     const messages = buildRagMessages(effectiveQuestion, matches);
-    const { text: answer, doneReason } = await chat(messages, {
+    const { text: answer, thinking, doneReason } = await chat(messages, {
       model: chatModel,
       temperature,
       maxTokens,
+      think,
       signal: controller.signal,
       onToken: (piece) => send({ type: 'token', text: piece }),
+      onThinking: (piece) => send({ type: 'thinking', text: piece }),
     });
-    send({ type: 'done', answer, sources: sourcesSummary(matches), doneReason });
+    // `thinking` in "done" mirrors /query's response: only included
+    // when non-empty, for a caller that reconnected mid-stream or
+    // otherwise missed the individual "thinking" events above.
+    send({ type: 'done', answer, sources: sourcesSummary(matches), doneReason, ...(thinking ? { thinking } : {}) });
   } catch (err) {
     if (clientGone) {
       console.log(`[query/stream] [${workspaceId}] stopped by client before finishing`);

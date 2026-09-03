@@ -132,6 +132,29 @@
       }
 
       #result { display: none; margin-top: 1.5rem; }
+
+      #reasoningWrap {
+	  display: none;
+	  margin-bottom: 0.85rem;
+	  border: 1px dashed var(--border);
+	  border-radius: 8px;
+	  padding: 0.55rem 0.9rem;
+      }
+      #reasoningWrap summary {
+	  cursor: pointer;
+	  font-size: 0.8rem;
+	  font-weight: 600;
+	  color: var(--muted);
+      }
+      #reasoningWrap[open] summary { margin-bottom: 0.5rem; }
+      #reasoningEl {
+	  font-size: 0.85rem;
+	  font-style: italic;
+	  color: var(--muted);
+	  line-height: 1.5;
+	  white-space: pre-wrap;
+      }
+
       #answer {
 	  background: var(--bg-soft);
 	  border: 1px solid var(--border);
@@ -397,11 +420,27 @@
               from rambling well past a direct answer.
             </p>
 	  </div>
+	  <div>
+            <label for="thinkEnabled" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+              <input type="checkbox" id="thinkEnabled" checked style="width:auto;" />
+              Enable thinking
+            </label>
+            <p class="hint">
+              For reasoning models (e.g. deepseek-r1) that work through a
+              chain-of-thought before answering — shown below the answer,
+              collapsed by default. Unchecking this tells Ollama to skip
+              that step entirely rather than just hiding it, which is
+              faster and also avoids max-answer-length being spent entirely
+              on reasoning before any real answer text. Models that don't
+              support thinking (e.g. llama models) ignore this either way.
+            </p>
+	  </div>
 	</div>
 
 	<div class="button-row">
 	  <button type="submit" id="submitBtn">Ask</button>
 	  <button type="button" id="stopBtn" class="btn-secondary" disabled>Stop</button>
+	  <span class="status" id="elapsedTime"></span>
 	</div>
 	<div class="status" id="status"></div>
 	<div id="queryProgressWrap" style="display:none;">
@@ -411,6 +450,11 @@
       </form>
 
       <div id="result">
+	<details id="reasoningWrap">
+	  <summary>Show reasoning</summary>
+	  <div id="reasoningEl"></div>
+	</details>
+
 	<div id="answer"></div>
 	<div id="lengthNote"></div>
 
@@ -1032,7 +1076,39 @@
       const confidenceNote = document.getElementById('confidenceNote');
       const submitBtn = document.getElementById('submitBtn');
       const stopBtn = document.getElementById('stopBtn');
+      const elapsedTimeEl = document.getElementById('elapsedTime');
       const queryProgressWrap = document.getElementById('queryProgressWrap');
+      const thinkCheckbox = document.getElementById('thinkEnabled');
+      const reasoningWrap = document.getElementById('reasoningWrap');
+      const reasoningEl = document.getElementById('reasoningEl');
+
+      // queryStartTime/queryTimerHandle track the elapsed-time display next
+      // to Ask/Stop. performance.now() rather than Date.now() — monotonic,
+      // so a system clock change mid-request can't produce a nonsensical
+      // (or negative) elapsed time, and it's precise enough for tenths of a
+      // second. The interval just re-renders the running total every
+      // 100ms; the actual timing is always derived fresh from
+      // performance.now() - queryStartTime; each render, so a delayed tick
+      // (e.g. the tab was backgrounded) never leaves the display stale by
+      // more than one interval — it always catches up to the true elapsed
+      // time on its next tick.
+      let queryStartTime = null;
+      let queryTimerHandle = null;
+
+      /** @param {number} ms @returns {string} e.g. "4.2s" or "1m 05s" */
+      function formatElapsedMs(ms) {
+	  const totalSeconds = ms / 1000;
+	  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+	  // Round the total once and derive minutes/seconds from that single
+	  // integer, rather than flooring minutes and separately rounding
+	  // the remainder — rounding each independently can carry the
+	  // seconds up to 60 without it rolling over into the next minute
+	  // (e.g. 59m 59.6s would render as the nonsensical "59m 60s").
+	  const roundedTotalSeconds = Math.round(totalSeconds);
+	  const minutes = Math.floor(roundedTotalSeconds / 60);
+	  const seconds = roundedTotalSeconds % 60;
+	  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+      }
 
       // Holds the AbortController for whichever /query/stream request is
       // currently in flight, or null when none is. stopBtn's click handler
@@ -1159,10 +1235,18 @@
       /**
        * Same NDJSON-over-fetch pattern as embedWithProgress() above,
        * pointed at /query/stream instead. onEvent fires for each line as
-       * it arrives: {type:"sources",...}, then a run of {type:"token",...}
-       * as the answer is generated, ending in {type:"done",...} or
-       * {type:"error",...}.
+       * it arrives: {type:"sources",...}, then for a reasoning model with
+       * thinking on, a run of {type:"thinking",...} (its reasoning trace,
+       * streamed separately from and before the answer), then a run of
+       * {type:"token",...} as the answer itself is generated, ending in
+       * {type:"done",...} or {type:"error",...}.
        *
+       * @param {boolean} [think] - true (or omitted) leaves thinking at
+       *   whatever Ollama's own default is for this model (on, for
+       *   supported models — same as thinkCheckbox defaulting checked);
+       *   false explicitly skips it. See the `think` param on chat() in
+       *   ollamaClient.js for why this is a real skip, not just a display
+       *   filter.
        * @param {AbortSignal} [signal] - wired to stopBtn below. Aborting
        *   this closes the fetch, which the /query/stream route on the
        *   server notices (via Express's `res.on('close', ...)`) and uses
@@ -1172,16 +1256,18 @@
        *   fetch spec's own name for it) rather than the usual thrown
        *   Error; the caller below checks err.name to tell the two apart.
        */
-      async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, onEvent, signal) {
+      async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, onEvent, signal) {
 	  const res = await fetch('/query/stream', {
 	      method: 'POST',
 	      headers: { 'Content-Type': 'application/json' },
-	      // chatModel/temperature/maxTokens/idealTopicId undefined (nothing
-	      // usable selected, or the field was cleared) just omits that key
-	      // from the JSON body entirely, and /query/stream's own default
-	      // takes over server-side — for maxTokens that's "no cap," for
-	      // idealTopicId that's "answer normally, no comparison."
-	      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId }),
+	      // chatModel/temperature/maxTokens/idealTopicId/think undefined
+	      // (nothing usable selected, or the field was cleared) just omits
+	      // that key from the JSON body entirely, and /query/stream's own
+	      // default takes over server-side — for maxTokens that's "no
+	      // cap," for idealTopicId that's "answer normally, no
+	      // comparison," for think that's "leave Ollama's own default
+	      // alone" (see the think param doc above).
+	      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId, think }),
 	      signal,
 	  });
 
@@ -1232,6 +1318,10 @@
 	  answerEl.textContent = '';
 	  lengthNote.style.display = 'none';
 	  lengthNote.textContent = '';
+	  elapsedTimeEl.textContent = '';
+	  reasoningEl.textContent = '';
+	  reasoningWrap.style.display = 'none';
+	  reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
 
 	  const workspaceId = requireWorkspace(errorEl);
 	  if (!workspaceId) return;
@@ -1257,6 +1347,15 @@
 		? undefined
 		: Number(rawMaxTokens);
 	  const idealTopicId = idealTopicSelect.value || undefined;
+	  // Checked (the default) omits `think` entirely, leaving Ollama's
+	  // own default in place (thinking on, for models that support it) —
+	  // unchecked explicitly requests `think: false`. See the think
+	  // param doc on queryWithStream() below and chat() in
+	  // ollamaClient.js for why "checked" isn't the same as sending
+	  // `think: true` — there's no need to, and omitting is more honest
+	  // about what this checkbox actually controls (not overriding vs.
+	  // overriding).
+	  const think = thinkCheckbox.checked ? undefined : false;
 
 	  // The question textarea is no longer `required` in the markup,
 	  // since a selected topic is enough on its own — see
@@ -1274,12 +1373,28 @@
 	  stopBtn.disabled = false;
 	  statusEl.textContent = 'Embedding question and searching stored chunks…';
 
+	  // Started here, right as the request actually begins, so it
+	  // measures the same "time to final answer" a person watching the
+	  // Ask button experiences — including the retrieval step before any
+	  // token arrives, not just the generation step. Runs the whole time
+	  // this request is in flight, live-updating elapsedTimeEl, and gets
+	  // stopped in the `finally` block below no matter how the request
+	  // ends (success, error, or Stop) — see that block for why `finally`
+	  // is the right place rather than tying this to some other
+	  // in-between event.
+	  queryStartTime = performance.now();
+	  elapsedTimeEl.textContent = formatElapsedMs(0);
+	  queryTimerHandle = setInterval(() => {
+	      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - queryStartTime);
+	  }, 100);
+
 	  let gotAnyToken = false;
+	  let gotAnyThinking = false;
 	  const controller = new AbortController();
 	  currentQueryController = controller;
 
 	  try {
-	      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, (event) => {
+	      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, (event) => {
 		  if (event.type === 'sources') {
 		      // Retrieval is fast — this fires almost immediately, well
 		      // before the answer is ready, so the sources table (and the
@@ -1293,18 +1408,31 @@
 			  // to show (we don't know the answer's eventual length), so
 			  // this is an indeterminate bar: not "X% done," just "still
 			  // alive, still working." It's for that gap specifically;
-			  // once real text starts appearing below, that's a stronger
-			  // liveness signal than any bar, so it disappears then.
+			  // once real text (thinking or the answer itself) starts
+			  // appearing below, that's a stronger liveness signal than
+			  // any bar, so it disappears then.
 			  queryProgressWrap.style.display = 'block';
 		      } else {
 			  statusEl.textContent = '';
 		      }
+		  } else if (event.type === 'thinking') {
+		      // Reasoning models stream their chain-of-thought separately
+		      // from, and before, the actual answer — collected here into
+		      // the collapsible section above the answer, collapsed by
+		      // default (see #reasoningWrap's CSS) so it's available
+		      // without taking up space unless someone opens it.
+		      gotAnyThinking = true;
+		      queryProgressWrap.style.display = 'none';
+		      statusEl.textContent = 'Model is thinking…';
+		      reasoningWrap.style.display = 'block';
+		      reasoningEl.textContent += event.text;
 		  } else if (event.type === 'token') {
 		      // Live "typing" effect: each fragment Ollama generates gets
 		      // appended as it arrives, instead of the answer box staying
 		      // blank until everything is done.
 		      gotAnyToken = true;
 		      queryProgressWrap.style.display = 'none';
+		      statusEl.textContent = 'Generating answer…';
 		      answerEl.textContent += event.text;
 		      resultEl.style.display = 'block';
 		  }
@@ -1338,12 +1466,25 @@
 	  } catch (err) {
 	      if (err.name === 'AbortError') {
 		  // Stopped via stopBtn below — not an error, so no red error
-		  // box. Whatever partial answer had already streamed into
-		  // answerEl is deliberately left in place rather than cleared,
-		  // same as Claude Desktop keeps a partial response after Stop.
-		  statusEl.textContent = gotAnyToken
-		      ? 'Stopped — the partial answer above is everything Ollama had generated so far.'
-		      : 'Stopped before an answer was generated.';
+		  // box. Whatever partial answer (and partial reasoning) had
+		  // already streamed in is deliberately left in place rather
+		  // than cleared, same as Claude Desktop keeps a partial
+		  // response after Stop.
+		  if (gotAnyToken) {
+		      statusEl.textContent = 'Stopped — the partial answer above is everything Ollama had generated so far.';
+		  } else if (gotAnyThinking) {
+		      // A real, distinct case worth its own message: the model was
+		      // still working through its reasoning and never got to an
+		      // actual answer — otherwise this would look identical to
+		      // "stopped before anything happened at all," which it isn't.
+		      // Auto-expand the reasoning section here specifically, since
+		      // it's the only content this request actually produced — no
+		      // reason to make someone click to find that out.
+		      reasoningWrap.open = true;
+		      statusEl.textContent = 'Stopped while the model was still thinking — no answer was generated. See the reasoning above for what it had worked through so far.';
+		  } else {
+		      statusEl.textContent = 'Stopped before an answer was generated.';
+		  }
 	      } else {
 		  errorEl.textContent = err.message;
 		  errorEl.style.display = 'block';
@@ -1354,6 +1495,16 @@
 	      submitBtn.disabled = false;
 	      stopBtn.disabled = true;
 	      currentQueryController = null;
+	      // Stop the live clock and render its final value — runs for
+	      // every way this request can end (success, error, or Stop), so
+	      // the displayed time is always "how long until this request
+	      // actually settled," not just "how long until the answer
+	      // started." One last render here rather than trusting the most
+	      // recent 100ms-interval tick, since that tick could be up to
+	      // 100ms stale by the time execution actually reaches here.
+	      clearInterval(queryTimerHandle);
+	      queryTimerHandle = null;
+	      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - queryStartTime);
 	  }
       });
 

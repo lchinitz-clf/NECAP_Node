@@ -114,12 +114,18 @@ Endpoints:
   context. Returns one JSON object with the answer plus exactly which
   chunks/sources were used. Requires `workspaceId`. `question` is
   required unless `idealTopicId` is given — see "Comparing against an
-  ideal proposal" below. Meant for scripting.
+  ideal proposal" below. Accepts an optional `think` boolean — see
+  "Reasoning models and the 'thinking' trace" below — and, when the
+  model produced one, the response includes a `thinking` field
+  alongside `answer` (omitted entirely when there's nothing to show).
+  Meant for scripting.
 - `POST /query/stream` — the browser-UI equivalent of `/query`, same
   body. Sends the retrieved sources back immediately (retrieval is
-  fast), then streams the answer itself back live, fragment by
-  fragment, as newline-delimited JSON — see the comment above this
-  route in `index.js` for the exact event shapes.
+  fast), then — for a reasoning model with thinking on — streams its
+  reasoning trace as its own run of events, then streams the answer
+  itself back live, fragment by fragment, as newline-delimited JSON —
+  see the comment above this route in `index.js` for the exact event
+  shapes.
 
 `workspaceId` must be 1-64 characters: letters, numbers, hyphens, and
 underscores only (enforced server-side in `src/workspace.js`) — this
@@ -245,6 +251,51 @@ partial answer had already streamed in stays on screen — it isn't
 cleared — the same way stopping a response in Claude Desktop leaves the
 partial text in place. See the comment on the `/query/stream` route in
 `index.js` for the full mechanics.
+
+### Reasoning models and the "thinking" trace
+
+Some models — DeepSeek-R1 is the common local one, Qwen 3 and others
+also qualify — are "reasoning models": trained to work through an
+explicit chain-of-thought before committing to a final answer, the
+same idea as OpenAI's o1/o3. Ollama recognizes these and, by default,
+generates that reasoning on every request (same as `ollama run` does
+at the CLI) — this app was originally throwing it away unread, since
+`chat()` in `ollamaClient.js` only looked at `message.content`. It
+doesn't anymore.
+
+An "Enable thinking" checkbox sits next to temperature/max-answer-length
+in the Ask form, checked by default (matching Ollama's own default).
+Unchecking it sends `think: false` to Ollama, which is a genuine skip —
+per Ollama's docs the model runs in a non-thinking mode and never
+generates those tokens at all, not just a hidden-but-still-generated
+step — so it's a real speed/compute win on modest hardware, not only a
+display filter. Leaving it checked doesn't send `think` at all, letting
+Ollama's own default apply; there's no need to send `think: true`
+explicitly for the same effect. A model that doesn't support thinking
+(llama3.1, for instance) just ignores the setting either way.
+
+When thinking is on and the model actually produces a trace, it
+appears in a collapsible "Show reasoning" section above the answer —
+collapsed by default, so it costs nothing on screen unless you open it,
+same principle as the chunk-text modal below. It fills in live as the
+model reasons, streamed via its own `{"type":"thinking",...}` events on
+`/query/stream`, entirely separate from the `{"type":"token",...}`
+events that carry the actual answer — Ollama streams reasoning first,
+then content, never both in the same fragment. Stopping mid-thought
+(via the Stop button above) auto-expands the section and says so
+plainly, since the reasoning trace is the only thing that request
+actually produced.
+
+One gotcha worth knowing, and part of why this is worth controlling
+rather than just quietly showing: `maxTokens` (Ollama's `num_predict`)
+caps thinking and answer tokens *together*, as one shared budget, not
+separately. A verbose thinker can in principle exhaust the whole
+budget on reasoning alone, cutting off with `doneReason: "length"` and
+an empty or truncated answer despite having generated plenty of
+`thinking` — which would otherwise look like this app's own max-answer-
+length feature malfunctioning. There's currently no way in Ollama to
+bound thinking on its own; disabling thinking entirely (or raising
+`maxTokens`) are the two available workarounds.
 
 ### Viewing a chunk's text
 
