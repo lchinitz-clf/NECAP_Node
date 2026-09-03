@@ -59,6 +59,37 @@
           "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
         }
       ]
-    }
-  ]
+    },
+	{
+	    "id": "sea-level-rise",
+	    "label": "Sea Level Rise",
+	    "description": "Policy proposals related to sea level rise",
+	    "attributes": [
+		{
+		    "name": "Manage likely sea level rise",
+		    "proposal": "Commit to managing for (around) 1.5 feet of relative sea-level rise by 2050 and (around) 3.9 feet by 2100."
+		},
+		{
+		    "name": "Manage worst caese sea level rise",
+		    "proposal": "Consider preparing to manage for (around) 3 feet of relative sea-level rise by 2050 and (around) 8.8 feet by 2100."
+		},
+		{
+		    "name": "Develop regulations",
+		    "proposal": "Incorporate official state sea-level rise projections into regulations by 2022 and require regular updates to ensure the projections utilize the latest scientific data."
+		},
+		{
+		    "name": "Develop guidance",
+		    "proposal": "Develop guidance to support flood risk reductions for communities and state infrastructure."
+		},
+		{
+		    "name": "Deploy expertise",
+		    "proposal": "Establish cabinet-level leadership (for example, a state resilience officer) and coordination across state agencies and with nonprofits, university experts, and other partners."
+		},
+		{
+		    "name": "Funding",
+		    "proposal": "Increase funds to incentivize regional resilience planning and cooperation and the inclusion of climate resilience in local and regional plans, regulations, and capital-investment plans."
+		}
+	    ]
+	}	
+    ]
 }
