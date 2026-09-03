@@ -131,6 +131,67 @@
   tr.below { color: var(--muted); }
   td.score-meets { color: var(--ok); font-weight: 600; }
   td.score-below { color: var(--low); }
+
+  .chunk-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: #2563eb;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .chunk-link:hover { color: #1d4ed8; }
+
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    z-index: 100;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 10px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  }
+  .modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h3 { margin: 0; font-size: 0.95rem; }
+  .modal-header p { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--muted); }
+  .modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0.1rem 0.3rem;
+  }
+  .modal-close:hover { color: #18181b; }
+  .modal-body {
+    padding: 1rem 1.25rem 1.25rem;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .modal-body.muted { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -215,7 +276,30 @@
   <form id="queryForm">
     <div>
       <label for="question">Question</label>
-      <textarea id="question" required placeholder="What does the plan say about offshore wind?"></textarea>
+      <textarea id="question" placeholder="What does the plan say about offshore wind?"></textarea>
+      <p class="hint">
+        Optional if you select an ideal-proposal topic below — in that
+        case, whatever you type here is added as extra guidance on top
+        of the topic's own criteria, rather than replacing it. Required
+        otherwise.
+      </p>
+    </div>
+
+    <div>
+      <label for="idealTopic">Compare against ideal proposal (optional)</label>
+      <select id="idealTopic">
+        <option value="">None — answer normally from the document(s) above</option>
+      </select>
+      <p class="hint" id="idealTopicHint">
+        Selecting a topic replaces plain Q&amp;A with a comparison: the
+        topic's own ideal attributes (from idealProposals.json) become
+        the actual question sent for retrieval, so the chunks pulled
+        from the reviewed document are chosen with those attributes in
+        mind, not just whatever you separately typed above. Consider
+        raising "Chunks to retrieve (topK)" below for a comparison —
+        checking several distinct attributes usually benefits from more
+        retrieved context than a single factual question does.
+      </p>
     </div>
 
     <div class="row">
@@ -275,6 +359,19 @@
     </table>
   </div>
 </section>
+
+<div class="modal-backdrop" id="chunkModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chunkModalTitle">
+    <div class="modal-header">
+      <div>
+        <h3 id="chunkModalTitle">Chunk</h3>
+        <p id="chunkModalSubtitle"></p>
+      </div>
+      <button type="button" class="modal-close" id="chunkModalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="chunkModalBody"></div>
+  </div>
+</div>
 
 <script>
   // Loads public/config.json — a small, separate file kept deliberately
@@ -380,6 +477,59 @@
     }
   }
   refreshModels();
+
+  const idealTopicSelect = document.getElementById('idealTopic');
+  const idealTopicHint = document.getElementById('idealTopicHint');
+  // The full hint text set in the HTML above — restored whenever the
+  // dropdown is populated successfully, since the failure branch below
+  // temporarily replaces it with an error-specific message instead.
+  const idealTopicHintDefault = idealTopicHint.textContent;
+
+  // Loads the topics defined in idealProposals.json (GET /ideal-proposals)
+  // into the compare-mode dropdown, same pattern as refreshModels()
+  // above. Unlike the chat-model list, an empty result here is a
+  // perfectly normal, expected state (nobody's populated
+  // idealProposals.json yet, or it's deliberately empty) — not
+  // something to warn about — so the "None" option this starts with is
+  // simply left as the only choice rather than showing a disabled
+  // placeholder row the way refreshModels() does for "no models found."
+  async function refreshIdealTopics() {
+    try {
+      const res = await fetch('/ideal-proposals');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load ideal-proposal topics');
+
+      const topics = data.topics || [];
+      const previousValue = idealTopicSelect.value;
+
+      idealTopicSelect.innerHTML = '';
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = 'None — answer normally from the document(s) above';
+      idealTopicSelect.appendChild(noneOpt);
+
+      for (const topic of topics) {
+        const opt = document.createElement('option');
+        opt.value = topic.id;
+        opt.textContent = topic.description ? `${topic.label} — ${topic.description}` : topic.label;
+        idealTopicSelect.appendChild(opt);
+      }
+
+      // Preserve whatever was selected across a refresh, same courtesy
+      // refreshWorkspaces()/refreshDocuments() give elsewhere — only
+      // matters if this ever gets called more than once per page load,
+      // but costs nothing to handle now.
+      if (topics.some((t) => t.id === previousValue)) {
+        idealTopicSelect.value = previousValue;
+      }
+      idealTopicHint.textContent = idealTopicHintDefault;
+    } catch (err) {
+      console.warn('Could not load ideal-proposal topics:', err);
+      idealTopicHint.textContent =
+        'Could not load ideal-proposal topics — compare mode is unavailable right now; plain Q&A above still works.';
+    }
+  }
+  refreshIdealTopics();
 
   function getWorkspaceId() {
     return workspaceInput.value.trim();
@@ -689,9 +839,16 @@
       const tr = document.createElement('tr');
       const ok = s.score >= threshold;
       tr.className = ok ? 'meets' : 'below';
+      // s.id ("<sourceFile>::<chunkIndex>") is what /workspaces/:id/chunks/:chunkId
+      // looks chunks up by — see getChunk() in store.js. Falls back to a
+      // plain (non-clickable) number if it's ever missing, e.g. a server
+      // that hasn't been updated to include it yet.
+      const chunkCell = s.id
+        ? `<button type="button" class="chunk-link" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${escapeHtml(s.sourceFile)}" data-chunk-index="${s.chunkIndex}">${s.chunkIndex}</button>`
+        : `${s.chunkIndex}`;
       tr.innerHTML = `
         <td>${escapeHtml(s.sourceFile)}</td>
-        <td>${s.chunkIndex}</td>
+        <td>${chunkCell}</td>
         <td class="${ok ? 'score-meets' : 'score-below'}">${s.score.toFixed(4)}</td>
       `;
       sourcesBody.appendChild(tr);
@@ -706,6 +863,71 @@
     return div.innerHTML;
   }
 
+  // ---- Chunk-text modal ----
+  //
+  // Clicking a chunk number in the sources table fetches that one
+  // chunk's full text on demand from GET
+  // /workspaces/:workspaceId/chunks/:chunkId (rather than the query
+  // response carrying every retrieved chunk's full text up front) and
+  // shows it in a modal. See getChunk() in store.js for the reasoning.
+
+  const chunkModalBackdrop = document.getElementById('chunkModalBackdrop');
+  const chunkModalTitle = document.getElementById('chunkModalTitle');
+  const chunkModalSubtitle = document.getElementById('chunkModalSubtitle');
+  const chunkModalBody = document.getElementById('chunkModalBody');
+  const chunkModalClose = document.getElementById('chunkModalClose');
+
+  function openChunkModal() {
+    chunkModalBackdrop.classList.add('open');
+  }
+
+  function closeChunkModal() {
+    chunkModalBackdrop.classList.remove('open');
+  }
+
+  chunkModalClose.addEventListener('click', closeChunkModal);
+  chunkModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === chunkModalBackdrop) closeChunkModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
+  });
+
+  // One delegated listener on the sources table body, same pattern as
+  // documentsBody's Remove-button handler above — handles every chunk
+  // link, including ones added by later queries, with no per-row
+  // re-attachment needed.
+  sourcesBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.chunk-link');
+    if (!btn) return;
+
+    const chunkId = btn.dataset.chunkId;
+    const sourceFile = btn.dataset.sourceFile;
+    const chunkIndex = btn.dataset.chunkIndex;
+    const workspaceId = getWorkspaceId();
+    if (!workspaceId) return;
+
+    chunkModalTitle.textContent = `Chunk ${chunkIndex}`;
+    chunkModalSubtitle.textContent = sourceFile;
+    chunkModalBody.className = 'modal-body muted';
+    chunkModalBody.textContent = 'Loading…';
+    openChunkModal();
+
+    try {
+      const res = await fetch(
+        `/workspaces/${encodeURIComponent(workspaceId)}/chunks/${encodeURIComponent(chunkId)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+      chunkModalBody.className = 'modal-body';
+      chunkModalBody.textContent = data.text;
+    } catch (err) {
+      chunkModalBody.className = 'modal-body muted';
+      chunkModalBody.textContent = `Could not load chunk text: ${err.message}`;
+    }
+  });
+
   /**
    * Same NDJSON-over-fetch pattern as embedWithProgress() above,
    * pointed at /query/stream instead. onEvent fires for each line as
@@ -713,16 +935,16 @@
    * as the answer is generated, ending in {type:"done",...} or
    * {type:"error",...}.
    */
-  async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, onEvent) {
+  async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, onEvent) {
     const res = await fetch('/query/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // chatModel/temperature/maxTokens undefined (nothing usable
-      // selected, or the field was cleared) just omits that key from
-      // the JSON body entirely, and /query/stream's own default
-      // (ollamaClient.js's chat()) takes over server-side — for
-      // maxTokens specifically, that default is "no cap."
-      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens }),
+      // chatModel/temperature/maxTokens/idealTopicId undefined (nothing
+      // usable selected, or the field was cleared) just omits that key
+      // from the JSON body entirely, and /query/stream's own default
+      // takes over server-side — for maxTokens that's "no cap," for
+      // idealTopicId that's "answer normally, no comparison."
+      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId }),
     });
 
     if (!res.ok) {
@@ -796,7 +1018,19 @@
     const maxTokens = rawMaxTokens === '' || Number.isNaN(Number(rawMaxTokens))
       ? undefined
       : Number(rawMaxTokens);
-    if (!question) return;
+    const idealTopicId = idealTopicSelect.value || undefined;
+
+    // The question textarea is no longer `required` in the markup,
+    // since a selected topic is enough on its own — see
+    // composeComparisonQuestion() in src/idealProposals.js, which
+    // builds a full question from the topic even with none typed here.
+    // So this has to be checked explicitly now, with a visible error,
+    // rather than relying on the browser to block submission.
+    if (!question && !idealTopicId) {
+      errorEl.textContent = 'Enter a question, or select an ideal-proposal topic to compare against.';
+      errorEl.style.display = 'block';
+      return;
+    }
 
     submitBtn.disabled = true;
     statusEl.textContent = 'Embedding question and searching stored chunks…';
@@ -804,7 +1038,7 @@
     let gotAnyToken = false;
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the

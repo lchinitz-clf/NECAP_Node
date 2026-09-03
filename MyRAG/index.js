@@ -5,9 +5,10 @@ const fs = require('fs');
 const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
 const { embed, chat, listModels } = require('./src/ollamaClient');
-const { search, listDocuments, deleteDocument } = require('./src/store');
+const { search, listDocuments, getChunk, deleteDocument } = require('./src/store');
 const { embedDocumentIntoWorkspace } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir } = require('./src/workspace');
+const { listTopicSummaries, getTopic, composeComparisonQuestion } = require('./src/idealProposals');
 
 const app = express();
 app.use(express.json());
@@ -58,6 +59,29 @@ app.get('/models', async (req, res) => {
 });
 
 /**
+ * GET /ideal-proposals
+ *
+ * Lists the "ideal proposal" comparison topics defined in
+ * idealProposals.json at the project root — see src/idealProposals.js
+ * and the "Comparing against an ideal proposal" section in README.md
+ * for the full design. Populates the Ask form's optional compare-mode
+ * dropdown. Only id/label/description come back here; each topic's
+ * actual attributes and compareInstruction stay server-side and are
+ * only folded into a query when that query names the topic's id via
+ * `idealTopicId` on /query or /query/stream. A missing or not-yet-
+ * populated idealProposals.json just yields an empty list, not an
+ * error — this feature is entirely optional.
+ */
+app.get('/ideal-proposals', (req, res) => {
+  try {
+    res.json({ topics: listTopicSummaries() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /workspaces/:workspaceId/documents
  *
  * Lists the documents actually embedded in a workspace (grouped by
@@ -75,6 +99,38 @@ app.get('/workspaces/:workspaceId/documents', (req, res) => {
     const documents = listDocuments(workspaceId);
     const totalChunks = documents.reduce((sum, d) => sum + d.chunks, 0);
     res.json({ workspaceId, documents, totalChunks });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /workspaces/:workspaceId/chunks/:chunkId
+ *
+ * Fetches one chunk's full text on demand, by the same `id` (a
+ * `"<sourceFile>::<chunkIndex>"` string) that sourcesSummary() now
+ * includes in every /query and /query/stream response's sources list.
+ * This is what powers the "click the chunk number to view its text"
+ * modal in the browser UI — see getChunk() in store.js for why this is
+ * a fetch-on-demand endpoint rather than sending every retrieved
+ * chunk's full text up front with the query response itself.
+ *
+ * :chunkId must be URL-encoded by the caller (the UI does this
+ * automatically) since it embeds a filename that can contain spaces,
+ * parentheses, etc., plus the literal "::" separator.
+ */
+app.get('/workspaces/:workspaceId/chunks/:chunkId', (req, res) => {
+  const { workspaceId, chunkId } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  try {
+    const chunk = getChunk(workspaceId, chunkId);
+    if (!chunk) {
+      return res.status(404).json({ error: `No chunk found with id "${chunkId}" in workspace "${workspaceId}"` });
+    }
+    res.json(chunk);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -368,7 +424,16 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
 
 /**
  * POST /query
- * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500 }
+ * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "idealTopicId": "offshore-wind" }
+ *
+ * `question` is normally required, but is optional if `idealTopicId`
+ * is given — see the "Comparing against an ideal proposal" section in
+ * README.md. When `idealTopicId` names a topic from
+ * idealProposals.json, that topic's attributes (plus `question`, if
+ * also given, as extra guidance) become the actual text embedded for
+ * retrieval and sent to the chat model — composeComparisonQuestion()
+ * in src/idealProposals.js builds it. An unrecognized `idealTopicId`
+ * 400s with the id that wasn't found.
  *
  * Embeds the question, finds the most similar chunks stored in the
  * given workspace, and asks the chat model to answer using only that
@@ -402,6 +467,7 @@ function buildRagMessages(question, matches) {
 
 function sourcesSummary(matches) {
   return matches.map((m) => ({
+    id: m.id,
     sourceFile: m.sourceFile,
     chunkIndex: m.chunkIndex,
     score: m.score,
@@ -409,13 +475,40 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens } = req.body;
-  if (!question) return res.status(400).json({ error: 'question is required' });
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
+  // Resolving idealTopicId can throw (a malformed idealProposals.json)
+  // separately from "not found" (a bad id), so this gets its own
+  // try/catch ahead of the question-required check below — a topic
+  // provides enough substance on its own to stand in for a question
+  // (see the check right after this), so we need to know whether one
+  // was actually found before deciding whether `question` is missing.
+  let topic;
+  if (idealTopicId) {
+    try {
+      topic = getTopic(idealTopicId);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
+    }
+    if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
+  }
+
+  if (!question && !topic) {
+    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
+  }
+
+  // See composeComparisonQuestion()'s big comment in
+  // src/idealProposals.js: when a topic is selected, ITS text (plus
+  // whatever the user additionally typed) becomes the actual question
+  // — driving both retrieval below and the prompt sent to the chat
+  // model, not just an instruction layered on top after the fact.
+  const effectiveQuestion = topic ? composeComparisonQuestion(topic, question) : question;
+
   try {
-    const queryVector = await embed(question, embedModel);
+    const queryVector = await embed(effectiveQuestion, embedModel);
     const matches = search(workspaceId, queryVector, topK);
 
     if (matches.length === 0) {
@@ -425,7 +518,7 @@ app.post('/query', async (req, res) => {
       });
     }
 
-    const messages = buildRagMessages(question, matches);
+    const messages = buildRagMessages(effectiveQuestion, matches);
     // doneReason ("stop" vs "length") is Ollama's own account of why
     // generation ended — see the long comment on chat()'s return value
     // in ollamaClient.js. Passed straight through here rather than
@@ -466,14 +559,33 @@ app.post('/query', async (req, res) => {
  *   {"type":"error","error":"..."}
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens } = req.body;
-  if (!question) return res.status(400).json({ error: 'question is required' });
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
+  // Same topic-resolution rules as /query above — kept before anything
+  // streams, so a bad idealTopicId or a broken idealProposals.json
+  // still comes back as a clean HTTP error rather than a stream event.
+  let topic;
+  if (idealTopicId) {
+    try {
+      topic = getTopic(idealTopicId);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
+    }
+    if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
+  }
+
+  if (!question && !topic) {
+    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
+  }
+
+  const effectiveQuestion = topic ? composeComparisonQuestion(topic, question) : question;
+
   let matches;
   try {
-    const queryVector = await embed(question, embedModel);
+    const queryVector = await embed(effectiveQuestion, embedModel);
     matches = search(workspaceId, queryVector, topK);
   } catch (err) {
     console.error(err);
@@ -496,7 +608,7 @@ app.post('/query/stream', async (req, res) => {
   send({ type: 'sources', sources: sourcesSummary(matches) });
 
   try {
-    const messages = buildRagMessages(question, matches);
+    const messages = buildRagMessages(effectiveQuestion, matches);
     const { text: answer, doneReason } = await chat(messages, {
       model: chatModel,
       temperature,

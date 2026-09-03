@@ -98,6 +98,36 @@ function listDocuments(workspaceId) {
 }
 
 /**
+ * Looks up one chunk by its id (the `"<sourceFile>::<chunkIndex>"`
+ * string embedPipeline.js assigns every record at embed time — see
+ * that file's `records.push({ id: \`${sourceFile}::${i}\`, ... })`).
+ * Used by GET /workspaces/:workspaceId/chunks/:chunkId so the browser
+ * can fetch one chunk's full text on demand — e.g. for the "view
+ * chunk" modal on the Ask form's sources table — without every query
+ * response needing to carry every retrieved chunk's full text up
+ * front (see sourcesSummary() in index.js, which deliberately doesn't).
+ *
+ * A linear scan, same as deleteDocument()'s filter above — fine at
+ * this app's scale (the whole point of loadStore() being a plain
+ * array is that hundreds-to-low-thousands of records is nothing to
+ * scan in plain JS), and simpler than maintaining a separate id-keyed
+ * index that could drift out of sync with store.json.
+ *
+ * @param {string} workspaceId
+ * @param {string} chunkId
+ * @returns {{id: string, sourceFile: string, chunkIndex: number, text: string, numPages: number|null}|undefined}
+ */
+function getChunk(workspaceId, chunkId) {
+  const record = loadStore(workspaceId).find((r) => r.id === chunkId);
+  if (!record) return undefined;
+  // Deliberately excludes `vector` — a few hundred floats nobody asked
+  // for and the browser has no use for, same reasoning sourcesSummary()
+  // already applies to search results.
+  const { id, sourceFile, chunkIndex, text, numPages } = record;
+  return { id, sourceFile, chunkIndex, text, numPages: numPages ?? null };
+}
+
+/**
  * Removes every chunk belonging to one document (matched by exact
  * sourceFile) from a workspace's store, and — when that document was
  * uploaded through this app — deletes its underlying file too.
@@ -169,4 +199,4 @@ function deleteDocument(workspaceId, sourceFile) {
   };
 }
 
-module.exports = { loadStore, saveStore, appendRecords, cosineSimilarity, search, listDocuments, deleteDocument };
+module.exports = { loadStore, saveStore, appendRecords, cosineSimilarity, search, listDocuments, getChunk, deleteDocument };

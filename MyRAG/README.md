@@ -32,6 +32,10 @@ Endpoints:
   which — so `nomic-embed-text` will show up here alongside real chat
   models; picking it as a chat model just errors clearly rather than
   doing anything harmful.
+- `GET /ideal-proposals` — lists the comparison topics defined in
+  `idealProposals.json` (id/label/description only), for the Ask
+  form's compare-mode dropdown. See "Comparing against an ideal
+  proposal" below.
 - `GET /workspaces/:workspaceId/documents` — lists the documents
   actually embedded in a workspace, grouped by source filename, with a
   chunk count and page count per document, e.g.
@@ -39,6 +43,17 @@ Endpoints:
   `numPages` is `null` for file types without a real page count
   (`.docx`, `.txt`) — only PDFs have one. This is what backs the
   "Documents in this workspace" section in the UI.
+- `GET /workspaces/:workspaceId/chunks/:chunkId` — fetches one chunk's
+  full text on demand, e.g.
+  `{ "id": "ma-plan.pdf::42", "sourceFile": "ma-plan.pdf", "chunkIndex": 42, "text": "...", "numPages": 127 }`.
+  `:chunkId` is the `"<sourceFile>::<chunkIndex>"` id that every source
+  in a `/query`/`/query/stream` response's `sources` list now carries,
+  and must be URL-encoded (the UI does this automatically). 404s with a
+  clear error if no chunk with that id exists in the workspace. This is
+  what backs the "click a chunk number to view its text" modal in the
+  UI — see "Viewing a chunk's text" below for why this is a
+  fetch-on-demand endpoint rather than the query response carrying
+  every retrieved chunk's full text up front.
 - `DELETE /workspaces/:workspaceId/documents/:sourceFile` — removes
   every chunk belonging to one document from a workspace's search
   index (`:sourceFile` must be URL-encoded — the UI does this
@@ -77,8 +92,9 @@ Endpoints:
 - `POST /query` — embed a question, find the closest chunks stored in
   the given workspace, ask the chat model to answer using only that
   context. Returns one JSON object with the answer plus exactly which
-  chunks/sources were used. Requires `workspaceId`. Meant for
-  scripting.
+  chunks/sources were used. Requires `workspaceId`. `question` is
+  required unless `idealTopicId` is given — see "Comparing against an
+  ideal proposal" below. Meant for scripting.
 - `POST /query/stream` — the browser-UI equivalent of `/query`, same
   body. Sends the retrieved sources back immediately (retrieval is
   fast), then streams the answer itself back live, fragment by
@@ -190,6 +206,189 @@ sources table appears almost immediately (retrieval is fast — no
 model generation involved), then the answer types itself out as
 Ollama generates it, instead of the page sitting on one static "this
 can take a while" line with nothing else to look at.
+
+### Viewing a chunk's text
+
+Each row in the sources table shows which chunk of which document was
+retrieved, by chunk number — and that number is a clickable link. Click
+it and a modal opens showing that chunk's full text, fetched live from
+`GET /workspaces/:workspaceId/chunks/:chunkId` (see the endpoint list
+above). Close it with the × button, the Escape key, or by clicking
+outside the modal.
+
+This is deliberately fetch-on-demand rather than something the query
+response carries up front: a typical query only retrieves a handful of
+chunks (`topK`, usually 5-10), but sending every one's full text with
+every `/query`/`/query/stream` response would bloat every single
+answer — including the vast majority a reviewer never actually opens —
+with text that's only useful the moment someone actually wants to read
+it. Fetching it lazily, one chunk at a time, only when someone clicks,
+keeps normal query responses lean and costs nothing extra for the
+common case of never opening a single source.
+
+## Comparing against an ideal proposal
+
+Beyond plain "what does this document say about X" Q&A, the Ask form
+has an optional second mode: instead of asking a question, compare the
+document(s) in a workspace against a predefined set of "ideal"
+criteria for a topic — e.g. "how does this offshore wind proposal
+measure up against an ideal one." The "Compare against ideal proposal"
+dropdown on the Ask form (backed by `GET /ideal-proposals`) lists
+whatever topics are defined in **`idealProposals.json`** at the
+project root; selecting "None" (the default) leaves the form working
+exactly as plain Q&A always has.
+
+### `idealProposals.json` schema
+
+A single JSON file, hand-edited directly (no UI for authoring it, by
+design — same "just a file you can open" philosophy as `store.json`).
+A missing file just means an empty dropdown, not an error; this
+feature is entirely optional.
+
+Whether an edit needs a page reload depends on *what* changed. Editing
+an existing topic's content — `attributes`, `compareInstruction`,
+`defaultCompareInstruction` — takes effect on your very next query,
+no reload or restart needed: `getTopic()` re-reads the file fresh from
+disk on every single request (see `loadTopics()` in
+`src/idealProposals.js`; nothing here is cached). But *which topics
+exist* — a new `id`, a renamed `label`, a removed topic — only reaches
+the dropdown itself when the browser re-fetches `GET /ideal-proposals`,
+which currently happens exactly once, on page load (`refreshIdealTopics()`
+in `public/index.html`). So: tweaking an existing topic's criteria →
+just ask your next question; adding, removing, or renaming a topic →
+reload the page once first.
+
+```json
+{
+  "defaultCompareInstruction": "Compare and contrast the proposal under review with the ideal proposal described above. ...",
+  "topics": [
+    {
+      "id": "offshore-wind",
+      "label": "Offshore Wind",
+      "description": "Ideal conditions for an offshore wind development proposal.",
+      "attributes": [
+        { "name": "Turbine setback distance", "proposal": "..." },
+        { "name": "Environmental review process", "proposal": "..." }
+      ]
+    }
+  ]
+}
+```
+
+- `defaultCompareInstruction` *(optional, top-level — a sibling of
+  `topics`, not inside any one topic)* — the general instruction that
+  applies to every topic that doesn't set its own. This is the field
+  you'll normally tune: one hand-editable place to change how
+  comparisons are phrased across the board, rather than repeating
+  (and risking drifting) the same instruction inside every topic.
+- `id` — stable identifier, submitted back as `idealTopicId` on
+  `/query`/`/query/stream` and used as the dropdown's option value.
+  Keep these to lowercase letters, digits, and hyphens (same character
+  class `workspaceId` already enforces elsewhere in this app).
+- `label` — shown in the dropdown.
+- `description` *(optional)* — a one-line note on what the topic
+  covers. Informative only — shown alongside the label in the dropdown
+  and returned by `GET /ideal-proposals`, never sent to the model.
+- `compareInstruction` *(optional, per topic)* — overrides
+  `defaultCompareInstruction` for this one topic specifically. Meant
+  for the rare case where one topic genuinely needs different phrasing
+  from every other topic (e.g. "does it meet or exceed" instead of
+  "does it match") — most topics shouldn't need this at all; leave it
+  out and let `defaultCompareInstruction` apply. `getTopic()` in
+  `src/idealProposals.js` resolves the full fallback chain — this
+  topic's own `compareInstruction`, else the file's
+  `defaultCompareInstruction`, else one final hardcoded string in the
+  code itself for the edge case where the file defines neither.
+- `attributes` — the actual substance: an array of `{name, proposal}`
+  pairs, one per ideal condition to check the reviewed document
+  against. `proposal` is deliberately a different field name from the
+  topic-level `description` above — the two mean genuinely different
+  things (one's a note to yourself, the other is the specific content
+  that gets sent to the model) and reusing one word for both invited
+  exactly the kind of mix-up worth avoiding in a hand-edited file.
+
+### How it works: approach 1 — fold into the question (implemented)
+
+This is what's actually wired up right now. When a request includes
+`idealTopicId`, `composeComparisonQuestion()` in
+`src/idealProposals.js` builds a block of text from that topic's
+attributes plus its `compareInstruction` — and *that becomes the
+question* (with whatever you also typed in the question box appended
+as "additional guidance from the reviewer," narrowing scope rather
+than replacing the topic's content). Critically, this composed text is
+what gets embedded for retrieval (`embed()` in `index.js`'s `/query`
+and `/query/stream`) as well as what's sent to the chat model — so
+selecting a topic doesn't just change how the model is *told* to
+respond, it changes *which chunks get retrieved* from the document
+under review in the first place, steering search toward passages
+relevant to the ideal attributes rather than retrieving whatever a
+generic or empty question would have pulled.
+
+The tradeoff: retrieval is still driven by one embedding of the whole
+combined block, not one retrieval per attribute — so a topic with
+several distinct attributes isn't guaranteed to get a well-matched
+chunk for *each* one; some may simply not surface among the top-K
+results, and the model (correctly, per the system prompt) will report
+those as not addressed in the retrieved context even if the reviewed
+document actually covers them elsewhere. Raising `topK` for a
+comparison (more of the reviewed document's content in front of the
+model to begin with) is the main lever against this today — and,
+because more retrieved context also means a bigger prompt, this is
+exactly where the context-window ceiling in "A second gotcha" above
+becomes relevant; watch `doneReason` on a comparison's response for
+`"length"` the same way you would for a long factual answer.
+
+### Approach 2 — inject into the system prompt instead (documented, not built)
+
+If approach 1's retrieval steering doesn't hold up well in practice —
+attributes getting silently dropped from retrieval feels like the
+bigger problem than anything about how the model phrases its
+comparison — the alternative is to leave retrieval alone (driven only
+by whatever the user actually typed, or a generic default question if
+nothing was typed) and instead fold the topic's attributes and
+`compareInstruction` into the **system** message that `buildRagMessages()`
+builds in `index.js`, alongside its existing "answer using ONLY the
+context provided" instruction. The model would then have the ideal
+criteria available when reasoning over whatever got retrieved, without
+the topic influencing what got retrieved in the first place.
+
+That's the core tradeoff between the two: approach 1 lets a topic
+actively steer retrieval (better odds of surfacing the right evidence
+for each attribute, at the cost of one blended-embedding retrieval
+sometimes missing an attribute entirely) versus approach 2 keeping
+retrieval "pure" — driven only by an explicit question — while still
+giving the model the comparison criteria to reason with (simpler
+mental model, but if the plain question underneath is generic or
+absent, retrieval has no signal at all about which of the topic's
+attributes matter, likely surfacing *less* relevant context than
+approach 1, not more). Neither one is strictly better; which one
+actually produces better comparisons is an empirical question worth
+testing against real documents once `idealProposals.json` has real
+content in it.
+
+Switching would mean: `buildRagMessages()` gains a parameter for
+topic-derived system-prompt text (kept separate from its existing
+grounding instruction, not replacing it); `/query` and `/query/stream`
+would stop calling `composeComparisonQuestion()` to build the
+`question` itself and instead pass the topic through to
+`buildRagMessages()` directly, while retrieval (`embed()`/`search()`)
+goes back to using only the literal `question` field. `getTopic()` and
+the rest of `src/idealProposals.js` wouldn't need to change at all —
+only how its output gets used downstream.
+
+A further option beyond either of these, if a topic ends up with many
+distinct attributes and a single blended retrieval keeps missing some
+of them regardless of which approach above is used: a structured,
+multi-step comparison — first ask the model to enumerate the topic's
+attributes (already known, since they're structured data here, so
+this step may not even be needed), then run one retrieval + one
+targeted question **per attribute** against the reviewed document, and
+assemble the individual verdicts into a final report. This scales
+better to a topic with a dozen attributes than either single-shot
+approach above, at the cost of being a genuinely different, multi-call
+pipeline rather than a variation on `/query` — worth considering if
+comparisons on topics with many attributes turn out to be the common
+case rather than the exception.
 
 ## Testing with PowerShell
 
