@@ -1,1526 +1,309 @@
-
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>local-rag</title>
-    <style>
-      :root {
-	  color-scheme: light;
-	  --border: #d4d4d8;
-	  --muted: #71717a;
-	  --bg-soft: #f4f4f5;
-	  --ok: #15803d;
-	  --ok-bg: #f0fdf4;
-	  --low: #b45309;
-	  --low-bg: #fffbeb;
-      }
-      * { box-sizing: border-box; }
-      body {
-	  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-	  max-width: 760px;
-	  margin: 2.5rem auto;
-	  padding: 0 1.25rem;
-	  color: #18181b;
-	  background: #fff;
-      }
-      h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
-      h2 { font-size: 1rem; margin: 0 0 0.75rem; }
-      p.sub { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
-      p.hint { color: var(--muted); font-size: 0.8rem; margin: 0.3rem 0 0; }
+<head>
+<meta charset="utf-8" />
+<title>local-rag</title>
+<link rel="stylesheet" href="style.css" />
+<script src="script.js"></script>
+</head>
+<body onload="init()">
 
-      section.card {
-	  border: 1px solid var(--border);
-	  border-radius: 10px;
-	  padding: 1.1rem 1.25rem 1.3rem;
-	  margin: 1.25rem 0;
-      }
+<h1 id="appNameHeading">local-rag</h1>
+<p class="sub">Everything below works within a single storage area — pick or create one first.</p>
+<p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
 
-      form { display: flex; flex-direction: column; gap: 0.85rem; }
-      label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem; }
-      textarea, input[type="text"], input[type="number"], select {
-	  width: 100%;
-	  font: inherit;
-	  padding: 0.55rem 0.65rem;
-	  border: 1px solid var(--border);
-	  border-radius: 6px;
-	  background: #fff;
-      }
-      textarea { resize: vertical; min-height: 4.5rem; }
+<section class="card">
+  <h2>Document storage area</h2>
+  <label for="workspace">Storage area name</label>
+  <input type="text" id="workspace" list="workspaceList" placeholder="e.g. ma-climate-plan" autocomplete="off" />
+  <datalist id="workspaceList"></datalist>
+  <p class="hint">
+    Pick an existing one from the list, or type a new name to create it.
+    Letters, numbers, hyphens, and underscores only.
+  </p>
+  <details class="tip">
+    <summary aria-label="More information">&#9432;</summary>
+    <span>
+      A storage area keeps a set of documents separate from any other
+      area — for example, one area for a Massachusetts plan and a
+      different one for a Vermont plan, so a question about one never
+      pulls in results from the other. Choosing an existing name reuses
+      that area; typing a new name creates it automatically the first
+      time you import a document into it.
+    </span>
+  </details>
+</section>
 
-      .row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-      .row > div { flex: 1; min-width: 160px; }
-      .row input, .row select { width: 100%; }
+<section class="card" id="documentsWrap" style="display:none;">
+  <h2>Documents in this area</h2>
+  <p class="hint" id="documentsEmpty"></p>
+  <table>
+    <thead>
+      <tr><th>Document</th><th>Blocks</th><th>Pages</th><th></th></tr>
+    </thead>
+    <tbody id="documentsBody"></tbody>
+  </table>
+  <p class="error" id="documentsError"></p>
 
-      button {
-	  align-self: flex-start;
-	  padding: 0.6rem 1.2rem;
-	  background: #18181b;
-	  color: #fff;
-	  border: none;
-	  border-radius: 6px;
-	  font: inherit;
-	  font-weight: 600;
-	  cursor: pointer;
-      }
-      button:disabled { background: #a1a1aa; cursor: default; }
-
-      .btn-remove {
-	  padding: 0.3rem 0.65rem;
-	  background: transparent;
-	  color: var(--low);
-	  border: 1px solid #fde68a;
-	  border-radius: 6px;
-	  font-size: 0.8rem;
-	  font-weight: 600;
-      }
-      .btn-remove:hover { background: var(--low-bg); }
-      .btn-remove:disabled { background: transparent; color: var(--muted); border-color: var(--border); }
-
-      .workspace-actions {
-	  margin-top: 1.1rem;
-	  padding-top: 1rem;
-	  border-top: 1px solid var(--border);
-      }
-      .workspace-actions h3 { font-size: 0.85rem; margin: 0 0 0.6rem; }
-      .workspace-actions .row > div { display: flex; flex-direction: column; align-items: flex-start; }
-
-      .btn-secondary {
-	  background: transparent;
-	  color: #18181b;
-	  border: 1px solid var(--border);
-      }
-      .btn-secondary:hover { background: var(--bg-soft); }
-
-      .btn-danger {
-	  background: #fff;
-	  color: #b91c1c;
-	  border: 1px solid #fecaca;
-      }
-      .btn-danger:hover { background: #fef2f2; }
-
-      .button-row { display: flex; gap: 0.6rem; align-items: center; }
-
-      .status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
-      .error {
-	  display: none;
-	  background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
-	  padding: 0.75rem 0.9rem; border-radius: 6px; font-size: 0.9rem; margin-top: 0.5rem;
-	  white-space: pre-wrap;
-      }
-
-      #embedResult {
-	  display: none;
-	  background: var(--ok-bg);
-	  border: 1px solid #bbf7d0;
-	  border-radius: 8px;
-	  padding: 0.75rem 0.9rem;
-	  font-size: 0.85rem;
-	  margin-top: 0.5rem;
-      }
-
-      input[type="file"] {
-	  width: 100%;
-	  font: inherit;
-	  padding: 0.4rem 0;
-      }
-
-      progress {
-	  width: 100%;
-	  height: 0.65rem;
-	  accent-color: #18181b;
-      }
-
-      #result { display: none; margin-top: 1.5rem; }
-
-      #reasoningWrap {
-	  display: none;
-	  margin-bottom: 0.85rem;
-	  border: 1px dashed var(--border);
-	  border-radius: 8px;
-	  padding: 0.55rem 0.9rem;
-      }
-      #reasoningWrap summary {
-	  cursor: pointer;
-	  font-size: 0.8rem;
-	  font-weight: 600;
-	  color: var(--muted);
-      }
-      #reasoningWrap[open] summary { margin-bottom: 0.5rem; }
-      #reasoningEl {
-	  font-size: 0.85rem;
-	  font-style: italic;
-	  color: var(--muted);
-	  line-height: 1.5;
-	  white-space: pre-wrap;
-      }
-
-      #answer {
-	  background: var(--bg-soft);
-	  border: 1px solid var(--border);
-	  border-radius: 8px;
-	  padding: 1rem 1.1rem;
-	  line-height: 1.5;
-	  white-space: pre-wrap;
-      }
-
-      #confidenceNote { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0.4rem; }
-      #lengthNote {
-	  display: none;
-	  background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
-	  padding: 0.6rem 0.9rem; border-radius: 6px; font-size: 0.85rem; margin-top: 0.6rem;
-      }
-
-      table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.3rem; }
-      th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
-      th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; }
-      tr.meets td:first-child::before { content: "●"; color: var(--ok); margin-right: 0.4rem; }
-      tr.below td:first-child::before { content: "●"; color: var(--low); margin-right: 0.4rem; }
-      tr.below { color: var(--muted); }
-      td.score-meets { color: var(--ok); font-weight: 600; }
-      td.score-below { color: var(--low); }
-
-      .chunk-link {
-	  background: none;
-	  border: none;
-	  padding: 0;
-	  font: inherit;
-	  color: #2563eb;
-	  text-decoration: underline;
-	  cursor: pointer;
-      }
-      .chunk-link:hover { color: #1d4ed8; }
-
-      .modal-backdrop {
-	  display: none;
-	  position: fixed;
-	  inset: 0;
-	  background: rgba(0, 0, 0, 0.4);
-	  align-items: center;
-	  justify-content: center;
-	  padding: 1.5rem;
-	  z-index: 100;
-      }
-      .modal-backdrop.open { display: flex; }
-      .modal {
-	  background: #fff;
-	  border-radius: 10px;
-	  max-width: 640px;
-	  width: 100%;
-	  max-height: 80vh;
-	  display: flex;
-	  flex-direction: column;
-	  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-      }
-      .modal-header {
-	  display: flex;
-	  align-items: flex-start;
-	  justify-content: space-between;
-	  gap: 1rem;
-	  padding: 1rem 1.25rem;
-	  border-bottom: 1px solid var(--border);
-      }
-      .modal-header h3 { margin: 0; font-size: 0.95rem; }
-      .modal-header p { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--muted); }
-      .modal-close {
-	  background: transparent;
-	  border: none;
-	  font-size: 1.3rem;
-	  line-height: 1;
-	  cursor: pointer;
-	  color: var(--muted);
-	  padding: 0.1rem 0.3rem;
-      }
-      .modal-close:hover { color: #18181b; }
-      .modal-body {
-	  padding: 1rem 1.25rem 1.25rem;
-	  overflow-y: auto;
-	  font-size: 0.9rem;
-	  line-height: 1.5;
-	  white-space: pre-wrap;
-      }
-      .modal-body.muted { color: var(--muted); }
-    </style>
-  </head>
-  <body>
-
-    <h1 id="appNameHeading">local-rag</h1>
-    <p class="sub">Everything below operates within a single workspace — pick or create one first.</p>
-
-    <section class="card">
-      <h2>Workspace</h2>
-      <label for="workspace">Workspace name</label>
-      <input type="text" id="workspace" list="workspaceList" placeholder="e.g. ma-climate-plan" autocomplete="off" />
-      <datalist id="workspaceList"></datalist>
-      <p class="hint">
-	Pick an existing one from the list, or type a new name to create it —
-	it's created automatically the first time you embed a document into it.
-	Letters, numbers, hyphens, and underscores only. Use separate workspaces
-	to keep unrelated document sets (e.g. a Massachusetts plan vs. a Vermont
-	plan) from ever being searched together.
-      </p>
-    </section>
-
-    <section class="card" id="documentsWrap" style="display:none;">
-      <h2>Documents in this workspace</h2>
-      <p class="hint" id="documentsEmpty"></p>
-      <table>
-	<thead>
-	  <tr><th>Document</th><th>Chunks</th><th>Pages</th><th></th></tr>
-	</thead>
-	<tbody id="documentsBody"></tbody>
-      </table>
-      <p class="error" id="documentsError"></p>
-
-      <div class="workspace-actions">
-	<h3>Workspace maintenance</h3>
-	<div class="row">
-	  <div>
-            <button type="button" id="rebuildIndexBtn" class="btn-secondary">Rebuild index from uploaded files</button>
-            <p class="hint">
-              Discards store.json and rebuilds it from scratch by
-              re-extracting, re-chunking, and re-embedding every file
-              already uploaded into this workspace. Use this if the index
-              seems out of sync with what's actually here, or if
-              store.json is missing or looks wrong. Only recovers
-              documents that were <em>uploaded</em> through this app —
-              anything embedded from a path on the server via <code>POST
-		/embed</code> is not restored, since this app never copied
-              that file into the workspace. See the README for the full
-              details and limitations.
-            </p>
-            <div class="status" id="rebuildStatus"></div>
-            <div id="rebuildProgressWrap" style="display:none;">
-              <progress id="rebuildProgressBar"></progress>
-            </div>
-            <p class="error" id="rebuildError"></p>
-	  </div>
-	  <div>
-            <button type="button" id="deleteWorkspaceBtn" class="btn-danger">Delete this entire workspace</button>
-            <p class="hint">
-              Permanently removes every document, chunk, and uploaded file
-              in this workspace, and the workspace itself. This cannot be
-              undone.
-            </p>
-            <div class="status" id="deleteWorkspaceStatus"></div>
-            <p class="error" id="deleteWorkspaceError"></p>
-	  </div>
-	</div>
+  <div class="workspace-actions">
+    <h3>Area maintenance</h3>
+    <div class="row">
+      <div>
+        <button type="button" id="rebuildIndexBtn" class="btn-secondary">Re-initialize this area</button>
+        <p class="hint">
+          Rebuilds this area from the files you've uploaded — use this
+          if something looks out of sync.
+        </p>
+        <details class="tip">
+          <summary aria-label="More information">&#9432;</summary>
+          <span>
+            This rebuilds the internal record of what's in this area
+            using only the files still uploaded here. Use it if the
+            document list looks wrong, incomplete, or out of sync. It
+            only recovers documents that were imported directly through
+            this app — anything added another way is not restored this
+            way.
+          </span>
+        </details>
+        <div class="status" id="rebuildStatus"></div>
+        <div id="rebuildProgressWrap" style="display:none;">
+          <progress id="rebuildProgressBar"></progress>
+        </div>
+        <p class="error" id="rebuildError"></p>
       </div>
-    </section>
-
-    <section class="card">
-      <h2>1. Embed a document</h2>
-      <form id="embedForm">
-	<div>
-	  <label for="pdfFile">Document (PDF, DOCX, or TXT)</label>
-	  <input type="file" id="pdfFile" accept=".pdf,.docx,.txt" required />
-	  <p class="hint">
-            Uploaded to the server and saved under this workspace before
-            extraction starts — the same flow this UI will use once the
-            server isn't your own computer anymore.
-	  </p>
-	</div>
-
-	<div class="row">
-	  <div>
-            <label for="maxWords">Chunk size (words)</label>
-            <input type="number" id="maxWords" value="300" min="20" max="1000" step="10" />
-	  </div>
-	  <div>
-            <label for="overlapWords">Chunk overlap (words)</label>
-            <input type="number" id="overlapWords" value="40" min="0" max="500" step="5" />
-	  </div>
-	</div>
-	<p class="hint">
-	  Smaller chunks retrieve more precisely but carry less surrounding
-	  context per match; overlap repeats a few trailing words at the
-	  start of the next chunk so a sentence spanning a boundary isn't
-	  lost entirely. A fixed internal 1800-character cap per chunk
-	  always applies underneath this setting too, to stay safely under
-	  the embedding model's context limit — so raising chunk size much
-	  past ~300-400 words on ordinary prose won't actually produce
-	  bigger chunks, only smaller ones (below that) will take effect.
-	  Applies to this one document; existing embedded documents in this
-	  workspace keep whatever size they were embedded with.
-	</p>
-
-	<button type="submit" id="embedSubmitBtn">Embed into workspace</button>
-	<div class="status" id="embedStatus"></div>
-	<div id="embedProgressWrap" style="display:none;">
-	  <progress id="embedProgressBar"></progress>
-	</div>
-	<div class="error" id="embedError"></div>
-	<div id="embedResult"></div>
-      </form>
-    </section>
-
-    <section class="card">
-      <h2>2. Ask a question</h2>
-      <form id="queryForm">
-	<div>
-	  <label for="question">Question</label>
-	  <textarea id="question" placeholder="What does the plan say about offshore wind?"></textarea>
-	  <p class="hint">
-            Optional if you select an ideal-proposal topic below — in that
-            case, whatever you type here is added as extra guidance on top
-            of the topic's own criteria, rather than replacing it. Required
-            otherwise.
-	  </p>
-	</div>
-
-	<div>
-	  <label for="idealTopic">Compare against ideal proposal (optional)</label>
-	  <select id="idealTopic">
-            <option value="">None — answer normally from the document(s) above</option>
-	  </select>
-	  <p class="hint" id="idealTopicHint">
-            Selecting a topic replaces plain Q&amp;A with a comparison: the
-            topic's own ideal attributes (from idealProposals.json) become
-            the actual question sent for retrieval, so the chunks pulled
-            from the reviewed document are chosen with those attributes in
-            mind, not just whatever you separately typed above. Consider
-            raising "Chunks to retrieve (topK)" below for a comparison —
-            checking several distinct attributes usually benefits from more
-            retrieved context than a single factual question does.
-	  </p>
-	</div>
-
-	<div class="row">
-	  <div>
-            <label for="chatModel">Chat model</label>
-            <select id="chatModel"></select>
-            <p class="hint" id="chatModelHint"></p>
-	  </div>
-	  <div>
-            <label for="topK">Chunks to retrieve (topK)</label>
-            <input type="number" id="topK" value="5" min="1" max="20" step="1" />
-	  </div>
-	  <div>
-            <label for="threshold">Confidence threshold (score)</label>
-            <input type="number" id="threshold" value="0.55" min="0" max="1" step="0.01" />
-	  </div>
-	  <div>
-            <label for="temperature">Temperature</label>
-            <input type="number" id="temperature" value="0.2" min="0" max="1.5" step="0.05" />
-            <p class="hint">
-              Lower (0) sticks closely to the retrieved chunks and answers
-              the same way every time; higher gets more varied and creative
-              but more prone to drifting from the source text — for
-              document Q&amp;A, low is usually right.
-            </p>
-	  </div>
-	  <div>
-            <label for="maxTokens">Max answer length (tokens)</label>
-            <input type="number" id="maxTokens" placeholder="no limit" min="1" max="4000" step="50" />
-            <p class="hint">
-              Leave blank for no cap (the model stops on its own, or when it
-              runs out of context). Set this to bound how long generation
-              can run — useful on modest local hardware, or to stop a model
-              from rambling well past a direct answer.
-            </p>
-	  </div>
-	  <div>
-            <label for="thinkEnabled" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
-              <input type="checkbox" id="thinkEnabled" checked style="width:auto;" />
-              Enable thinking
-            </label>
-            <p class="hint">
-              For reasoning models (e.g. deepseek-r1) that work through a
-              chain-of-thought before answering — shown below the answer,
-              collapsed by default. Unchecking this tells Ollama to skip
-              that step entirely rather than just hiding it, which is
-              faster and also avoids max-answer-length being spent entirely
-              on reasoning before any real answer text. Models that don't
-              support thinking (e.g. llama models) ignore this either way.
-            </p>
-	  </div>
-	</div>
-
-	<div class="button-row">
-	  <button type="submit" id="submitBtn">Ask</button>
-	  <button type="button" id="stopBtn" class="btn-secondary" disabled>Stop</button>
-	  <span class="status" id="elapsedTime"></span>
-	</div>
-	<div class="status" id="status"></div>
-	<div id="queryProgressWrap" style="display:none;">
-	  <progress id="queryProgressBar"></progress>
-	</div>
-	<div class="error" id="error"></div>
-      </form>
-
-      <div id="result">
-	<details id="reasoningWrap">
-	  <summary>Show reasoning</summary>
-	  <div id="reasoningEl"></div>
-	</details>
-
-	<div id="answer"></div>
-	<div id="lengthNote"></div>
-
-	<div id="confidenceNote"></div>
-	<table>
-	  <thead>
-            <tr><th>Source</th><th>Chunk</th><th>Score</th></tr>
-	  </thead>
-	  <tbody id="sourcesBody"></tbody>
-	</table>
-      </div>
-    </section>
-
-    <div class="modal-backdrop" id="chunkModalBackdrop">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chunkModalTitle">
-	<div class="modal-header">
-	  <div>
-            <h3 id="chunkModalTitle">Chunk</h3>
-            <p id="chunkModalSubtitle"></p>
-	  </div>
-	  <button type="button" class="modal-close" id="chunkModalClose" aria-label="Close">&times;</button>
-	</div>
-	<div class="modal-body" id="chunkModalBody"></div>
+      <div>
+        <button type="button" id="deleteWorkspaceBtn" class="btn-danger">Delete this area</button>
+        <p class="hint">
+          Permanently removes every document and file in this area.
+          This cannot be undone.
+        </p>
+        <div class="status" id="deleteWorkspaceStatus"></div>
+        <p class="error" id="deleteWorkspaceError"></p>
       </div>
     </div>
-
-    <script>
-      // Loads public/config.json — a small, separate file kept deliberately
-      // outside this HTML so renaming the app doesn't mean hand-editing
-      // markup. { "appName": "..." } is the only field read today; the
-      // "local-rag" in <title> and <h1> above is just the fallback shown
-      // if this fetch fails or the file's missing, not a second place that
-      // needs updating. Runs first, before anything else on the page.
-      async function applyConfig() {
-	  try {
-	      const res = await fetch('/config.json', { cache: 'no-store' });
-	      const config = await res.json();
-	      if (config.appName) {
-		  document.title = config.appName;
-		  document.getElementById('appNameHeading').textContent = config.appName;
-	      }
-	  } catch (err) {
-	      console.warn('Could not load config.json, using default name:', err);
-	  }
-      }
-      applyConfig();
-
-      const workspaceInput = document.getElementById('workspace');
-      const workspaceList = document.getElementById('workspaceList');
-
-      // Loads the list of existing workspaces into the datalist, so the
-      // workspace field behaves like a combo box: pick one that's there,
-      // or just type a name that isn't yet and it'll be created on first
-      // embed. Called on page load and again after a successful embed
-      // (which may have just created a brand new workspace).
-      async function refreshWorkspaces() {
-	  try {
-	      const res = await fetch('/workspaces');
-	      const data = await res.json();
-	      workspaceList.innerHTML = '';
-	      for (const id of data.workspaces || []) {
-		  const opt = document.createElement('option');
-		  opt.value = id;
-		  workspaceList.appendChild(opt);
-	      }
-	  } catch (err) {
-	      // Non-fatal — the field still works as a plain text input even
-	      // if this fetch fails (e.g. server briefly restarting).
-	      console.warn('Could not load workspace list:', err);
-	  }
-      }
-      refreshWorkspaces();
-
-      // The server's own hardcoded fallback (see ollamaClient.js's chat()
-      // default) — pre-selecting it when it's in the pulled-models list
-      // just makes the picker's starting state match what would happen
-      // anyway if you left it alone.
-      const SERVER_DEFAULT_CHAT_MODEL = 'llama3.1:8b';
-
-      const chatModelSelect = document.getElementById('chatModel');
-      const chatModelHint = document.getElementById('chatModelHint');
-
-      // Loads models actually pulled into this Ollama installation (GET
-      // /models -> Ollama's /api/tags) into the chat-model dropdown. This
-      // list includes embedding models too — Ollama doesn't label which
-      // is which — so nomic-embed-text (or similar) may show up here; it's
-      // harmless to leave in since Ollama will just error clearly if you
-      // try to use it as a chat model, this UI doesn't try to guess.
-      async function refreshModels() {
-	  try {
-	      const res = await fetch('/models');
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || 'Failed to load models');
-
-	      const models = data.models || [];
-	      chatModelSelect.innerHTML = '';
-
-	      if (models.length === 0) {
-		  const opt = document.createElement('option');
-		  opt.textContent = 'No models found — pull one with "ollama pull"';
-		  opt.disabled = true;
-		  opt.selected = true;
-		  chatModelSelect.appendChild(opt);
-		  chatModelHint.textContent = '';
-		  return;
-	      }
-
-	      for (const name of models) {
-		  const opt = document.createElement('option');
-		  opt.value = name;
-		  opt.textContent = name;
-		  chatModelSelect.appendChild(opt);
-	      }
-
-	      if (models.includes(SERVER_DEFAULT_CHAT_MODEL)) {
-		  chatModelSelect.value = SERVER_DEFAULT_CHAT_MODEL;
-	      }
-	      chatModelHint.textContent = '';
-	  } catch (err) {
-	      console.warn('Could not load model list:', err);
-	      chatModelSelect.innerHTML = '';
-	      const opt = document.createElement('option');
-	      opt.textContent = 'Could not load models';
-	      opt.disabled = true;
-	      opt.selected = true;
-	      chatModelSelect.appendChild(opt);
-	      chatModelHint.textContent = 'Is Ollama running? Falling back to the server default if you ask a question anyway.';
-	  }
-      }
-      refreshModels();
-
-      const idealTopicSelect = document.getElementById('idealTopic');
-      const idealTopicHint = document.getElementById('idealTopicHint');
-      // The full hint text set in the HTML above — restored whenever the
-      // dropdown is populated successfully, since the failure branch below
-      // temporarily replaces it with an error-specific message instead.
-      const idealTopicHintDefault = idealTopicHint.textContent;
-
-      // Loads the topics defined in idealProposals.json (GET /ideal-proposals)
-      // into the compare-mode dropdown, same pattern as refreshModels()
-      // above. Unlike the chat-model list, an empty result here is a
-      // perfectly normal, expected state (nobody's populated
-      // idealProposals.json yet, or it's deliberately empty) — not
-      // something to warn about — so the "None" option this starts with is
-      // simply left as the only choice rather than showing a disabled
-      // placeholder row the way refreshModels() does for "no models found."
-      async function refreshIdealTopics() {
-	  try {
-	      const res = await fetch('/ideal-proposals');
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || 'Failed to load ideal-proposal topics');
-
-	      const topics = data.topics || [];
-	      const previousValue = idealTopicSelect.value;
-
-	      idealTopicSelect.innerHTML = '';
-	      const noneOpt = document.createElement('option');
-	      noneOpt.value = '';
-	      noneOpt.textContent = 'None — answer normally from the document(s) above';
-	      idealTopicSelect.appendChild(noneOpt);
-
-	      for (const topic of topics) {
-		  const opt = document.createElement('option');
-		  opt.value = topic.id;
-		  opt.textContent = topic.description ? `${topic.label} — ${topic.description}` : topic.label;
-		  idealTopicSelect.appendChild(opt);
-	      }
-
-	      // Preserve whatever was selected across a refresh, same courtesy
-	      // refreshWorkspaces()/refreshDocuments() give elsewhere — only
-	      // matters if this ever gets called more than once per page load,
-	      // but costs nothing to handle now.
-	      if (topics.some((t) => t.id === previousValue)) {
-		  idealTopicSelect.value = previousValue;
-	      }
-	      idealTopicHint.textContent = idealTopicHintDefault;
-	  } catch (err) {
-	      console.warn('Could not load ideal-proposal topics:', err);
-	      idealTopicHint.textContent =
-		  'Could not load ideal-proposal topics — compare mode is unavailable right now; plain Q&A above still works.';
-	  }
-      }
-      refreshIdealTopics();
-
-      function getWorkspaceId() {
-	  return workspaceInput.value.trim();
-      }
-
-      function requireWorkspace(errorEl) {
-	  const id = getWorkspaceId();
-	  if (!id) {
-	      errorEl.textContent = 'Enter or pick a workspace name above first.';
-	      errorEl.style.display = 'block';
-	      return null;
-	  }
-	  return id;
-      }
-
-      // ---- Documents-in-workspace list ----
-
-      const documentsWrap = document.getElementById('documentsWrap');
-      const documentsEmpty = document.getElementById('documentsEmpty');
-      const documentsBody = document.getElementById('documentsBody');
-      const documentsError = document.getElementById('documentsError');
-
-      // Shows what's actually embedded (grouped by source filename) in
-      // whatever workspace is currently entered above, with a Remove
-      // button per document. Also doubles as the easiest way to spot an
-      // accidental duplicate embed: the same document showing roughly
-      // double its usual chunk count is that happening.
-      async function refreshDocuments() {
-	  const id = getWorkspaceId();
-	  if (!id) {
-	      documentsWrap.style.display = 'none';
-	      return;
-	  }
-
-	  try {
-	      const res = await fetch(`/workspaces/${encodeURIComponent(id)}/documents`);
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || 'Failed to load documents');
-
-	      documentsWrap.style.display = 'block';
-	      documentsBody.innerHTML = '';
-	      documentsError.style.display = 'none';
-
-	      if (data.documents.length === 0) {
-		  documentsEmpty.textContent = `No documents embedded in workspace "${id}" yet.`;
-		  return;
-	      }
-
-	      documentsEmpty.textContent = '';
-	      for (const doc of data.documents) {
-		  const tr = document.createElement('tr');
-		  tr.innerHTML = `
-          <td>${escapeHtml(doc.sourceFile)}</td>
-          <td>${doc.chunks}</td>
-          <td>${doc.numPages != null ? doc.numPages : '—'}</td>
-          <td><button type="button" class="btn-remove" data-source="${escapeHtml(doc.sourceFile)}">Remove</button></td>
-        `;
-		  documentsBody.appendChild(tr);
-	      }
-	  } catch (err) {
-	      // Non-fatal — an invalid/incomplete workspace name typed
-	      // mid-edit will 400 here transiently, which is fine; just hide
-	      // the section rather than showing an error for that.
-	      console.warn('Could not load documents:', err);
-	      documentsWrap.style.display = 'none';
-	  }
-      }
-
-      // Debounced on typing (rather than firing on every keystroke), and
-      // also handles picking a suggestion from the workspace datalist,
-      // since selecting one fires an "input" event too.
-      let documentsDebounce = null;
-      workspaceInput.addEventListener('input', () => {
-	  clearTimeout(documentsDebounce);
-	  documentsDebounce = setTimeout(refreshDocuments, 400);
-      });
-
-      // One delegated listener on the table body handles every Remove
-      // button, including ones added after a later refresh — no need to
-      // re-attach a handler per row.
-      documentsBody.addEventListener('click', async (e) => {
-	  const btn = e.target.closest('.btn-remove');
-	  if (!btn) return;
-
-	  const sourceFile = btn.dataset.source;
-	  const workspaceId = getWorkspaceId();
-	  if (!workspaceId) return;
-
-	  if (!confirm(
-	      `Remove "${sourceFile}" from workspace "${workspaceId}"?\n\n` +
-		  `This deletes its chunks from the search index. If it was uploaded ` +
-		  `through this app, its uploaded file is deleted too. If it was ` +
-		  `embedded from a path on the server (via /embed), only the index ` +
-		  `entries are removed — the original file is left alone.`
-	  )) {
-	      return;
-	  }
-
-	  btn.disabled = true;
-	  documentsError.style.display = 'none';
-
-	  try {
-	      const res = await fetch(
-		  `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}`,
-		  { method: 'DELETE' }
-	      );
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
-	      // The delete itself succeeded either way, but a recorded upload
-	      // path that somehow failed to resolve inside this workspace's
-	      // uploads/ directory (or failed to unlink for some other reason)
-	      // is surfaced rather than silently swallowed — see fileErrors on
-	      // deleteDocument() in src/store.js.
-	      if (data.fileErrors && data.fileErrors.length) {
-		  documentsError.textContent = data.fileErrors.join(' ');
-		  documentsError.style.display = 'block';
-	      }
-	      refreshDocuments();
-	  } catch (err) {
-	      documentsError.textContent = err.message;
-	      documentsError.style.display = 'block';
-	      btn.disabled = false;
-	  }
-      });
-
-      // ---- Workspace maintenance: delete workspace / rebuild index ----
-      //
-      // Two blunt recovery tools, both requiring their own confirmation
-      // dialog since neither can be undone: wipe a workspace entirely
-      // (DELETE /workspaces/:id), or discard store.json and rebuild it
-      // from whatever's actually in the workspace's uploads folder (POST
-      // /workspaces/:id/rebuild-index). See the hint text next to each
-      // button, and the README, for what each one can and can't recover.
-
-      const deleteWorkspaceBtn = document.getElementById('deleteWorkspaceBtn');
-      const deleteWorkspaceStatus = document.getElementById('deleteWorkspaceStatus');
-      const deleteWorkspaceError = document.getElementById('deleteWorkspaceError');
-
-      deleteWorkspaceBtn.addEventListener('click', async () => {
-	  const workspaceId = getWorkspaceId();
-	  if (!workspaceId) return;
-
-	  if (!confirm(
-	      `Permanently delete the entire workspace "${workspaceId}"?\n\n` +
-		  `This removes every document, every chunk in its search index, ` +
-		  `and every uploaded file — the workspace itself will no longer ` +
-		  `exist. This cannot be undone.`
-	  )) {
-	      return;
-	  }
-
-	  deleteWorkspaceBtn.disabled = true;
-	  deleteWorkspaceError.style.display = 'none';
-	  deleteWorkspaceStatus.textContent = 'Deleting workspace…';
-
-	  try {
-	      const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}`, { method: 'DELETE' });
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
-
-	      deleteWorkspaceStatus.textContent = `Workspace "${workspaceId}" deleted.`;
-	      // The workspace is gone — clear the field so the UI doesn't sit
-	      // there pointed at something that no longer exists, and refresh
-	      // the (now shorter) list of workspaces below it.
-	      workspaceInput.value = '';
-	      documentsWrap.style.display = 'none';
-	      refreshWorkspaces();
-	  } catch (err) {
-	      deleteWorkspaceError.textContent = err.message;
-	      deleteWorkspaceError.style.display = 'block';
-	  } finally {
-	      deleteWorkspaceBtn.disabled = false;
-	  }
-      });
-
-      const rebuildIndexBtn = document.getElementById('rebuildIndexBtn');
-      const rebuildStatus = document.getElementById('rebuildStatus');
-      const rebuildError = document.getElementById('rebuildError');
-      const rebuildProgressWrap = document.getElementById('rebuildProgressWrap');
-      const rebuildProgressBar = document.getElementById('rebuildProgressBar');
-
-      /**
-       * Same NDJSON-over-fetch pattern as embedWithProgress() below, but a
-       * plain JSON POST body (no file to upload — the server reads
-       * whatever's already in the workspace's uploads/ folder) and events
-       * that also include a "file-start"/"file-done" pair wrapping each
-       * document, since a rebuild processes a whole folder of files, not
-       * just one.
-       */
-      async function rebuildWithProgress(workspaceId, onEvent) {
-	  const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}/rebuild-index`, {
-	      method: 'POST',
-	      headers: { 'Content-Type': 'application/json' },
-	      body: JSON.stringify({}),
-	  });
-
-	  if (!res.ok) {
-	      let message = `Request failed: ${res.status}`;
-	      try {
-		  const data = await res.json();
-		  message = data.error || message;
-	      } catch {
-		  // Body wasn't JSON — fall back to the generic message above.
-	      }
-	      throw new Error(message);
-	  }
-
-	  const reader = res.body.getReader();
-	  const decoder = new TextDecoder();
-	  let buffer = '';
-	  let finalEvent = null;
-
-	  while (true) {
-	      const { done, value } = await reader.read();
-	      if (done) break;
-	      buffer += decoder.decode(value, { stream: true });
-
-	      let newlineIdx;
-	      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
-		  const line = buffer.slice(0, newlineIdx).trim();
-		  buffer = buffer.slice(newlineIdx + 1);
-		  if (!line) continue;
-		  const event = JSON.parse(line);
-		  onEvent(event);
-		  if (event.type === 'done' || event.type === 'error') finalEvent = event;
-	      }
-	  }
-
-	  if (!finalEvent) throw new Error('Server closed the connection before finishing.');
-	  if (finalEvent.type === 'error') throw new Error(finalEvent.error);
-	  return finalEvent;
-      }
-
-      rebuildIndexBtn.addEventListener('click', async () => {
-	  const workspaceId = getWorkspaceId();
-	  if (!workspaceId) return;
-
-	  if (!confirm(
-	      `Rebuild the search index for workspace "${workspaceId}" from its ` +
-		  `uploaded files?\n\n` +
-		  `This discards the current store.json and re-embeds every file ` +
-		  `already uploaded into this workspace from scratch. Documents ` +
-		  `embedded from a server path (via /embed, not uploaded through ` +
-		  `this app) will NOT be restored. This cannot be undone.`
-	  )) {
-	      return;
-	  }
-
-	  rebuildIndexBtn.disabled = true;
-	  rebuildError.style.display = 'none';
-	  rebuildProgressWrap.style.display = 'block';
-	  rebuildProgressBar.removeAttribute('value'); // indeterminate until the first file's "start" event arrives
-	  rebuildStatus.textContent = 'Rebuilding…';
-
-	  try {
-	      const result = await rebuildWithProgress(workspaceId, (event) => {
-		  if (event.type === 'file-start') {
-		      rebuildStatus.textContent = `File ${event.fileIndex} / ${event.totalFiles}: extracting "${event.sourceFile}"…`;
-		  } else if (event.type === 'start') {
-		      rebuildProgressBar.max = event.totalChunks;
-		      rebuildProgressBar.value = 0;
-		      rebuildStatus.textContent = `Embedding "${event.sourceFile}": 0 / ${event.totalChunks} chunks`;
-		  } else if (event.type === 'progress') {
-		      rebuildProgressBar.value = event.chunksEmbedded;
-		      rebuildStatus.textContent = `Embedding "${event.sourceFile || ''}": ${event.chunksEmbedded} / ${event.totalChunks} chunks`;
-		  }
-	      });
-
-	      rebuildStatus.textContent =
-		  `Rebuilt: ${result.filesProcessed} file(s), ${result.totalChunks} chunks total.`;
-	      rebuildProgressWrap.style.display = 'none';
-	      refreshDocuments();
-	  } catch (err) {
-	      rebuildError.textContent = err.message;
-	      rebuildError.style.display = 'block';
-	      rebuildProgressWrap.style.display = 'none';
-	  } finally {
-	      rebuildIndexBtn.disabled = false;
-	  }
-      });
-
-      // ---- Embed form ----
-
-      const embedForm = document.getElementById('embedForm');
-      const embedStatus = document.getElementById('embedStatus');
-      const embedError = document.getElementById('embedError');
-      const embedResult = document.getElementById('embedResult');
-      const embedSubmitBtn = document.getElementById('embedSubmitBtn');
-      const embedProgressWrap = document.getElementById('embedProgressWrap');
-      const embedProgressBar = document.getElementById('embedProgressBar');
-
-      /**
-       * Uploads a file to /workspaces/:id/upload-and-embed and reads back
-       * the streamed newline-delimited JSON progress events as they
-       * arrive, calling onEvent() for each one. The server can only fail
-       * cleanly (a normal HTTP error status) *before* it starts streaming
-       * — a bad workspace id, wrong file type, etc. Once streaming has
-       * begun, a failure shows up as one of the events themselves
-       * ({type: "error"}), not as an HTTP error, since the response
-       * headers already committed to 200. This function surfaces both
-       * cases the same way: by throwing.
-       */
-      async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEvent) {
-	  const formData = new FormData();
-	  formData.append('file', file);
-	  // Omit blank/cleared fields entirely rather than sending an empty
-	  // string — the server treats a missing field as "use chunker.js's
-	  // own default," same convention /query's chatModel/temperature use
-	  // for a JSON body.
-	  if (maxWords !== undefined) formData.append('maxWords', maxWords);
-	  if (overlapWords !== undefined) formData.append('overlapWords', overlapWords);
-
-	  const res = await fetch(`/workspaces/${encodeURIComponent(workspaceId)}/upload-and-embed`, {
-	      method: 'POST',
-	      body: formData,
-	  });
-
-	  if (!res.ok) {
-	      let message = `Request failed: ${res.status}`;
-	      try {
-		  const data = await res.json();
-		  message = data.error || message;
-	      } catch {
-		  // Body wasn't JSON — fall back to the generic message above.
-	      }
-	      throw new Error(message);
-	  }
-
-	  const reader = res.body.getReader();
-	  const decoder = new TextDecoder();
-	  let buffer = '';
-	  let finalEvent = null;
-
-	  while (true) {
-	      const { done, value } = await reader.read();
-	      if (done) break;
-	      buffer += decoder.decode(value, { stream: true });
-
-	      let newlineIdx;
-	      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
-		  const line = buffer.slice(0, newlineIdx).trim();
-		  buffer = buffer.slice(newlineIdx + 1);
-		  if (!line) continue;
-		  const event = JSON.parse(line);
-		  onEvent(event);
-		  if (event.type === 'done' || event.type === 'error') finalEvent = event;
-	      }
-	  }
-
-	  if (!finalEvent) throw new Error('Server closed the connection before finishing.');
-	  if (finalEvent.type === 'error') throw new Error(finalEvent.error);
-	  return finalEvent;
-      }
-
-      embedForm.addEventListener('submit', async (e) => {
-	  e.preventDefault();
-
-	  embedError.style.display = 'none';
-	  embedResult.style.display = 'none';
-
-	  const workspaceId = requireWorkspace(embedError);
-	  if (!workspaceId) return;
-
-	  const fileInput = document.getElementById('pdfFile');
-	  const file = fileInput.files[0];
-	  if (!file) {
-	      embedError.textContent = 'Choose a file first.';
-	      embedError.style.display = 'block';
-	      return;
-	  }
-
-	  // Same "blank/non-numeric field means let the server default
-	  // apply" convention as temperature above, for the same reason: an
-	  // empty string sent as-is would either be silently coerced to a
-	  // useless 0 or rejected, neither of which is "no opinion, just use
-	  // chunker.js's default."
-	  const readOptionalPositiveInt = (id) => {
-	      const raw = document.getElementById(id).value;
-	      return raw === '' || Number.isNaN(Number(raw)) ? undefined : Number(raw);
-	  };
-	  const maxWords = readOptionalPositiveInt('maxWords');
-	  const overlapWords = readOptionalPositiveInt('overlapWords');
-
-	  embedSubmitBtn.disabled = true;
-	  embedProgressWrap.style.display = 'block';
-	  embedProgressBar.removeAttribute('value'); // indeterminate until "start" arrives
-	  embedStatus.textContent = 'Uploading and extracting text…';
-
-	  try {
-	      const result = await embedWithProgress(workspaceId, file, maxWords, overlapWords, (event) => {
-		  if (event.type === 'start') {
-		      embedProgressBar.max = event.totalChunks;
-		      embedProgressBar.value = 0;
-		      // numPages is null for file types without a real page count
-		      // (.docx, .txt) — only PDFs have one.
-		      const pageInfo = event.numPages != null ? ` (${event.numPages} pages)` : '';
-		      embedStatus.textContent =
-			  `Embedding "${event.sourceFile}"${pageInfo}: 0 / ${event.totalChunks} chunks`;
-		  } else if (event.type === 'progress') {
-		      embedProgressBar.value = event.chunksEmbedded;
-		      const pct = Math.round((event.chunksEmbedded / event.totalChunks) * 100);
-		      embedStatus.textContent =
-			  `Embedding: ${event.chunksEmbedded} / ${event.totalChunks} chunks (${pct}%)`;
-		  }
-	      });
-
-	      const resultPageInfo = result.numPages != null ? ` (${result.numPages} pages)` : '';
-	      embedResult.textContent =
-		  `Embedded ${result.chunksEmbedded} chunks from "${result.originalName}"${resultPageInfo} ` +
-		  `into workspace "${result.workspaceId}". ` +
-		  `That workspace now has ${result.totalStored} chunks total.`;
-	      embedResult.style.display = 'block';
-	      embedStatus.textContent = '';
-	      fileInput.value = '';
-	      refreshWorkspaces();
-	      refreshDocuments();
-	  } catch (err) {
-	      embedError.textContent = err.message;
-	      embedError.style.display = 'block';
-	      embedStatus.textContent = '';
-	  } finally {
-	      embedSubmitBtn.disabled = false;
-	      embedProgressWrap.style.display = 'none';
-	  }
-      });
-
-      // ---- Query form ----
-
-      const form = document.getElementById('queryForm');
-      const statusEl = document.getElementById('status');
-      const errorEl = document.getElementById('error');
-      const resultEl = document.getElementById('result');
-      const answerEl = document.getElementById('answer');
-      const lengthNote = document.getElementById('lengthNote');
-      const sourcesBody = document.getElementById('sourcesBody');
-      const confidenceNote = document.getElementById('confidenceNote');
-      const submitBtn = document.getElementById('submitBtn');
-      const stopBtn = document.getElementById('stopBtn');
-      const elapsedTimeEl = document.getElementById('elapsedTime');
-      const queryProgressWrap = document.getElementById('queryProgressWrap');
-      const thinkCheckbox = document.getElementById('thinkEnabled');
-      const reasoningWrap = document.getElementById('reasoningWrap');
-      const reasoningEl = document.getElementById('reasoningEl');
-
-      // queryStartTime/queryTimerHandle track the elapsed-time display next
-      // to Ask/Stop. performance.now() rather than Date.now() — monotonic,
-      // so a system clock change mid-request can't produce a nonsensical
-      // (or negative) elapsed time, and it's precise enough for tenths of a
-      // second. The interval just re-renders the running total every
-      // 100ms; the actual timing is always derived fresh from
-      // performance.now() - queryStartTime; each render, so a delayed tick
-      // (e.g. the tab was backgrounded) never leaves the display stale by
-      // more than one interval — it always catches up to the true elapsed
-      // time on its next tick.
-      let queryStartTime = null;
-      let queryTimerHandle = null;
-
-      /** @param {number} ms @returns {string} e.g. "4.2s" or "1m 05s" */
-      function formatElapsedMs(ms) {
-	  const totalSeconds = ms / 1000;
-	  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
-	  // Round the total once and derive minutes/seconds from that single
-	  // integer, rather than flooring minutes and separately rounding
-	  // the remainder — rounding each independently can carry the
-	  // seconds up to 60 without it rolling over into the next minute
-	  // (e.g. 59m 59.6s would render as the nonsensical "59m 60s").
-	  const roundedTotalSeconds = Math.round(totalSeconds);
-	  const minutes = Math.floor(roundedTotalSeconds / 60);
-	  const seconds = roundedTotalSeconds % 60;
-	  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
-      }
-
-      // Holds the AbortController for whichever /query/stream request is
-      // currently in flight, or null when none is. stopBtn's click handler
-      // aborts it; the submit handler creates a fresh one per request and
-      // clears this back to null once that request settles (success,
-      // error, or stop) — see both below.
-      let currentQueryController = null;
-
-      // The threshold is a purely client-side display filter: the server
-      // always returns its topK closest chunks regardless of how weak the
-      // match is (this is intentional — see /query in index.js). This UI
-      // is what decides, for display purposes, which of those returned
-      // chunks are worth calling "confident" matches versus noise the
-      // model was still handed as context. It doesn't change what the
-      // model saw, only how we label the sources here.
-      function renderSources(sources, threshold) {
-	  sourcesBody.innerHTML = '';
-	  const meets = sources.filter((s) => s.score >= threshold);
-
-	  if (sources.length === 0) {
-	      confidenceNote.textContent = 'No documents have been embedded yet in this workspace.';
-	  } else if (meets.length === 0) {
-	      confidenceNote.textContent =
-		  `None of the ${sources.length} retrieved chunks met your confidence threshold ` +
-		  `(${threshold.toFixed(2)}) — treat this answer with caution, it may be based on weak or irrelevant matches.`;
-	  } else {
-	      confidenceNote.textContent =
-		  `${meets.length} of ${sources.length} retrieved chunks met your confidence threshold (${threshold.toFixed(2)}).`;
-	  }
-
-	  for (const s of sources) {
-	      const tr = document.createElement('tr');
-	      const ok = s.score >= threshold;
-	      tr.className = ok ? 'meets' : 'below';
-	      // s.id ("<sourceFile>::<chunkIndex>") is what /workspaces/:id/chunks/:chunkId
-	      // looks chunks up by — see getChunk() in store.js. Falls back to a
-	      // plain (non-clickable) number if it's ever missing, e.g. a server
-	      // that hasn't been updated to include it yet.
-	      const chunkCell = s.id
-		    ? `<button type="button" class="chunk-link" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${escapeHtml(s.sourceFile)}" data-chunk-index="${s.chunkIndex}">${s.chunkIndex}</button>`
-		    : `${s.chunkIndex}`;
-	      tr.innerHTML = `
-        <td>${escapeHtml(s.sourceFile)}</td>
-        <td>${chunkCell}</td>
-        <td class="${ok ? 'score-meets' : 'score-below'}">${s.score.toFixed(4)}</td>
-      `;
-	      sourcesBody.appendChild(tr);
-	  }
-
-	  resultEl.style.display = 'block';
-      }
-
-      function escapeHtml(str) {
-	  const div = document.createElement('div');
-	  div.textContent = str;
-	  return div.innerHTML;
-      }
-
-      // ---- Chunk-text modal ----
-      //
-      // Clicking a chunk number in the sources table fetches that one
-      // chunk's full text on demand from GET
-      // /workspaces/:workspaceId/chunks/:chunkId (rather than the query
-      // response carrying every retrieved chunk's full text up front) and
-      // shows it in a modal. See getChunk() in store.js for the reasoning.
-
-      const chunkModalBackdrop = document.getElementById('chunkModalBackdrop');
-      const chunkModalTitle = document.getElementById('chunkModalTitle');
-      const chunkModalSubtitle = document.getElementById('chunkModalSubtitle');
-      const chunkModalBody = document.getElementById('chunkModalBody');
-      const chunkModalClose = document.getElementById('chunkModalClose');
-
-      function openChunkModal() {
-	  chunkModalBackdrop.classList.add('open');
-      }
-
-      function closeChunkModal() {
-	  chunkModalBackdrop.classList.remove('open');
-      }
-
-      chunkModalClose.addEventListener('click', closeChunkModal);
-      chunkModalBackdrop.addEventListener('click', (e) => {
-	  if (e.target === chunkModalBackdrop) closeChunkModal();
-      });
-      document.addEventListener('keydown', (e) => {
-	  if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
-      });
-
-      // One delegated listener on the sources table body, same pattern as
-      // documentsBody's Remove-button handler above — handles every chunk
-      // link, including ones added by later queries, with no per-row
-      // re-attachment needed.
-      sourcesBody.addEventListener('click', async (e) => {
-	  const btn = e.target.closest('.chunk-link');
-	  if (!btn) return;
-
-	  const chunkId = btn.dataset.chunkId;
-	  const sourceFile = btn.dataset.sourceFile;
-	  const chunkIndex = btn.dataset.chunkIndex;
-	  const workspaceId = getWorkspaceId();
-	  if (!workspaceId) return;
-
-	  chunkModalTitle.textContent = `Chunk ${chunkIndex}`;
-	  chunkModalSubtitle.textContent = sourceFile;
-	  chunkModalBody.className = 'modal-body muted';
-	  chunkModalBody.textContent = 'Loading…';
-	  openChunkModal();
-
-	  try {
-	      const res = await fetch(
-		  `/workspaces/${encodeURIComponent(workspaceId)}/chunks/${encodeURIComponent(chunkId)}`
-	      );
-	      const data = await res.json();
-	      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
-
-	      chunkModalBody.className = 'modal-body';
-	      chunkModalBody.textContent = data.text;
-	  } catch (err) {
-	      chunkModalBody.className = 'modal-body muted';
-	      chunkModalBody.textContent = `Could not load chunk text: ${err.message}`;
-	  }
-      });
-
-      /**
-       * Same NDJSON-over-fetch pattern as embedWithProgress() above,
-       * pointed at /query/stream instead. onEvent fires for each line as
-       * it arrives: {type:"sources",...}, then for a reasoning model with
-       * thinking on, a run of {type:"thinking",...} (its reasoning trace,
-       * streamed separately from and before the answer), then a run of
-       * {type:"token",...} as the answer itself is generated, ending in
-       * {type:"done",...} or {type:"error",...}.
-       *
-       * @param {boolean} [think] - true (or omitted) leaves thinking at
-       *   whatever Ollama's own default is for this model (on, for
-       *   supported models — same as thinkCheckbox defaulting checked);
-       *   false explicitly skips it. See the `think` param on chat() in
-       *   ollamaClient.js for why this is a real skip, not just a display
-       *   filter.
-       * @param {AbortSignal} [signal] - wired to stopBtn below. Aborting
-       *   this closes the fetch, which the /query/stream route on the
-       *   server notices (via Express's `res.on('close', ...)`) and uses
-       *   to cancel its own in-flight request to Ollama — so Stop actually
-       *   halts generation server-side, not just this tab's display of it.
-       *   When aborted, this function rejects with an AbortError (the
-       *   fetch spec's own name for it) rather than the usual thrown
-       *   Error; the caller below checks err.name to tell the two apart.
-       */
-      async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, onEvent, signal) {
-	  const res = await fetch('/query/stream', {
-	      method: 'POST',
-	      headers: { 'Content-Type': 'application/json' },
-	      // chatModel/temperature/maxTokens/idealTopicId/think undefined
-	      // (nothing usable selected, or the field was cleared) just omits
-	      // that key from the JSON body entirely, and /query/stream's own
-	      // default takes over server-side — for maxTokens that's "no
-	      // cap," for idealTopicId that's "answer normally, no
-	      // comparison," for think that's "leave Ollama's own default
-	      // alone" (see the think param doc above).
-	      body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId, think }),
-	      signal,
-	  });
-
-	  if (!res.ok) {
-	      let message = `Request failed: ${res.status}`;
-	      try {
-		  const data = await res.json();
-		  message = data.error || message;
-	      } catch {
-		  // Not JSON — fall back to the generic message above.
-	      }
-	      throw new Error(message);
-	  }
-
-	  const reader = res.body.getReader();
-	  const decoder = new TextDecoder();
-	  let buffer = '';
-	  let finalEvent = null;
-
-	  while (true) {
-	      const { done, value } = await reader.read();
-	      if (done) break;
-	      buffer += decoder.decode(value, { stream: true });
-
-	      let newlineIdx;
-	      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
-		  const line = buffer.slice(0, newlineIdx).trim();
-		  buffer = buffer.slice(newlineIdx + 1);
-		  if (!line) continue;
-		  const event = JSON.parse(line);
-		  onEvent(event);
-		  if (event.type === 'done' || event.type === 'error') finalEvent = event;
-	      }
-	  }
-
-	  if (!finalEvent) throw new Error('Server closed the connection before finishing.');
-	  if (finalEvent.type === 'error') throw new Error(finalEvent.error);
-	  return finalEvent;
-      }
-
-      form.addEventListener('submit', async (e) => {
-	  e.preventDefault();
-
-	  errorEl.style.display = 'none';
-	  resultEl.style.display = 'none';
-	  sourcesBody.innerHTML = '';
-	  confidenceNote.textContent = '';
-	  answerEl.textContent = '';
-	  lengthNote.style.display = 'none';
-	  lengthNote.textContent = '';
-	  elapsedTimeEl.textContent = '';
-	  reasoningEl.textContent = '';
-	  reasoningWrap.style.display = 'none';
-	  reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
-
-	  const workspaceId = requireWorkspace(errorEl);
-	  if (!workspaceId) return;
-
-	  const question = document.getElementById('question').value.trim();
-	  const topK = Number(document.getElementById('topK').value) || 5;
-	  const threshold = Number(document.getElementById('threshold').value) || 0;
-	  const chatModel = chatModelSelect.value || undefined;
-	  // Unlike topK/threshold, 0 is a meaningful, valid temperature (as
-	  // deterministic as the model gets) — so this can't fall back to a
-	  // default with `|| ...` the way those do, since `0 || x` would
-	  // wrongly become x. An empty or non-numeric field instead becomes
-	  // undefined, which omits the key from the request body and lets
-	  // the server's own default apply.
-	  const rawTemperature = document.getElementById('temperature').value;
-	  const temperature = rawTemperature === '' || Number.isNaN(Number(rawTemperature))
-		? undefined
-		: Number(rawTemperature);
-	  // Blank is the normal state here (no placeholder value to fall
-	  // back on) and means exactly what it looks like: no cap.
-	  const rawMaxTokens = document.getElementById('maxTokens').value;
-	  const maxTokens = rawMaxTokens === '' || Number.isNaN(Number(rawMaxTokens))
-		? undefined
-		: Number(rawMaxTokens);
-	  const idealTopicId = idealTopicSelect.value || undefined;
-	  // Checked (the default) omits `think` entirely, leaving Ollama's
-	  // own default in place (thinking on, for models that support it) —
-	  // unchecked explicitly requests `think: false`. See the think
-	  // param doc on queryWithStream() below and chat() in
-	  // ollamaClient.js for why "checked" isn't the same as sending
-	  // `think: true` — there's no need to, and omitting is more honest
-	  // about what this checkbox actually controls (not overriding vs.
-	  // overriding).
-	  const think = thinkCheckbox.checked ? undefined : false;
-
-	  // The question textarea is no longer `required` in the markup,
-	  // since a selected topic is enough on its own — see
-	  // composeComparisonQuestion() in src/idealProposals.js, which
-	  // builds a full question from the topic even with none typed here.
-	  // So this has to be checked explicitly now, with a visible error,
-	  // rather than relying on the browser to block submission.
-	  if (!question && !idealTopicId) {
-	      errorEl.textContent = 'Enter a question, or select an ideal-proposal topic to compare against.';
-	      errorEl.style.display = 'block';
-	      return;
-	  }
-
-	  submitBtn.disabled = true;
-	  stopBtn.disabled = false;
-	  statusEl.textContent = 'Embedding question and searching stored chunks…';
-
-	  // Started here, right as the request actually begins, so it
-	  // measures the same "time to final answer" a person watching the
-	  // Ask button experiences — including the retrieval step before any
-	  // token arrives, not just the generation step. Runs the whole time
-	  // this request is in flight, live-updating elapsedTimeEl, and gets
-	  // stopped in the `finally` block below no matter how the request
-	  // ends (success, error, or Stop) — see that block for why `finally`
-	  // is the right place rather than tying this to some other
-	  // in-between event.
-	  queryStartTime = performance.now();
-	  elapsedTimeEl.textContent = formatElapsedMs(0);
-	  queryTimerHandle = setInterval(() => {
-	      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - queryStartTime);
-	  }, 100);
-
-	  let gotAnyToken = false;
-	  let gotAnyThinking = false;
-	  const controller = new AbortController();
-	  currentQueryController = controller;
-
-	  try {
-	      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, (event) => {
-		  if (event.type === 'sources') {
-		      // Retrieval is fast — this fires almost immediately, well
-		      // before the answer is ready, so the sources table (and the
-		      // confidence-threshold coloring) shows up right away instead
-		      // of waiting on generation too.
-		      renderSources(event.sources, threshold);
-		      if (event.sources.length) {
-			  statusEl.textContent = 'Generating answer…';
-			  // There's an unavoidable gap here — however long the model
-			  // takes to produce its first fragment — with no percentage
-			  // to show (we don't know the answer's eventual length), so
-			  // this is an indeterminate bar: not "X% done," just "still
-			  // alive, still working." It's for that gap specifically;
-			  // once real text (thinking or the answer itself) starts
-			  // appearing below, that's a stronger liveness signal than
-			  // any bar, so it disappears then.
-			  queryProgressWrap.style.display = 'block';
-		      } else {
-			  statusEl.textContent = '';
-		      }
-		  } else if (event.type === 'thinking') {
-		      // Reasoning models stream their chain-of-thought separately
-		      // from, and before, the actual answer — collected here into
-		      // the collapsible section above the answer, collapsed by
-		      // default (see #reasoningWrap's CSS) so it's available
-		      // without taking up space unless someone opens it.
-		      gotAnyThinking = true;
-		      queryProgressWrap.style.display = 'none';
-		      statusEl.textContent = 'Model is thinking…';
-		      reasoningWrap.style.display = 'block';
-		      reasoningEl.textContent += event.text;
-		  } else if (event.type === 'token') {
-		      // Live "typing" effect: each fragment Ollama generates gets
-		      // appended as it arrives, instead of the answer box staying
-		      // blank until everything is done.
-		      gotAnyToken = true;
-		      queryProgressWrap.style.display = 'none';
-		      statusEl.textContent = 'Generating answer…';
-		      answerEl.textContent += event.text;
-		      resultEl.style.display = 'block';
-		  }
-	      }, controller.signal);
-
-	      // Covers the "no documents embedded yet" case: "done" fires with
-	      // a ready-made answer and no sources/tokens were ever streamed.
-	      if (!gotAnyToken) {
-		  answerEl.textContent = finalEvent.answer;
-		  renderSources(finalEvent.sources || [], threshold);
-	      }
-
-	      // doneReason "length" means Ollama cut generation short instead of
-	      // reaching a natural stop — but that has two possible causes that
-	      // look identical from here, so distinguish them using whatever
-	      // this request itself sent: if maxTokens was set, that's almost
-	      // certainly why (working as configured); if it was left blank
-	      // ("no limit" — nothing was sent), the far more likely explanation
-	      // is Ollama's own num_ctx context-window ceiling being exhausted
-	      // by the prompt + retrieved chunks + answer combined, which this
-	      // app doesn't set and isn't the same thing as maxTokens at all.
-	      if (finalEvent.doneReason === 'length') {
-		  lengthNote.textContent = maxTokens !== undefined
-		      ? `Cut off at the max answer length you set (${maxTokens} tokens). Raise or clear that field for a longer answer.`
-		      : 'Cut off before finishing, even with no max answer length set — this is almost always Ollama’s own context window (num_ctx) running out, not this app’s max-answer-length setting. Try a lower "Chunks to retrieve (topK)" to leave more room for the answer, or increase num_ctx for this model in Ollama.';
-		  lengthNote.style.display = 'block';
-	      }
-
-	      statusEl.textContent = '';
-	      queryProgressWrap.style.display = 'none';
-	  } catch (err) {
-	      if (err.name === 'AbortError') {
-		  // Stopped via stopBtn below — not an error, so no red error
-		  // box. Whatever partial answer (and partial reasoning) had
-		  // already streamed in is deliberately left in place rather
-		  // than cleared, same as Claude Desktop keeps a partial
-		  // response after Stop.
-		  if (gotAnyToken) {
-		      statusEl.textContent = 'Stopped — the partial answer above is everything Ollama had generated so far.';
-		  } else if (gotAnyThinking) {
-		      // A real, distinct case worth its own message: the model was
-		      // still working through its reasoning and never got to an
-		      // actual answer — otherwise this would look identical to
-		      // "stopped before anything happened at all," which it isn't.
-		      // Auto-expand the reasoning section here specifically, since
-		      // it's the only content this request actually produced — no
-		      // reason to make someone click to find that out.
-		      reasoningWrap.open = true;
-		      statusEl.textContent = 'Stopped while the model was still thinking — no answer was generated. See the reasoning above for what it had worked through so far.';
-		  } else {
-		      statusEl.textContent = 'Stopped before an answer was generated.';
-		  }
-	      } else {
-		  errorEl.textContent = err.message;
-		  errorEl.style.display = 'block';
-		  statusEl.textContent = '';
-	      }
-	      queryProgressWrap.style.display = 'none';
-	  } finally {
-	      submitBtn.disabled = false;
-	      stopBtn.disabled = true;
-	      currentQueryController = null;
-	      // Stop the live clock and render its final value — runs for
-	      // every way this request can end (success, error, or Stop), so
-	      // the displayed time is always "how long until this request
-	      // actually settled," not just "how long until the answer
-	      // started." One last render here rather than trusting the most
-	      // recent 100ms-interval tick, since that tick could be up to
-	      // 100ms stale by the time execution actually reaches here.
-	      clearInterval(queryTimerHandle);
-	      queryTimerHandle = null;
-	      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - queryStartTime);
-	  }
-      });
-
-      // stopBtn only aborts the browser's own fetch — but /query/stream on
-      // the server is listening for exactly that disconnect (via Express's
-      // res.on('close', ...)) and uses it to cancel its own in-flight
-      // request to Ollama, so this actually halts generation server-side,
-      // not just this tab's view of it. See the comment on that route in
-      // index.js.
-      stopBtn.addEventListener('click', () => {
-	  if (!currentQueryController) return;
-	  stopBtn.disabled = true; // avoid double-clicks while the abort is still settling
-	  statusEl.textContent = 'Stopping…';
-	  currentQueryController.abort();
-      });
-    </script>
-
-  </body>
+  </div>
+</section>
+
+<section class="card">
+  <h2>1. Import a document</h2>
+  <form id="embedForm">
+    <div>
+      <label for="pdfFile">Document (PDF, DOCX, or TXT)</label>
+      <input type="file" id="pdfFile" accept=".pdf,.docx,.txt" required />
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced settings</summary>
+      <div class="row">
+        <div>
+          <label for="maxWords">Block size (words)</label>
+          <input type="number" id="maxWords" value="300" min="20" max="1000" step="10" />
+        </div>
+        <div>
+          <label for="overlapWords">Block overlap (words)</label>
+          <input type="number" id="overlapWords" value="40" min="0" max="500" step="5" />
+        </div>
+      </div>
+      <p class="hint">
+        Controls how this document is split into blocks for searching.
+      </p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          Smaller blocks help find precise matches but include less
+          surrounding context; overlap repeats a few words at the start
+          of the next block so a sentence split across the boundary
+          isn't lost. In practice, raising this much past 300-400 words
+          usually won't make blocks bigger — only lowering it will
+          have much effect. This only applies to the document you're
+          about to import; documents already in this area keep
+          whatever size they were imported with.
+        </span>
+      </details>
+    </details>
+
+    <button type="submit" id="embedSubmitBtn">Import into this area</button>
+    <div class="status" id="embedStatus"></div>
+    <div id="embedProgressWrap" style="display:none;">
+      <progress id="embedProgressBar"></progress>
+    </div>
+    <div class="error" id="embedError"></div>
+    <div id="embedResult"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>2. Ask a question</h2>
+  <form id="queryForm">
+    <div>
+      <label for="question">Question</label>
+      <textarea id="question" placeholder="What does the plan say about offshore wind?"></textarea>
+      <p class="hint">
+        Optional if you're comparing against an ideal proposal below.
+      </p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          If you select a comparison topic below, this question becomes
+          extra guidance added on top of that topic's own criteria,
+          rather than replacing it. If you don't select a topic, a
+          question here is required.
+        </span>
+      </details>
+    </div>
+
+    <div>
+      <label for="idealTopic">Compare against ideal proposal (optional)</label>
+      <select id="idealTopic">
+        <option value="">None — answer normally from the document(s) above</option>
+      </select>
+      <p class="hint" id="idealTopicHint">
+        Replaces the question above with a structured comparison against
+        the selected topic's ideal attributes.
+      </p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          When you pick a topic, its own list of ideal attributes
+          becomes the actual question used to search your documents, so
+          the blocks pulled back are chosen with those attributes in
+          mind — not just whatever you separately typed above. If you
+          also typed a question, it's added as extra guidance rather
+          than replacing the topic. For a comparison like this, it
+          often helps to raise "Blocks to search" in Advanced
+          settings below, since checking several attributes usually
+          benefits from more context than a single question does.
+        </span>
+      </details>
+    </div>
+
+    <div>
+      <label for="chatModel">Chat model</label>
+      <select id="chatModel"></select>
+      <p class="hint" id="chatModelHint"></p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          This is the AI model that reads your documents and writes the
+          answer. Different models can give different-quality answers,
+          or run at different speeds.
+        </span>
+      </details>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced settings</summary>
+      <div class="row">
+        <div>
+          <label for="topK">Blocks to search</label>
+          <input type="number" id="topK" value="5" min="1" max="20" step="1" />
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              How many blocks from your documents to look at when
+              answering. More can give a fuller answer but may take
+              longer.
+            </span>
+          </details>
+        </div>
+        <div>
+          <label for="threshold">Relevance</label>
+          <input type="number" id="threshold" value="0.55" min="0" max="1" step="0.01" />
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Ranges from 0 to 1, with 0 meaning unrelated. Blocks
+              scoring below this are shown as weak matches rather than
+              treated as strong evidence for the answer.
+            </span>
+          </details>
+        </div>
+        <div>
+          <label for="temperature">Consistency</label>
+          <input type="number" id="temperature" value="0.2" min="0" max="1.5" step="0.05" />
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Usually between 0 and 1, with 0 meaning always consistent.
+              Higher values allow more variety in how the answer is
+              worded, but can drift further from the source text.
+            </span>
+          </details>
+        </div>
+        <div>
+          <label for="maxTokens">Max answer length</label>
+          <input type="number" id="maxTokens" placeholder="no limit" min="1" max="4000" step="50" />
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Roughly limits how long the answer can be. Leave blank
+              for no limit — the answer will stop on its own once it's
+              complete.
+            </span>
+          </details>
+        </div>
+        <div>
+          <label for="thinkEnabled" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+            <input type="checkbox" id="thinkEnabled" checked style="width:auto;" />
+            Enable thinking
+          </label>
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Some AI models work through their reasoning before giving
+              a final answer — viewable by opening "Show reasoning"
+              below the answer. Turning this off skips that step, which
+              is usually faster. Models that don't support this ignore
+              the setting either way.
+            </span>
+          </details>
+        </div>
+      </div>
+    </details>
+
+    <div class="button-row">
+      <button type="submit" id="submitBtn">Ask</button>
+      <button type="button" id="stopBtn" class="btn-secondary" disabled>Stop</button>
+      <span class="status" id="elapsedTime"></span>
+    </div>
+    <div class="status" id="status"></div>
+    <div id="queryProgressWrap" style="display:none;">
+      <progress id="queryProgressBar"></progress>
+    </div>
+    <div class="error" id="error"></div>
+  </form>
+
+  <div id="result">
+    <details id="reasoningWrap">
+      <summary>Show reasoning</summary>
+      <div id="reasoningEl"></div>
+    </details>
+
+    <div id="answer"></div>
+    <div id="lengthNote"></div>
+
+    <div id="confidenceNote"></div>
+    <table>
+      <thead>
+        <tr><th>Source</th><th>Block</th><th>Relevance</th></tr>
+      </thead>
+      <tbody id="sourcesBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal-backdrop" id="chunkModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chunkModalTitle">
+    <div class="modal-header">
+      <div>
+        <h3 id="chunkModalTitle">Block</h3>
+        <p id="chunkModalSubtitle"></p>
+      </div>
+      <button type="button" class="modal-close" id="chunkModalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="chunkModalBody"></div>
+  </div>
+</div>
+
+</body>
 </html>

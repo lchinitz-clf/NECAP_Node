@@ -1,0 +1,299 @@
+:root {
+  color-scheme: light;
+  --border: #d4d4d8;
+  --muted: #71717a;
+  --bg-soft: #f4f4f5;
+  --ok: #15803d;
+  --ok-bg: #f0fdf4;
+  --low: #b45309;
+  --low-bg: #fffbeb;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  max-width: 760px;
+  margin: 2.5rem auto;
+  padding: 0 1.25rem;
+  color: #18181b;
+  background: #fff;
+}
+h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+p.sub { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
+p.hint { color: var(--muted); font-size: 0.8rem; margin: 0.3rem 0 0; }
+
+section.card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem 1.3rem;
+  margin: 1.25rem 0;
+}
+
+form { display: flex; flex-direction: column; gap: 0.85rem; }
+label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem; }
+textarea, input[type="text"], input[type="number"], select {
+  width: 100%;
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+textarea { resize: vertical; min-height: 4.5rem; }
+
+.row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.row > div { flex: 1; min-width: 160px; }
+.row input, .row select { width: 100%; }
+
+button {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:disabled { background: #a1a1aa; cursor: default; }
+
+.btn-remove {
+  padding: 0.3rem 0.65rem;
+  background: transparent;
+  color: var(--low);
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.btn-remove:hover { background: var(--low-bg); }
+.btn-remove:disabled { background: transparent; color: var(--muted); border-color: var(--border); }
+
+.workspace-actions {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.workspace-actions h3 { font-size: 0.85rem; margin: 0 0 0.6rem; }
+.workspace-actions .row > div { display: flex; flex-direction: column; align-items: flex-start; }
+
+.btn-secondary {
+  background: transparent;
+  color: #18181b;
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--bg-soft); }
+
+.btn-danger {
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.btn-danger:hover { background: #fef2f2; }
+
+.button-row { display: flex; gap: 0.6rem; align-items: center; }
+
+.status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+.error {
+  display: none;
+  background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+  padding: 0.75rem 0.9rem; border-radius: 6px; font-size: 0.9rem; margin-top: 0.5rem;
+  white-space: pre-wrap;
+}
+
+#embedResult {
+  display: none;
+  background: var(--ok-bg);
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+input[type="file"] {
+  width: 100%;
+  font: inherit;
+  padding: 0.4rem 0;
+}
+
+progress {
+  width: 100%;
+  height: 0.65rem;
+  accent-color: #18181b;
+}
+
+#result { display: none; margin-top: 1.5rem; }
+
+/* Tooltip (i) icons — a <details>/<summary> per icon, same click-to-toggle
+   mechanism as #reasoningWrap below, but browsers always draw a
+   <summary>'s own disclosure triangle BEFORE its content, with no way to
+   reorder that through markup alone. To show the ⓘ first and the triangle
+   after it instead, the native marker is hidden here and a matching
+   triangle character is appended via ::after, flipped between closed/open
+   based on the [open] attribute — all still pure CSS, no JS involved.
+   The tooltip body itself is positioned absolutely so opening one floats
+   a small popover below the icon instead of pushing the rest of the page
+   down. */
+details.tip {
+  position: relative;
+  display: inline-block;
+  margin-top: 0.35rem;
+}
+details.tip > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  user-select: none;
+}
+details.tip > summary::-webkit-details-marker { display: none; }
+details.tip > summary::after { content: "\25B8"; font-size: 0.7em; }
+details.tip[open] > summary::after { content: "\25BE"; }
+details.tip > span {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  margin-top: 0.3rem;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 3rem));
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #18181b;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* Advanced settings — same collapsible mechanism as #reasoningWrap, kept
+   closed by default so the more technical controls (consistency,
+   relevance, blocks to search, etc.) don't clutter the page until
+   someone specifically wants them. */
+details.advanced {
+  margin: 0.15rem 0 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+}
+details.advanced > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+details.advanced[open] > summary { margin-bottom: 0.7rem; }
+
+#reasoningWrap {
+  display: none;
+  margin-bottom: 0.85rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+}
+#reasoningWrap summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+#reasoningWrap[open] summary { margin-bottom: 0.5rem; }
+#reasoningEl {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+#answer {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+#confidenceNote { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0.4rem; }
+#lengthNote {
+  display: none;
+  background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
+  padding: 0.6rem 0.9rem; border-radius: 6px; font-size: 0.85rem; margin-top: 0.6rem;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.3rem; }
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.02em; }
+tr.meets td:first-child::before { content: "●"; color: var(--ok); margin-right: 0.4rem; }
+tr.below td:first-child::before { content: "●"; color: var(--low); margin-right: 0.4rem; }
+tr.below { color: var(--muted); }
+td.score-meets { color: var(--ok); font-weight: 600; }
+td.score-below { color: var(--low); }
+
+.chunk-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.chunk-link:hover { color: #1d4ed8; }
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 100;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { margin: 0; font-size: 0.95rem; }
+.modal-header p { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0.1rem 0.3rem;
+}
+.modal-close:hover { color: #18181b; }
+.modal-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.modal-body.muted { color: var(--muted); }

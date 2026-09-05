@@ -28,11 +28,28 @@ const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'idealProposals.json');
 // doesn't define a file-level `defaultCompareInstruction` either (e.g.
 // a minimal or very old file). The normal, hand-editable default lives
 // in the JSON file, not here: see getTopic()'s fallback chain below.
+/*
 const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
   'Compare and contrast the proposal under review with the ideal proposal ' +
   'described above. For each attribute, note whether the reviewed proposal ' +
   'matches, falls short of, or exceeds the ideal, and flag anything the ' +
-  'ideal calls for that the reviewed proposal does not appear to address at all.';
+      'ideal calls for that the reviewed proposal does not appear to address at all.';
+*/
+
+/*
+const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
+  'The proposal under review is the document context provided to you separately, ' +
+  'not the ideal-attribute list above — compare and contrast that reviewed ' +
+  'proposal with the ideal proposal described above. For each attribute listed ' +
+  'above, in order, respond with exactly one line in the form "<attribute name>: ' +
+  'Matches / Falls short / Exceeds / Not addressed — <one-sentence reason>", ' +
+  'based only on what the provided context actually says. If the context does ' +
+  'not mention that attribute at all, mark it "Not addressed" rather than ' +
+  'guessing. State your line for each attribute once and move on — do not ' +
+  'revisit an attribute after you\'ve addressed it.';
+*/
+
+const HARDCODED_FALLBACK_COMPARE_INSTRUCTION = "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.";
 
 /**
  * Reads and parses idealProposals.json fresh from disk.

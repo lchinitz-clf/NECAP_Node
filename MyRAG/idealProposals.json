@@ -1,65 +1,65 @@
 {
-    "defaultCompareInstruction": "Compare and contrast the proposal under review with the ideal proposal described above. For each attribute, note whether the reviewed proposal matches, falls short of, or exceeds the ideal, and flag anything the ideal calls for that the reviewed proposal does not appear to address at all.",
+    "defaultCompareInstruction": "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.",
     "topics": [
-    {
-      "id": "offshore-wind",
-      "label": "Offshore Wind",
-      "description": "Policy proposals for offshore wind development.",
-      "compareInstruction": "Compare and contrast the proposal under review with the ideal offshore wind proposal described above. For each attribute, note whether the reviewed proposal matches, falls short of, or exceeds the ideal, and flag anything the ideal calls for that the reviewed proposal does not appear to address at all.",
-      "attributes": [
-        {
-          "name": "Transmission Systems",
-          "proposal": "Work with neighboring states, federal agencies, and other relevant entities to develop a regional plan for offshore wind transmission."
-        },
-        {
-          "name": "Education and Training",
-          "proposal": "Advance education and training programs to grow a new offshore wind workforce."
-        },
-        {
-          "name": "Supply Chains",
-          "proposal": "Expand local supply chains to support the development of the offshore wind industry."
-        },
-        {
-          "name": "Port Infrastructure",
-          "proposal": "Support the redevelopment of and improvements to critical port infrastructure to support the offshore wind industry.  Should include specific funding proposals."
-        }
-      ]
-    },
-    {
-      "id": "transportation",
-      "label": "Transportation",
-      "description": "Policy proposals related to the transportation sector",
-      "attributes": [
-        {
-          "name": "EVs on the road",
-          "proposal": "Set a specific target, or targets, for EVs on the road by certain dates."
-        },
-        {
-          "name": "Charging stations",
-          "proposal": "Set a specific target, or targets, for charging stations by certain dates."
-        },
-        {
-          "name": "Single Occupancy Vehicles",
-          "proposal": "Set specific goals for reducing single-occupancy vehicles on the roads by certain dates."
-        },
-        {
-          "name": "Telework",
-          "proposal": "Investigate, discuss the use of teleworking to reduce vehicular traffic."
-        },
-        {
-          "name": "eBikes",
-          "proposal": "Launch an eBike incentive program to promote eBike use."
-        },
-        {
-          "name": "Bicycle Infratructure",
-          "proposal": "Invest in bicycle and pedestrian infrastructure to increase utilization of non-vehicular modes of transportation."
-        },
-        {
-          "name": "Multimodal Transportation",
-          "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
-        }
-      ]
-    },
+	{
+	    "id": "offshore-wind",
+	    "label": "Offshore Wind",
+	    "description": "Policy proposals for offshore wind development.",
+	    "compareInstruction": "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.",
+	    "attributes": [
+		{
+		    "name": "Transmission Systems",
+		    "proposal": "Work with neighboring states, federal agencies, and other relevant entities to develop a regional plan for offshore wind transmission."
+		},
+		{
+		    "name": "Education and Training",
+		    "proposal": "Advance education and training programs to grow a new offshore wind workforce."
+		},
+		{
+		    "name": "Supply Chains",
+		    "proposal": "Expand local supply chains to support the development of the offshore wind industry."
+		},
+		{
+		    "name": "Port Infrastructure",
+		    "proposal": "Support the redevelopment of and improvements to critical port infrastructure to support the offshore wind industry.  Should include specific funding proposals."
+		}
+	    ]
+	},
+	{
+	    "id": "transportation",
+	    "label": "Transportation",
+	    "description": "Policy proposals related to the transportation sector",
+	    "attributes": [
+		{
+		    "name": "EVs on the road",
+		    "proposal": "Set a specific target, or targets, for EVs on the road by certain dates."
+		},
+		{
+		    "name": "Charging stations",
+		    "proposal": "Set a specific target, or targets, for charging stations by certain dates."
+		},
+		{
+		    "name": "Single Occupancy Vehicles",
+		    "proposal": "Set specific goals for reducing single-occupancy vehicles on the roads by certain dates."
+		},
+		{
+		    "name": "Telework",
+		    "proposal": "Investigate, discuss the use of teleworking to reduce vehicular traffic."
+		},
+		{
+		    "name": "eBikes",
+		    "proposal": "Launch an eBike incentive program to promote eBike use."
+		},
+		{
+		    "name": "Bicycle Infratructure",
+		    "proposal": "Invest in bicycle and pedestrian infrastructure to increase utilization of non-vehicular modes of transportation."
+		},
+		{
+		    "name": "Multimodal Transportation",
+		    "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
+		}
+	    ]
+	},
 	{
 	    "id": "sea-level-rise",
 	    "label": "Sea Level Rise",
@@ -90,6 +90,29 @@
 		    "proposal": "Increase funds to incentivize regional resilience planning and cooperation and the inclusion of climate resilience in local and regional plans, regulations, and capital-investment plans."
 		}
 	    ]
-	}	
+	},
+	{
+	    "id": "natural-gas",
+	    "label": "Natural Gas",
+	    "description": "Policy proposals related to natural gas",
+	    "attributes": [
+		{
+		    "name": "Pipeline costs",
+		    "proposal": "Mitigate the risks of locking in additional investments and costs of pipeline systems that must eventually be paid for by either ratepayers or gas utilities’ shareholders."
+		},
+		{
+		    "name": "Decommision",
+		    "proposal": "Investigating the decommissioning of the gas distribution system to support a just and equitable transition toward electrified heating."
+		},
+		{
+		    "name": "Pipeline maintenance",
+		    "proposal": "Evaluate options to reduce maintenance costs for the natural gas pipeline system while prioritizing reliability and safety, including assessing the need for full replacement versus lower-cost repairs to avoid the risks of installing stranded assets."
+		},
+		{
+		    "name": "Regulation",
+		    "proposal": "Develop a regulatory framework to guide gas utilities and align with decarbonization efforts, as seen in DPU’s Docket 20-80 on the Future of Gas."
+		}
+	    ]
+	}			
     ]
 }
