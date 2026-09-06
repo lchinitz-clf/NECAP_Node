@@ -401,7 +401,16 @@ let currentQueryController = null;
 // chunks are worth calling "confident" matches versus noise the
 // model was still handed as context. It doesn't change what the
 // model saw, only how we label the sources here.
-function renderSources(sources, threshold) {
+//
+// `topK` (the value actually submitted for this request, not just
+// whatever the input currently shows) is used for one extra nudge:
+// if every single retrieved block cleared the relevance bar, that's
+// a sign the area may hold more relevant material than got pulled
+// in — but only when retrieval was actually capped by topK. If the
+// area simply doesn't have topK blocks total, sources.length comes
+// back smaller than topK and there's nothing more to raise topK to
+// reach, so the suggestion is withheld in that case.
+function renderSources(sources, threshold, topK) {
   sourcesBody.innerHTML = '';
   const meets = sources.filter((s) => s.score >= threshold);
 
@@ -414,6 +423,11 @@ function renderSources(sources, threshold) {
   } else {
     confidenceNote.textContent =
       `${meets.length} of ${sources.length} retrieved blocks met your relevance setting (${threshold.toFixed(2)}).`;
+    if (meets.length === sources.length && sources.length === topK) {
+      confidenceNote.textContent +=
+        ' All of the retrieved blocks cleared the bar, so there may be more relevant material in this area ' +
+        'than got pulled in — consider raising "Blocks to search" in Advanced settings to search further.';
+    }
   }
 
   for (const s of sources) {
@@ -477,6 +491,11 @@ function closeChunkModal() {
  *   false explicitly skips it. See the `think` param on chat() in
  *   ollamaClient.js for why this is a real skip, not just a display
  *   filter.
+ * @param {number} [numCtx] - the "Request size" Advanced setting —
+ *   passed straight through to Ollama's `num_ctx` (see the doc on
+ *   chat()'s `numCtx` option in ollamaClient.js for what this
+ *   actually controls). Undefined when left blank, same "absence
+ *   means don't override" convention maxTokens follows.
  * @param {AbortSignal} [signal] - wired to stopBtn in init(). Aborting
  *   this closes the fetch, which the /query/stream route on the
  *   server notices (via Express's `res.on('close', ...)`) and uses
@@ -486,18 +505,19 @@ function closeChunkModal() {
  *   fetch spec's own name for it) rather than the usual thrown
  *   Error; the caller below checks err.name to tell the two apart.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // chatModel/temperature/maxTokens/idealTopicId/think undefined
-    // (nothing usable selected, or the field was cleared) just omits
-    // that key from the JSON body entirely, and /query/stream's own
-    // default takes over server-side — for maxTokens that's "no
-    // cap," for idealTopicId that's "answer normally, no
+    // chatModel/temperature/maxTokens/numCtx/idealTopicId/think
+    // undefined (nothing usable selected, or the field was cleared)
+    // just omits that key from the JSON body entirely, and
+    // /query/stream's own default takes over server-side — for
+    // maxTokens that's "no cap," for numCtx that's "use the model's
+    // own default," for idealTopicId that's "answer normally, no
     // comparison," for think that's "leave Ollama's own default
     // alone" (see the think param doc above).
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, idealTopicId, think }),
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think }),
     signal,
   });
 
@@ -900,6 +920,13 @@ function init() {
     const maxTokens = rawMaxTokens === '' || Number.isNaN(Number(rawMaxTokens))
       ? undefined
       : Number(rawMaxTokens);
+    // Same blank-means-omit convention as maxTokens above: an empty
+    // field lets the model's own default context window apply,
+    // rather than this app silently picking a number on your behalf.
+    const rawNumCtx = document.getElementById('numCtx').value;
+    const numCtx = rawNumCtx === '' || Number.isNaN(Number(rawNumCtx))
+      ? undefined
+      : Number(rawNumCtx);
     const idealTopicId = idealTopicSelect.value || undefined;
     // Checked (the default) omits `think` entirely, leaving Ollama's
     // own default in place (thinking on, for models that support it) —
@@ -948,13 +975,13 @@ function init() {
     currentQueryController = controller;
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, idealTopicId, think, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the
           // confidence-threshold coloring) shows up right away instead
           // of waiting on generation too.
-          renderSources(event.sources, threshold);
+          renderSources(event.sources, threshold, topK);
           if (event.sources.length) {
             statusEl.textContent = 'Generating answer…';
             // There's an unavoidable gap here — however long the model
@@ -996,7 +1023,7 @@ function init() {
       // a ready-made answer and no sources/tokens were ever streamed.
       if (!gotAnyToken) {
         answerEl.textContent = finalEvent.answer;
-        renderSources(finalEvent.sources || [], threshold);
+        renderSources(finalEvent.sources || [], threshold, topK);
       }
 
       // doneReason "length" means Ollama cut generation short instead of
@@ -1005,13 +1032,14 @@ function init() {
       // this request itself sent: if maxTokens was set, that's almost
       // certainly why (working as configured); if it was left blank
       // ("no limit" — nothing was sent), the far more likely explanation
-      // is Ollama's own num_ctx context-window ceiling being exhausted
-      // by the prompt + retrieved chunks + answer combined, which this
-      // app doesn't set and isn't the same thing as maxTokens at all.
+      // is the model's context window (Request size, if set — otherwise
+      // its own default) being exhausted by the prompt + retrieved
+      // chunks + answer combined, which isn't the same thing as
+      // maxTokens at all.
       if (finalEvent.doneReason === 'length') {
         lengthNote.textContent = maxTokens !== undefined
           ? `Cut off at the answer length limit you set. Raise or clear "Max answer length" in Advanced settings for a longer answer.`
-          : 'Cut off before finishing, even with no answer length limit set — this usually means the AI ran out of room to work with. Try lowering "Blocks to search" in Advanced settings to leave more room for the answer.';
+          : 'Cut off before finishing, even with no answer length limit set — this usually means the AI ran out of room to work with. Try raising "Request size" in Advanced settings, or lowering "Blocks to search" to leave more room for the answer within the room it already has.';
         lengthNote.style.display = 'block';
       }
 

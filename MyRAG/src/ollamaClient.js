@@ -80,6 +80,19 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   same "absence means don't override" convention temperature would
  *   ideally follow too, though temperature's default of 0.2 predates
  *   this and is left as-is to avoid changing existing behavior.
+ * @param {number} [opts.numCtx] - passed through as Ollama's `num_ctx`:
+ *   the total context window, in tokens, available for the system
+ *   prompt + retrieved chunks + conversation + answer combined. Left
+ *   out entirely when omitted, so the model's own Modelfile default
+ *   (or Ollama's own fallback) applies, same as today. This is the
+ *   fix for the failure mode documented at length in the `doneReason`
+ *   part of this function's return-value doc below, and — more
+ *   abruptly — for Ollama refusing a request outright with something
+ *   like `"exceeds the available context size (4096 tokens)"` when
+ *   the prompt alone is already too big to fit before generation even
+ *   starts; raising this is the direct fix for both. The UI exposes
+ *   this as "Request size" in Advanced settings, deliberately avoiding
+ *   the `num_ctx` name itself.
  * @param {(piece: string) => void} [opts.onToken] - if provided, switches
  *   to streaming mode and is called once per fragment of generated text.
  * @param {boolean} [opts.think] - for reasoning models (deepseek-r1,
@@ -136,10 +149,11 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   "length" cause specific to reasoning models: the shared
  *   thinking+answer token budget being exhausted by thinking alone.)
  */
-async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, onToken, think, onThinking, signal } = {}) {
+async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
   const options = { temperature };
   if (maxTokens !== undefined) options.num_predict = maxTokens;
+  if (numCtx !== undefined) options.num_ctx = numCtx;
   const body = { model, messages, stream: streaming, options };
   // Top-level, not inside `options` — see the `think` doc comment above
   // for why. Omitted entirely (not even `think: undefined`, which

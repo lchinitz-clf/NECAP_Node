@@ -113,6 +113,21 @@
 		    "proposal": "Develop a regulatory framework to guide gas utilities and align with decarbonization efforts, as seen in DPU’s Docket 20-80 on the Future of Gas."
 		}
 	    ]
-	}			
+	},
+	{
+	    "id": "electric-vehicles",
+	    "label": "Electric Vehicles",
+	    "description": "Policy proposals related to electric vehicles",
+	    "attributes": [
+		{
+		    "name": "Accessibility",
+		    "proposal": "Increase the size of incentives, shift to point-of-sale rebates, target funds towards lower-income households."
+		},
+		{
+		    "name": "Charging infrastructure",
+		    "proposal": "Improve charger reliabiity, support vehicle-to-grid technologies, integrate EV planning with local infrastructure efforts."
+		}
+	    ]
+	}				
     ]
 }

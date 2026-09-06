@@ -529,7 +529,7 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
 
 /**
  * POST /query
- * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "idealTopicId": "offshore-wind" }
+ * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "numCtx": 8192, "idealTopicId": "offshore-wind" }
  *
  * `question` is normally required, but is optional if `idealTopicId`
  * is given — see the "Comparing against an ideal proposal" section in
@@ -580,7 +580,7 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId, think } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -630,7 +630,7 @@ app.post('/query', async (req, res) => {
     // interpreted, since only the caller knows whether it itself set
     // maxTokens (in which case "length" was requested) or not (in
     // which case "length" means Ollama's own context window ran out).
-    const { text: answer, thinking, doneReason } = await chat(messages, { model: chatModel, temperature, maxTokens, think });
+    const { text: answer, thinking, doneReason } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, think });
 
     // `thinking` is only included when non-empty — a model that
     // doesn't support it (or was asked not to via `think: false`)
@@ -673,7 +673,7 @@ app.post('/query', async (req, res) => {
  *   {"type":"error","error":"..."}
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, idealTopicId, think } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -761,6 +761,7 @@ app.post('/query/stream', async (req, res) => {
       model: chatModel,
       temperature,
       maxTokens,
+      numCtx,
       think,
       signal: controller.signal,
       onToken: (piece) => send({ type: 'token', text: piece }),
