@@ -8,7 +8,8 @@ const { embed, chat, listModels } = require('./src/ollamaClient');
 const { search, listDocuments, getChunk, deleteDocument } = require('./src/store');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { listTopicSummaries, getTopic, composeComparisonQuestion } = require('./src/idealProposals');
+const { listTopicSummaries, getTopic, composeComparisonQuestion, batchAttributes } = require('./src/idealProposals');
+const { parseComparisonAnswer } = require('./src/responseParser');
 
 const app = express();
 app.use(express.json());
@@ -422,7 +423,7 @@ const upload = multer({
       cb(null, `${Date.now()}-${safeBase}`);
     },
   }),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB — generous for a text-heavy document, not unlimited.
+  limits: { fileSize: 150 * 1024 * 1024 }, // 150MB — raised from the original 50MB to cover larger real-world documents (e.g. image-heavy scanned PDFs); still a hard cap, not unlimited.
   fileFilter: (req, file, cb) => {
     // Extension-based, not mimetype-based — browsers are inconsistent
     // about what mimetype they report for .docx/.txt across OSes, so
@@ -580,7 +581,7 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think, attributesPerCall } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -605,37 +606,86 @@ app.post('/query', async (req, res) => {
     return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
   }
 
-  // See composeComparisonQuestion()'s big comment in
-  // src/idealProposals.js: when a topic is selected, ITS text (plus
-  // whatever the user additionally typed) becomes the actual question
-  // — driving both retrieval below and the prompt sent to the chat
-  // model, not just an instruction layered on top after the fact.
-  const effectiveQuestion = topic ? composeComparisonQuestion(topic, question) : question;
+  // `batches` is what makes the "attributes per call" Advanced setting
+  // work: a topic's attributes get split into one or more chunks (see
+  // batchAttributes() in src/idealProposals.js), each becoming its own
+  // retrieval + chat call below rather than one giant question folding
+  // in every attribute at once. A plain (non-comparison) question is
+  // always exactly one "batch" with no attribute subset — `null` — so
+  // the loop below still runs exactly once, unchanged from before.
+  const batches = topic ? batchAttributes(topic.attributes, attributesPerCall) : [null];
 
   try {
-    const queryVector = await embed(effectiveQuestion, embedModel);
-    const matches = search(workspaceId, queryVector, topK);
+    let combinedAnswer = '';
+    let allSources = [];
+    let allRecords = [];
+    const thinkingParts = [];
+    let totalPromptTokens = 0;
+    let totalAnswerTokens = 0;
+    let lastDoneReason;
 
-    if (matches.length === 0) {
-      return res.json({
-        answer: `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`,
-        sources: [],
-      });
+    for (const attributesSubset of batches) {
+      // See composeComparisonQuestion()'s big comment in
+      // src/idealProposals.js: when a topic is selected, ITS text
+      // (plus whatever the user additionally typed) becomes the
+      // actual question — driving both retrieval below and the
+      // prompt sent to the chat model, not just an instruction
+      // layered on top after the fact. `attributesSubset` narrows
+      // that to just this batch's attributes.
+      const effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
+
+      const queryVector = await embed(effectiveQuestion, embedModel);
+      const matches = search(workspaceId, queryVector, topK);
+
+      if (matches.length === 0) {
+        // Every batch would hit this same empty workspace, so there's
+        // no point continuing the loop — short-circuit the whole
+        // request exactly like the single-pass version did.
+        return res.json({
+          answer: `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`,
+          sources: [],
+        });
+      }
+
+      const messages = buildRagMessages(effectiveQuestion, matches);
+      // doneReason ("stop" vs "length") is Ollama's own account of why
+      // generation ended — see the long comment on chat()'s return value
+      // in ollamaClient.js. Passed straight through here rather than
+      // interpreted, since only the caller knows whether it itself set
+      // maxTokens (in which case "length" was requested) or not (in
+      // which case "length" means Ollama's own context window ran out).
+      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, think });
+
+      combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
+      allSources = allSources.concat(sourcesSummary(matches));
+      totalPromptTokens += promptTokens || 0;
+      totalAnswerTokens += answerTokens || 0;
+      lastDoneReason = doneReason;
+      if (thinking) thinkingParts.push(thinking);
+
+      // Only a topic-driven comparison batch has attributes to parse
+      // structured records out of — see parseComparisonAnswer() in
+      // src/responseParser.js, and its module-level caveat about how
+      // reliable this parsing actually is.
+      if (attributesSubset && attributesSubset.length) {
+        allRecords = allRecords.concat(parseComparisonAnswer(answer, attributesSubset));
+      }
     }
-
-    const messages = buildRagMessages(effectiveQuestion, matches);
-    // doneReason ("stop" vs "length") is Ollama's own account of why
-    // generation ended — see the long comment on chat()'s return value
-    // in ollamaClient.js. Passed straight through here rather than
-    // interpreted, since only the caller knows whether it itself set
-    // maxTokens (in which case "length" was requested) or not (in
-    // which case "length" means Ollama's own context window ran out).
-    const { text: answer, thinking, doneReason } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, think });
 
     // `thinking` is only included when non-empty — a model that
     // doesn't support it (or was asked not to via `think: false`)
-    // shouldn't clutter every response with an empty field.
-    res.json({ answer, sources: sourcesSummary(matches), doneReason, ...(thinking ? { thinking } : {}) });
+    // shouldn't clutter every response with an empty field. `records`
+    // is similarly only meaningful (non-empty) for a topic comparison.
+    res.json({
+      answer: combinedAnswer,
+      sources: allSources,
+      doneReason: lastDoneReason,
+      promptTokens: totalPromptTokens,
+      answerTokens: totalAnswerTokens,
+      records: allRecords,
+      totalBatches: batches.length,
+      ...(thinkingParts.length ? { thinking: thinkingParts.join('\n\n') } : {}),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -671,9 +721,32 @@ app.post('/query', async (req, res) => {
  * or, if generation fails partway through (same caveat as the upload
  * route — the HTTP status is already committed to 200 by then):
  *   {"type":"error","error":"..."}
+ *
+ * When an ideal-proposal topic is selected AND the "attributes per
+ * call" Advanced setting splits it into more than one batch (see
+ * batchAttributes() in src/idealProposals.js), this route runs one
+ * full retrieval+chat pass per batch instead of one pass over every
+ * attribute at once, and every event above additionally carries
+ * `batchIndex` (0-based) and `totalBatches`. Each batch's own tokens
+ * still stream live exactly as above, and once a batch's chat call
+ * finishes, one more event appears before the next batch starts:
+ *   {"type":"batch-done","batchIndex":0,"totalBatches":8,"answer":"...","sources":[...],"records":[{"name":"...","proposal":"...","resultText":"...","category":"Matches"},...],"doneReason":"stop","promptTokens":...,"answerTokens":...}
+ * `records` is this batch's attributes parsed into structured rows
+ * (see parseComparisonAnswer() in src/responseParser.js — and its
+ * caveat about how reliable that parsing actually is); it's what
+ * lets the browser UI build a per-attribute table and CSV export
+ * incrementally, batch by batch, rather than only after everything
+ * finishes. The final "done" event's `answer`/`promptTokens`/
+ * `answerTokens`/`records` are the combination of every batch's,
+ * and it carries `totalBatches` too, so a caller that only cares
+ * about the end result never has to sum the individual batch-done
+ * events itself. For a non-comparison question, or a comparison left
+ * at "all" (the default — unchanged from before this setting
+ * existed), `totalBatches` is simply 1 and there's exactly one
+ * "batch-done" immediately before "done".
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think, attributesPerCall } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -695,7 +768,11 @@ app.post('/query/stream', async (req, res) => {
     return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
   }
 
-  const effectiveQuestion = topic ? composeComparisonQuestion(topic, question) : question;
+  // See the long comment on batchAttributes() in src/idealProposals.js
+  // and on /query above — same batching, just streamed per batch here
+  // instead of collected silently into one response.
+  const batches = topic ? batchAttributes(topic.attributes, attributesPerCall) : [null];
+  const totalBatches = batches.length;
 
   // Cancellation: if the browser's Stop button aborts its own fetch to
   // this route (or the tab just closes, or the connection drops), Node
@@ -730,10 +807,16 @@ app.post('/query/stream', async (req, res) => {
   // (an unavoidable small race, not a bug) can't crash the server.
   res.on('error', () => {});
 
-  let matches;
+  // Only this FIRST batch's retrieval can still fail as a clean HTTP
+  // error response — once anything has streamed (right after this),
+  // the status code is already committed to 200, so every batch
+  // after the first reports a retrieval failure as a stream
+  // {"type":"error"} event instead (inside the loop below).
+  const firstQuestion = topic ? composeComparisonQuestion(topic, question, batches[0]) : question;
+  let firstMatches;
   try {
-    const queryVector = await embed(effectiveQuestion, embedModel, undefined, controller.signal);
-    matches = search(workspaceId, queryVector, topK);
+    const queryVector = await embed(firstQuestion, embedModel, undefined, controller.signal);
+    firstMatches = search(workspaceId, queryVector, topK);
   } catch (err) {
     if (clientGone) return; // stopped before retrieval even finished — no one to report back to
     console.error(err);
@@ -744,33 +827,102 @@ app.post('/query/stream', async (req, res) => {
   if (res.flushHeaders) res.flushHeaders();
   const send = (event) => res.write(JSON.stringify(event) + '\n');
 
-  if (matches.length === 0) {
+  if (firstMatches.length === 0) {
     send({
       type: 'done',
       answer: `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`,
       sources: [],
+      totalBatches: 1,
     });
     return res.end();
   }
 
-  send({ type: 'sources', sources: sourcesSummary(matches) });
+  let combinedAnswer = '';
+  let allRecords = [];
+  let totalPromptTokens = 0;
+  let totalAnswerTokens = 0;
+  let lastDoneReason;
 
   try {
-    const messages = buildRagMessages(effectiveQuestion, matches);
-    const { text: answer, thinking, doneReason } = await chat(messages, {
-      model: chatModel,
-      temperature,
-      maxTokens,
-      numCtx,
-      think,
-      signal: controller.signal,
-      onToken: (piece) => send({ type: 'token', text: piece }),
-      onThinking: (piece) => send({ type: 'thinking', text: piece }),
-    });
-    // `thinking` in "done" mirrors /query's response: only included
-    // when non-empty, for a caller that reconnected mid-stream or
-    // otherwise missed the individual "thinking" events above.
-    send({ type: 'done', answer, sources: sourcesSummary(matches), doneReason, ...(thinking ? { thinking } : {}) });
+    for (let i = 0; i < batches.length; i++) {
+      if (clientGone) break;
+      const attributesSubset = batches[i];
+
+      // Batch 0 reuses the retrieval already done above (so it isn't
+      // repeated); every later batch gets its own question, embed,
+      // and search — a fresh retrieval scoped to just that batch's
+      // attributes, which is the whole point of batching (see the
+      // big comment on batchAttributes() in src/idealProposals.js).
+      let matches, effectiveQuestion;
+      if (i === 0) {
+        matches = firstMatches;
+        effectiveQuestion = firstQuestion;
+      } else {
+        effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
+        const queryVector = await embed(effectiveQuestion, embedModel, undefined, controller.signal);
+        matches = search(workspaceId, queryVector, topK);
+      }
+
+      send({ type: 'sources', batchIndex: i, totalBatches, sources: sourcesSummary(matches) });
+
+      if (matches.length === 0) {
+        // Shouldn't normally happen once batch 0 already found
+        // something, but handled defensively rather than assumed
+        // impossible — nothing to chat about for this batch.
+        send({ type: 'batch-done', batchIndex: i, totalBatches, answer: '', sources: [], records: [] });
+        continue;
+      }
+
+      const messages = buildRagMessages(effectiveQuestion, matches);
+      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, {
+        model: chatModel,
+        temperature,
+        maxTokens,
+        numCtx,
+        think,
+        signal: controller.signal,
+        onToken: (piece) => send({ type: 'token', batchIndex: i, totalBatches, text: piece }),
+        onThinking: (piece) => send({ type: 'thinking', batchIndex: i, totalBatches, text: piece }),
+      });
+
+      combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
+      totalPromptTokens += promptTokens || 0;
+      totalAnswerTokens += answerTokens || 0;
+      lastDoneReason = doneReason;
+
+      const records = attributesSubset && attributesSubset.length
+        ? parseComparisonAnswer(answer, attributesSubset)
+        : [];
+      allRecords = allRecords.concat(records);
+
+      // `thinking` here mirrors /query's response: only included when
+      // non-empty, for a caller that reconnected mid-stream or
+      // otherwise missed the individual "thinking" events above.
+      send({
+        type: 'batch-done',
+        batchIndex: i,
+        totalBatches,
+        answer,
+        sources: sourcesSummary(matches),
+        doneReason,
+        promptTokens,
+        answerTokens,
+        records,
+        ...(thinking ? { thinking } : {}),
+      });
+    }
+
+    if (!clientGone) {
+      send({
+        type: 'done',
+        answer: combinedAnswer,
+        promptTokens: totalPromptTokens,
+        answerTokens: totalAnswerTokens,
+        doneReason: lastDoneReason,
+        records: allRecords,
+        totalBatches,
+      });
+    }
   } catch (err) {
     if (clientGone) {
       console.log(`[query/stream] [${workspaceId}] stopped by client before finishing`);

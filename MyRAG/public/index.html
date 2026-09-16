@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -35,53 +36,57 @@
 </section>
 
 <section class="card" id="documentsWrap" style="display:none;">
-  <h2>Documents in this area</h2>
-  <p class="hint" id="documentsEmpty"></p>
-  <table>
-    <thead>
-      <tr><th>Document</th><th>Blocks</th><th>Pages</th><th></th></tr>
-    </thead>
-    <tbody id="documentsBody"></tbody>
-  </table>
-  <p class="error" id="documentsError"></p>
+  <details class="section-toggle" id="documentsDetails" open>
+    <summary><h2>Documents in this area</h2></summary>
+    <div class="section-toggle-body">
+      <p class="hint" id="documentsEmpty"></p>
+      <table>
+        <thead>
+          <tr><th>Document</th><th>Blocks</th><th>Pages</th><th></th></tr>
+        </thead>
+        <tbody id="documentsBody"></tbody>
+      </table>
+      <p class="error" id="documentsError"></p>
 
-  <div class="workspace-actions">
-    <h3>Area maintenance</h3>
-    <div class="row">
-      <div>
-        <button type="button" id="rebuildIndexBtn" class="btn-secondary">Re-initialize this area</button>
-        <p class="hint">
-          Rebuilds this area from the files you've uploaded — use this
-          if something looks out of sync.
-        </p>
-        <details class="tip">
-          <summary aria-label="More information">&#9432;</summary>
-          <span>
-            This rebuilds the internal record of what's in this area
-            using only the files still uploaded here. Use it if the
-            document list looks wrong, incomplete, or out of sync. It
-            only recovers documents that were imported directly through
-            this app — anything added another way is not restored this
-            way.
-          </span>
-        </details>
-        <div class="status" id="rebuildStatus"></div>
-        <div id="rebuildProgressWrap" style="display:none;">
-          <progress id="rebuildProgressBar"></progress>
+      <div class="workspace-actions">
+        <h3>Area maintenance</h3>
+        <div class="row">
+          <div>
+            <button type="button" id="rebuildIndexBtn" class="btn-secondary">Re-initialize this area</button>
+            <p class="hint">
+              Rebuilds this area from the files you've uploaded — use this
+              if something looks out of sync.
+            </p>
+            <details class="tip">
+              <summary aria-label="More information">&#9432;</summary>
+              <span>
+                This rebuilds the internal record of what's in this area
+                using only the files still uploaded here. Use it if the
+                document list looks wrong, incomplete, or out of sync. It
+                only recovers documents that were imported directly through
+                this app — anything added another way is not restored this
+                way.
+              </span>
+            </details>
+            <div class="status" id="rebuildStatus"></div>
+            <div id="rebuildProgressWrap" style="display:none;">
+              <progress id="rebuildProgressBar"></progress>
+            </div>
+            <p class="error" id="rebuildError"></p>
+          </div>
+          <div>
+            <button type="button" id="deleteWorkspaceBtn" class="btn-danger">Delete this area</button>
+            <p class="hint">
+              Permanently removes every document and file in this area.
+              This cannot be undone.
+            </p>
+            <div class="status" id="deleteWorkspaceStatus"></div>
+            <p class="error" id="deleteWorkspaceError"></p>
+          </div>
         </div>
-        <p class="error" id="rebuildError"></p>
-      </div>
-      <div>
-        <button type="button" id="deleteWorkspaceBtn" class="btn-danger">Delete this area</button>
-        <p class="hint">
-          Permanently removes every document and file in this area.
-          This cannot be undone.
-        </p>
-        <div class="status" id="deleteWorkspaceStatus"></div>
-        <p class="error" id="deleteWorkspaceError"></p>
       </div>
     </div>
-  </div>
+  </details>
 </section>
 
 <section class="card">
@@ -276,6 +281,28 @@
             </span>
           </details>
         </div>
+        <div>
+          <label for="attributesPerCall">Attributes per call</label>
+          <input type="number" id="attributesPerCall" placeholder="all" min="1" step="1" />
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Only matters when comparing against an ideal proposal
+              below. A topic with many attributes can otherwise fold
+              all of them into one very large question at once. Enter
+              a number to split it into smaller batches instead — "1"
+              asks about each attribute one at a time, "5" asks in
+              groups of 5, and so on — which both keeps each call
+              smaller and lets each batch's search focus on just its
+              own attributes. Leave blank to ask about every attribute
+              in a single call, as before. Smaller batches take more
+              calls (and somewhat longer overall) but retrieve more
+              relevant material per attribute and are also parsed more
+              reliably into the per-attribute results table and CSV
+              below.
+            </span>
+          </details>
+        </div>
       </div>
     </details>
 
@@ -297,10 +324,44 @@
       <div id="reasoningEl"></div>
     </details>
 
-    <div id="answer"></div>
-    <div id="lengthNote"></div>
+    <details class="section-toggle" id="answerDetails" open>
+      <summary><h3>Answer</h3></summary>
+      <div class="section-toggle-body">
+        <div id="answer"></div>
+        <div id="lengthNote"></div>
+      </div>
+    </details>
+
+    <div id="attributeResultsWrap" style="display:none;">
+      <details class="section-toggle" id="attributeResultsDetails" open>
+        <summary><h3>Per-attribute results</h3></summary>
+        <div class="section-toggle-body">
+          <div class="button-row" style="margin: 0 0 0.5rem;">
+            <button type="button" id="downloadCsvBtn" class="btn-secondary">Download CSV</button>
+          </div>
+          <p class="hint">
+            Best-effort parsing of the answer above into one row per
+            attribute. Always double-check against the answer text itself
+            before relying on this — see the tip on "Attributes per call"
+            in Advanced settings for why this parsing isn't guaranteed
+            accurate, especially with many attributes asked about in one
+            call. The Sources column shows every block retrieved for that
+            row's batch, not just the ones behind that specific attribute
+            — the model isn't asked to say which block backed which
+            claim, only which blocks it was given.
+          </p>
+          <table>
+            <thead>
+              <tr><th>Attribute</th><th>Proposal</th><th>Result</th><th>Analysis</th><th>Sources</th></tr>
+            </thead>
+            <tbody id="attributeResultsBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </div>
 
     <div id="confidenceNote"></div>
+    <div id="tokenUsageNote"></div>
     <table>
       <thead>
         <tr><th>Source</th><th>Block</th><th>Relevance</th></tr>

@@ -190,6 +190,39 @@ details.advanced > summary {
 }
 details.advanced[open] > summary { margin-bottom: 0.7rem; }
 
+/* Section toggles — collapsible wrappers around "Documents in this
+   area," the answer text block, and the per-attribute results table,
+   so a long session (many documents, a long answer, a big comparison
+   table) doesn't turn into an ever-growing page. Persisted per
+   browser via localStorage (see initSectionToggle() in script.js);
+   open by default the first time, same as details.advanced below is
+   the opposite default. Deliberately unstyled otherwise — each of
+   these already sits inside its own card or box, so this only needs
+   to handle the summary/chevron and a little spacing, not its own
+   border or background. */
+details.section-toggle > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.section-toggle > summary::-webkit-details-marker { display: none; }
+details.section-toggle > summary h2,
+details.section-toggle > summary h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+details.section-toggle > summary h2::after,
+details.section-toggle > summary h3::after {
+  content: "\25BE";
+  font-size: 0.7em;
+  color: var(--muted);
+}
+details.section-toggle:not([open]) > summary h2::after,
+details.section-toggle:not([open]) > summary h3::after {
+  content: "\25B8";
+}
+details.section-toggle .section-toggle-body { margin-top: 0.75rem; }
+
 #reasoningWrap {
   display: none;
   margin-bottom: 0.85rem;
@@ -222,6 +255,7 @@ details.advanced[open] > summary { margin-bottom: 0.7rem; }
 }
 
 #confidenceNote { font-size: 0.85rem; color: var(--muted); margin: 0.75rem 0 0.4rem; }
+#tokenUsageNote { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.4rem; }
 #lengthNote {
   display: none;
   background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
@@ -237,6 +271,11 @@ tr.below { color: var(--muted); }
 td.score-meets { color: var(--ok); font-weight: 600; }
 td.score-below { color: var(--low); }
 
+#attributeResultsWrap h3 { font-size: 0.95rem; }
+td.cat-exceeds, td.cat-matches { color: var(--ok); font-weight: 600; }
+td.cat-falls-short { color: var(--low); font-weight: 600; }
+td.cat-not-addressed { color: #b91c1c; font-weight: 600; }
+
 .chunk-link {
   background: none;
   border: none;
@@ -247,6 +286,47 @@ td.score-below { color: var(--low); }
   cursor: pointer;
 }
 .chunk-link:hover { color: #1d4ed8; }
+
+/* Sources column in the per-attribute results table — every block
+   shown as a small pill rather than the plain underlined link style
+   above, since a row can list several of them side by side. Color
+   differentiates blocks that met the relevance setting from ones that
+   didn't, same green/amber convention as the main sources table's
+   score-meets/score-below. A chip carries both .chunk-link (for the
+   shared click-to-open-modal behavior in script.js) and .chip (for
+   this look) when it's clickable; a source with no id (very old
+   server) renders as a plain, non-clickable <span class="chip"> with
+   no color, since there's nothing to open. */
+.sources-cell { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+button.chip {
+  font: inherit;
+  font-size: 0.75rem;
+  background: none;
+  text-decoration: none;
+}
+button.chip:hover { background: var(--bg-soft); }
+.chip.score-meets { border-color: #bbf7d0; color: var(--ok); }
+.chip.score-below { border-color: #fde68a; color: var(--low); }
+
+/* One full-width row per batch in the per-attribute results table
+   (only shown once there's more than one batch — see
+   renderAttributeResults() in script.js), reporting that specific
+   batch's own token usage rather than only a combined total, plus a
+   cutoff warning when that batch specifically hit the length limit. */
+tr.batch-summary-row td {
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.78rem;
+}
 
 .modal-backdrop {
   display: none;

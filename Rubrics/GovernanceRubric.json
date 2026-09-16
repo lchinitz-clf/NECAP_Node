@@ -1,0 +1,176 @@
+{
+  "attributes": [
+    {
+      "name": "G1 - Participation - Access to Information",
+      "proposal": "Can stakeholders easily and independently access key scientific analysis, technical documents and policy papers to inform their opinions about risks and responses?"
+    },
+    {
+      "name": "G2 - Participation - Access to Information",
+      "proposal": "Does such information relate to climate adaptation as a whole, or particular risks?"
+    },
+    {
+      "name": "G3 - Participation - Access to Information",
+      "proposal": "Is information made available in the appropriate languages and formats?"
+    },
+    {
+      "name": "G4 - Participation - Access to Information",
+      "proposal": "How is the information communicated to non-technical audiences?"
+    },
+    {
+      "name": "G5 - Participation - Meaningful Opportunities",
+      "proposal": "Are stakeholders provided with meaningful opportunities to participate in climate change preparation and adaption?"
+    },
+    {
+      "name": "G6 - Participation - Meaningful Opportunities",
+      "proposal": "What measures beyond traditional notice and comment period are provided?"
+    },
+    {
+      "name": "G7 - Participation - Inclusiveness",
+      "proposal": "Can you please provide examples where state plans identify populations in states of vulnerability (e.g., disabled, EJ populations, youth, immigrants, etc.) and facilitate their participation in policy-making?"
+    },
+    {
+      "name": "G8 - Participation - On-going Involvement",
+      "proposal": "Is the on-going involvement of key stakeholders encouraged (e.g., maintaining active dialogues, informing participations of the results and impact of their inputs, etc.)?"
+    },
+    {
+      "name": "G9 - Institutions - Goal Definition",
+      "proposal": "Is there a clear definition of what ‘climate resilience’ and ‘climate adaptation’ would mean in the state?"
+    },
+    {
+      "name": "G10 - Institutions - Goal Definition",
+      "proposal": "Are the policy measures to achieve that goal gathered in one plan that is periodically revised?"
+    },
+    {
+      "name": "G11 - Institutions - Political Leadership",
+      "proposal": "Is strong political leadership shaping and supporting climate adaptation policy?"
+    },
+    {
+      "name": "G12 - Institutions - Political Leadership",
+      "proposal": "Is the climate adaptation plan required by statue or an executive order?"
+    },
+    {
+      "name": "G13 - Institutions - Technical Leadership",
+      "proposal": "Is there a dedicated climate resilience officer at the highest level of state government?"
+    },
+    {
+      "name": "G14 - Institutions - Technical Leadership",
+      "proposal": "Is there an administrative office committed to climate adaptation?"
+    },
+    {
+      "name": "G15 - Institutions - Technical Leadership",
+      "proposal": "Are the roles and responsibilities of the office committed to cliamte adapatation defined in enabling legislation or state policy?"
+    },
+    {
+      "name": "G16 - Institutions - Agency Cooperation",
+      "proposal": "Are there strong mechanisms to ensure that government agencies are achieving the same climate adaptation ends in ways that increase efficiency through cooperation?"
+    },
+    {
+      "name": "G17 - Institutions - Agency Cooperation",
+      "proposal": "Is there an explicit understanding of how climate adaptation can be reflected in such departments priorities?"
+    },
+    {
+      "name": "G18 - Institutions - Legal and Regulatory Framework",
+      "proposal": "Are the governance arrangements for the climate adaptation plan supported by a framework of laws and executive orders?"
+    },
+    {
+      "name": "G19 - Institutions - Expertise",
+      "proposal": "Does the institutional framework encourage the use of best scientific evidence for risk identification and responsive policy design?"
+    },
+    {
+      "name": "G20 - Institutions - Expertise",
+      "proposal": "Is there a process for incorporating new findings as they emerge?"
+    },
+    {
+      "name": "G21 - Institutions - Expertise",
+      "proposal": "Does the plan mention consultation with expert bodies (e.g., climate scientists, engineers)?"
+    },
+    {
+      "name": "G22 - Institutions - Expertise",
+      "proposal": "Is there a formal advisory council of experts to guide the plan's development and evaluation?"
+    },
+    {
+      "name": "G23 - Institutions - Expertise",
+      "proposal": "Are mechanisms in place to allow for expert input during planning, implementation, monitoring and evaluation?"
+    },
+    {
+      "name": "G24 - Institutions - Capacity Development",
+      "proposal": "Does the climate adaptation plan address increasing the capability of government departments and employees to identify and address risks arising from climate adaptation?"
+    },
+    {
+      "name": "G25 - Transparency - Quality",
+      "proposal": "Does the data provided give the public an on-going sense of the risks of climate adaptation and the progress of policy measures to prepare, respond to and recover from them?"
+    },
+    {
+      "name": "G26 - Transparency - Quality",
+      "proposal": "Is there a clear audit trail and verification mechanism?"
+    },
+    {
+      "name": "G27 - Transparency - Granularity",
+      "proposal": "Are the data and reports provided sufficiently granular to provide a clear picture at the community level, without masking outcomes or impacts on vulnerable populations?"
+    },
+    {
+      "name": "G28 - Transparency - Granularity",
+      "proposal": "Have clear, useful metrics been developed?"
+    },
+    {
+      "name": "G29 - Transparency - Speed and Frequency",
+      "proposal": "Is information provided sufficiently quickly and with enough frequency to give stakeholders a solid understanding of a climate adaptation risk or policy?"
+    },
+    {
+      "name": "G30 - Transparency - Speed and Frequency",
+      "proposal": "Are data and reports stale or irrelevant by the time the public has access?"
+    },
+    {
+      "name": "G31 - Transparency - Reach",
+      "proposal": "Is the information made available to all impacted stakeholders in a manner that facilitates their understanding?"
+    },
+    {
+      "name": "G32 - Accountability - Clarity",
+      "proposal": "Are roles, responsibilities and objectives clearly delineated?"
+    },
+    {
+      "name": "G33 - Accountability - Enforceability",
+      "proposal": "Do citizens have statutory rights to enforce the climate adaptation policy or pursue breaches?"
+    },
+    {
+      "name": "G34 - Accountability - Enforceability",
+      "proposal": "Does the plan outline the consequences for departments or entities that fail to meet their obligations?"
+    },
+    {
+      "name": "G35 - Accountability - Systematic",
+      "proposal": "Is there a systematic approach to monitoring, evaluation, publication and learning to maximize positive outcomes and learning?"
+    },
+    {
+      "name": "G36 - Resources - Human Resources",
+      "proposal": "Are enough people with a broad range of skills giving enough attention to the critical climate adaptation risks?"
+    },
+    {
+      "name": "G37 - Resources - Human Resources",
+      "proposal": "Does the plan invest in building the skills of state employees needed to address climate adaptation issues?"
+    },
+    {
+      "name": "G38 - Resources - Public Financial Resources",
+      "proposal": "Does the plan provide estimated costs of increasing the resilience of key physical and natural assets?  Are funding mechanisms identified to cover those costs?"
+    },
+    {
+      "name": "G39 - Resources - Public Financial Resources",
+      "proposal": "Is it identified and protected in state budgets?"
+    },
+    {
+      "name": "G40 - Resources - Public Financial Resources",
+      "proposal": "Does the plan provide dedicated funding for proactive climate adaptation measures, separate from funding for disaster recovery?"
+    },
+    {
+      "name": "G41 - Resources - Private Financial Resources",
+      "proposal": "Does the plan provide incentives that encourage private investment in climate resilience measures? Are the resources required from private investment quantified?"
+    },
+    {
+      "name": "G42 - Resources - Private Financial Resources",
+      "proposal": "Do these incentives advance or detract from efforts to ensure public climate readiness?"
+    },
+    {
+      "name": "G43 - Resources - Access",
+      "proposal": "Are financial, human and knowledge resources made available to regional/municipal entities?"
+    }
+  ]
+}

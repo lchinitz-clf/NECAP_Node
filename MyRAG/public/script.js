@@ -355,9 +355,10 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 
 // ---- Query form ----
 
-let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote;
+let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
 let thinkCheckbox, reasoningWrap, reasoningEl;
+let attributeResultsWrap, attributeResultsBody, downloadCsvBtn;
 
 // queryStartTime/queryTimerHandle track the elapsed-time display next
 // to Ask/Stop. performance.now() rather than Date.now() — monotonic,
@@ -393,6 +394,25 @@ function formatElapsedMs(ms) {
 // one per request and clears this back to null once that request
 // settles (success, error, or stop) — see both below.
 let currentQueryController = null;
+
+// Backs the Download CSV button, which lives outside the submit
+// handler's own scope (it can be clicked any time after a query
+// finishes, not just in the moment it finishes) — holds one entry per
+// batch that has finished so far (a plain document question, or an
+// ideal-proposal comparison left at "all" attributes per call, is
+// always exactly zero-or-one entries; a batched comparison grows this
+// one entry at a time as each batch's "batch-done" event arrives).
+// Each entry is
+// { batchIndex, totalBatches, records, sources, promptTokens,
+//   answerTokens, doneReason }
+// — records are this batch's own parsed per-attribute rows (see
+// parseComparisonAnswer() in src/responseParser.js), sources are every
+// block retrieved for this batch's question (see sourcesSummary() in
+// index.js), and the token/doneReason fields are what let the table
+// show this batch's own usage and cutoff status, not just a combined
+// total. Reset at the start of every new query, same as the other
+// per-query display state below.
+let latestBatches = [];
 
 // The threshold is a purely client-side display filter: the server
 // always returns its topK closest chunks regardless of how weak the
@@ -452,6 +472,208 @@ function renderSources(sources, threshold, topK) {
   resultEl.style.display = 'block';
 }
 
+// promptTokens/answerTokens are Ollama's own counts for this exact
+// request (see the doc on chat()'s return value in ollamaClient.js) —
+// not an estimate computed here. promptTokens is left undefined for
+// the "no documents embedded yet" canned-answer case (chat() was
+// never even called) and, in principle, for an older Ollama version
+// that doesn't return these fields at all; either way this just shows
+// nothing rather than a confusing "undefined tokens" message.
+//
+// Phrasing depends on whether Request size (numCtx) was set for this
+// request: with a known ceiling, the count can be shown as "used X of
+// your Y," which is the more useful framing since it says how close
+// you are to the wall this app already warns about elsewhere; left
+// blank, there's no known ceiling from the browser's side to compare
+// against (only Ollama knows the model's own default), so this falls
+// back to just stating the raw counts.
+//
+// `totalBatches` (see the "Attributes per call" Advanced setting)
+// changes this further: numCtx is a per-call ceiling, not a shared
+// budget across batches, so once there's more than one batch the "used
+// X of your Y" framing would misleadingly suggest a single shared
+// limit that isn't actually how it works — each batch is checked
+// against that same ceiling independently. The totals are still shown
+// (summed across every batch), just without implying they share one
+// Y-token wall.
+// `totalBatches` (see the "Attributes per call" Advanced setting)
+// changes the phrasing again once there's more than one: the combined
+// total across every batch no longer says much about how close any
+// one call came to running out of room (a run with 40 attributes and
+// 14 batches could total 35,000+ tokens while every individual batch
+// was nowhere near its own limit) — the number that actually answers
+// "was any single call under stress" is the AVERAGE per batch, so
+// that's what leads here, with the combined total kept alongside in
+// parentheses for reference. See the per-attribute results table for
+// each batch's own individual numbers (and a cutoff flag on whichever
+// batch, if any, actually hit the limit) rather than just the average.
+function renderTokenUsage(promptTokens, answerTokens, numCtx, totalBatches) {
+  if (promptTokens === undefined) {
+    tokenUsageNote.textContent = '';
+    return;
+  }
+  const promptText = promptTokens.toLocaleString();
+  const answerText = (answerTokens || 0).toLocaleString();
+
+  if (totalBatches && totalBatches > 1) {
+    const avgPromptText = Math.round(promptTokens / totalBatches).toLocaleString();
+    const avgAnswerText = Math.round((answerTokens || 0) / totalBatches).toLocaleString();
+    tokenUsageNote.textContent = numCtx !== undefined
+      ? `Across ${totalBatches} batches, retrieval averaged ${avgPromptText} of your ${numCtx.toLocaleString()}-token Request size per call (${promptText} total); answers averaged ${avgAnswerText} tokens per call (${answerText} total). See the per-attribute table below for each batch's own numbers.`
+      : `Across ${totalBatches} batches, retrieval averaged ${avgPromptText} tokens per call (${promptText} total); answers averaged ${avgAnswerText} tokens per call (${answerText} total). See the per-attribute table below for each batch's own numbers.`;
+    return;
+  }
+
+  tokenUsageNote.textContent = numCtx !== undefined
+    ? `Used ${promptText} of your ${numCtx.toLocaleString()}-token Request size for the question and retrieved blocks, plus ${answerText} more for the answer.`
+    : `Your question and the retrieved blocks used ${promptText} tokens; the answer used ${answerText} more.`;
+}
+
+// Human labels for src/responseParser.js's four fixed category
+// strings, mapped to the CSS classes in style.css that color-code them
+// in the per-attribute results table — an unparsed/empty category (see
+// that module's caveat about parsing reliability) intentionally gets
+// no class and a plain, honest label instead of guessing.
+const CATEGORY_CLASS = {
+  Exceeds: 'cat-exceeds',
+  Matches: 'cat-matches',
+  'Falls short': 'cat-falls-short',
+  'Not addressed': 'cat-not-addressed',
+};
+
+/**
+ * Renders every source retrieved for one batch as a row of small
+ * clickable pills (or plain, non-clickable ones if a source is
+ * somehow missing its chunk id — an older server), color-differentiated
+ * by the same relevance-threshold convention as the main sources table
+ * below. Every row belonging to that batch shows this same list: the
+ * model is only ever told which blocks it was given for the whole
+ * batch, not which one backed which specific attribute (see the hint
+ * text next to the table in index.html), so that's the most honest
+ * thing to show per row.
+ */
+function renderSourceChips(sources, threshold) {
+  if (!sources || sources.length === 0) return '<span class="hint">—</span>';
+  return sources
+    .map((s) => {
+      const ok = threshold === undefined || s.score >= threshold;
+      const scoreClass = ok ? 'score-meets' : 'score-below';
+      // Chunk number only, not the source file name too — with several
+      // chips per row this column got too cramped once file names were
+      // included (especially long, real-world document names). The
+      // file name isn't lost: it's on the chip as a hover title, and
+      // shown as the modal's subtitle once you click through to the
+      // block text — same as the main sources table already handles
+      // this trade-off, just applied here for a row that can carry
+      // several chips at once instead of one file name per row.
+      const label = `#${s.chunkIndex}`;
+      const title = escapeHtml(s.sourceFile);
+      return s.id
+        ? `<button type="button" class="chunk-link chip ${scoreClass}" title="${title}" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${title}" data-chunk-index="${s.chunkIndex}">${label}</button>`
+        : `<span class="chip" title="${title}">${label}</span>`;
+    })
+    .join(' ');
+}
+
+/**
+ * One line summarizing a single batch's own token usage (against the
+ * Request size ceiling, when set) and, when this specific batch got
+ * cut off before finishing, a warning flag — see renderTokenUsage()
+ * above for why the aggregate line alone stopped being useful once a
+ * comparison runs many batches, and the doc comment on latestBatches
+ * for what each batch object carries.
+ */
+function formatBatchSummary(batch, numCtx) {
+  const label = batch.totalBatches
+    ? `Batch ${batch.batchIndex + 1} of ${batch.totalBatches}`
+    : `Batch ${batch.batchIndex + 1}`;
+  let text = label;
+  if (batch.promptTokens !== undefined) {
+    const promptText = batch.promptTokens.toLocaleString();
+    const answerText = (batch.answerTokens || 0).toLocaleString();
+    text += numCtx !== undefined
+      ? ` — used ${promptText} of your ${numCtx.toLocaleString()}-token Request size, plus ${answerText} for the answer.`
+      : ` — used ${promptText} tokens for the question and retrieved blocks, plus ${answerText} for the answer.`;
+  } else {
+    text += '.';
+  }
+  if (batch.doneReason === 'length') {
+    text += ' ⚠ Cut off — hit the length limit for this batch.';
+  }
+  return text;
+}
+
+// Renders every batch accumulated so far (each batch contributing its
+// own rows, plus — once there's more than one batch — a full-width
+// summary row after them, see formatBatchSummary() above) into the
+// results table, and shows/hides that whole section depending on
+// whether there's anything to show — a plain document question never
+// populates this at all, since parseComparisonAnswer() is only ever
+// run for a topic-comparison batch (see the "batch-done" handling in
+// the query form's submit handler below).
+function renderAttributeResults(batches, numCtx, threshold) {
+  attributeResultsBody.innerHTML = '';
+  const showBatchRows = batches.length > 1;
+  let anyRecords = false;
+
+  for (const batch of batches) {
+    const sourcesHtml = renderSourceChips(batch.sources, threshold);
+    for (const r of batch.records || []) {
+      anyRecords = true;
+      const tr = document.createElement('tr');
+      const catClass = CATEGORY_CLASS[r.category] || '';
+      tr.innerHTML = `
+        <td>${escapeHtml(r.name)}</td>
+        <td>${escapeHtml(r.proposal)}</td>
+        <td>${escapeHtml(r.resultText)}</td>
+        <td class="${catClass}">${escapeHtml(r.category || '(unparsed — see answer above)')}</td>
+        <td class="sources-cell">${sourcesHtml}</td>
+      `;
+      attributeResultsBody.appendChild(tr);
+    }
+
+    if (showBatchRows && batch.records && batch.records.length) {
+      const tr = document.createElement('tr');
+      tr.className = 'batch-summary-row';
+      tr.innerHTML = `<td colspan="5">${escapeHtml(formatBatchSummary(batch, numCtx))}</td>`;
+      attributeResultsBody.appendChild(tr);
+    }
+  }
+
+  attributeResultsWrap.style.display = anyRecords ? 'block' : 'none';
+}
+
+/**
+ * Turns the accumulated batches into CSV text: Attribute name,
+ * Proposal, LLM result, LLM analysis, Source document(s) — the five
+ * columns for the Excel/CSV export, in that order. The last column
+ * lists every block retrieved for that row's batch (see the doc
+ * comment on renderSourceChips() above for why it's the whole batch's
+ * sources, not an attribute-specific subset), as
+ * "<file> #<block>" pairs separated by "; " — page numbers aren't
+ * tracked per block today (see extract.js), so a document/block
+ * reference is the most specific citation available. A field
+ * containing a comma, quote, or newline is quoted and any internal
+ * quotes doubled, per the standard CSV escaping rule; everything else
+ * is left bare for readability. A leading UTF-8 BOM is included so
+ * Excel opens the file with correct characters instead of guessing
+ * the encoding wrong.
+ */
+function buildAttributeResultsCsv(batches) {
+  const csvEscape = (value) => {
+    const str = value == null ? '' : String(value);
+    return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  };
+  const rows = [['Attribute name', 'Proposal', 'LLM result', 'LLM analysis', 'Source document(s)']];
+  for (const batch of batches) {
+    const sourceRefs = (batch.sources || []).map((s) => `${s.sourceFile} #${s.chunkIndex}`).join('; ');
+    for (const r of batch.records || []) {
+      rows.push([r.name, r.proposal, r.resultText, r.category, sourceRefs]);
+    }
+  }
+  return '﻿' + rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
@@ -477,6 +699,119 @@ function closeChunkModal() {
 }
 
 /**
+ * Fetches one chunk's full text and shows it in the modal — the
+ * click-handling logic shared by both the main sources table and the
+ * per-attribute results table's Sources column (see
+ * wireChunkLinkDelegate() below), since both just want the same
+ * "look up this block, show it in the modal" behavior on click.
+ */
+async function showChunkModal(chunkId, sourceFile, chunkIndex) {
+  const workspaceId = getWorkspaceId();
+  if (!workspaceId) return;
+
+  chunkModalTitle.textContent = `Block ${chunkIndex}`;
+  chunkModalSubtitle.textContent = sourceFile;
+  chunkModalBody.className = 'modal-body muted';
+  chunkModalBody.textContent = 'Loading…';
+  openChunkModal();
+
+  try {
+    const res = await fetch(
+      `/workspaces/${encodeURIComponent(workspaceId)}/chunks/${encodeURIComponent(chunkId)}`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+    chunkModalBody.className = 'modal-body';
+    chunkModalBody.textContent = data.text;
+  } catch (err) {
+    chunkModalBody.className = 'modal-body muted';
+    chunkModalBody.textContent = `Could not load block text: ${err.message}`;
+  }
+}
+
+/**
+ * One delegated click listener on a container that may hold any
+ * number of chunk-link buttons (data-chunk-id/data-source-file/
+ * data-chunk-index), handling all of them — including ones added by a
+ * later query or batch — with no per-button re-attachment needed. Used
+ * for both the main sources table and the per-attribute results
+ * table's Sources column.
+ */
+function wireChunkLinkDelegate(container) {
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chunk-link');
+    if (!btn) return;
+    showChunkModal(btn.dataset.chunkId, btn.dataset.sourceFile, btn.dataset.chunkIndex);
+  });
+}
+
+// ---- Collapsible section toggles ----
+//
+// Backs the three <details class="section-toggle"> wrappers in
+// index.html (Documents in this area, the answer text block, and the
+// per-attribute results table) — plain native <details>/<summary>
+// elements, so no library is needed for the collapse/expand behavior
+// itself. What this adds on top:
+//
+//   1. Persistence: whichever state someone leaves a section in
+//      (open or closed) is remembered per browser via localStorage,
+//      and restored the next time this page loads — but only for a
+//      genuine click on the <summary>. A <details> element's "toggle"
+//      event fires for BOTH a real click AND a script-driven change
+//      to its .open property, with no way to tell them apart from the
+//      event itself — see point 2.
+//   2. forceOpen(): lets other code (the submit handler, for the
+//      answer section specifically — see its call below) force a
+//      section open without that being mistaken for, or overwriting,
+//      someone's own stored preference. It works by setting a
+//      one-shot "suppress" flag immediately before changing .open;
+//      the very next "toggle" event consumes that flag and returns
+//      without persisting anything, rather than trying to guess
+//      real-click-vs-script from timing.
+//
+// localStorage failing outright (blocked cookies/storage, private
+// browsing in some browsers) is handled by just leaving the section at
+// whatever index.html's own `open` attribute already set — a missing
+// or unreadable preference is never treated as an error, just as "no
+// preference recorded yet."
+function initSectionToggle(details, storageKey) {
+  const state = { suppress: false };
+
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored === '0') details.open = false;
+    else if (stored === '1') details.open = true;
+  } catch (err) {
+    // Storage unavailable — leave index.html's own `open` default alone.
+  }
+
+  details.addEventListener('toggle', () => {
+    if (state.suppress) {
+      state.suppress = false;
+      return;
+    }
+    try {
+      localStorage.setItem(storageKey, details.open ? '1' : '0');
+    } catch (err) {
+      // Non-fatal — the toggle itself still worked, it just won't be
+      // remembered next visit.
+    }
+  });
+
+  return {
+    forceOpen() {
+      if (details.open) return; // already open — nothing to force, and no event will fire to suppress
+      state.suppress = true;
+      details.open = true;
+    },
+  };
+}
+
+let documentsDetails, answerDetails, attributeResultsDetails;
+let answerToggle;
+
+/**
  * Same NDJSON-over-fetch pattern as embedWithProgress() above,
  * pointed at /query/stream instead. onEvent fires for each line as
  * it arrives: {type:"sources",...}, then for a reasoning model with
@@ -496,6 +831,11 @@ function closeChunkModal() {
  *   chat()'s `numCtx` option in ollamaClient.js for what this
  *   actually controls). Undefined when left blank, same "absence
  *   means don't override" convention maxTokens follows.
+ * @param {number} [attributesPerCall] - the "Attributes per call"
+ *   Advanced setting. Only has any effect when `idealTopicId` is also
+ *   set — see batchAttributes() in src/idealProposals.js. Undefined
+ *   when left blank, same convention as maxTokens/numCtx: ask about
+ *   every attribute in one call, as before this setting existed.
  * @param {AbortSignal} [signal] - wired to stopBtn in init(). Aborting
  *   this closes the fetch, which the /query/stream route on the
  *   server notices (via Express's `res.on('close', ...)`) and uses
@@ -505,19 +845,20 @@ function closeChunkModal() {
  *   fetch spec's own name for it) rather than the usual thrown
  *   Error; the caller below checks err.name to tell the two apart.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // chatModel/temperature/maxTokens/numCtx/idealTopicId/think
+    // chatModel/temperature/maxTokens/numCtx/idealTopicId/attributesPerCall/think
     // undefined (nothing usable selected, or the field was cleared)
     // just omits that key from the JSON body entirely, and
     // /query/stream's own default takes over server-side — for
     // maxTokens that's "no cap," for numCtx that's "use the model's
     // own default," for idealTopicId that's "answer normally, no
-    // comparison," for think that's "leave Ollama's own default
-    // alone" (see the think param doc above).
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think }),
+    // comparison," for attributesPerCall that's "ask about every
+    // attribute in one call," for think that's "leave Ollama's own
+    // default alone" (see the think param doc above).
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think }),
     signal,
   });
 
@@ -610,6 +951,7 @@ function init() {
   lengthNote = document.getElementById('lengthNote');
   sourcesBody = document.getElementById('sourcesBody');
   confidenceNote = document.getElementById('confidenceNote');
+  tokenUsageNote = document.getElementById('tokenUsageNote');
   submitBtn = document.getElementById('submitBtn');
   stopBtn = document.getElementById('stopBtn');
   elapsedTimeEl = document.getElementById('elapsedTime');
@@ -618,11 +960,28 @@ function init() {
   reasoningWrap = document.getElementById('reasoningWrap');
   reasoningEl = document.getElementById('reasoningEl');
 
+  attributeResultsWrap = document.getElementById('attributeResultsWrap');
+  attributeResultsBody = document.getElementById('attributeResultsBody');
+  downloadCsvBtn = document.getElementById('downloadCsvBtn');
+
   chunkModalBackdrop = document.getElementById('chunkModalBackdrop');
   chunkModalTitle = document.getElementById('chunkModalTitle');
   chunkModalSubtitle = document.getElementById('chunkModalSubtitle');
   chunkModalBody = document.getElementById('chunkModalBody');
   chunkModalClose = document.getElementById('chunkModalClose');
+
+  documentsDetails = document.getElementById('documentsDetails');
+  answerDetails = document.getElementById('answerDetails');
+  attributeResultsDetails = document.getElementById('attributeResultsDetails');
+
+  // ---- Collapsible section toggles ----
+  // Documents-in-this-area and the per-attribute results table just
+  // need plain persistence; the answer section additionally gets
+  // force-opened at the start of every new query (see the submit
+  // handler below), so its own return value is kept.
+  initSectionToggle(documentsDetails, 'local-rag:documentsOpen');
+  answerToggle = initSectionToggle(answerDetails, 'local-rag:answerOpen');
+  initSectionToggle(attributeResultsDetails, 'local-rag:attributeResultsOpen');
 
   // ---- Event listeners ----
 
@@ -847,39 +1206,26 @@ function init() {
     if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
   });
 
-  // One delegated listener on the sources table body, same pattern as
-  // documentsBody's Remove-button handler above — handles every chunk
-  // link, including ones added by later queries, with no per-row
-  // re-attachment needed.
-  sourcesBody.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.chunk-link');
-    if (!btn) return;
+  // Same shared delegate on both the main sources table and the
+  // per-attribute results table's Sources column — see
+  // wireChunkLinkDelegate()'s doc comment above.
+  wireChunkLinkDelegate(sourcesBody);
+  wireChunkLinkDelegate(attributeResultsBody);
 
-    const chunkId = btn.dataset.chunkId;
-    const sourceFile = btn.dataset.sourceFile;
-    const chunkIndex = btn.dataset.chunkIndex;
-    const workspaceId = getWorkspaceId();
-    if (!workspaceId) return;
-
-    chunkModalTitle.textContent = `Block ${chunkIndex}`;
-    chunkModalSubtitle.textContent = sourceFile;
-    chunkModalBody.className = 'modal-body muted';
-    chunkModalBody.textContent = 'Loading…';
-    openChunkModal();
-
-    try {
-      const res = await fetch(
-        `/workspaces/${encodeURIComponent(workspaceId)}/chunks/${encodeURIComponent(chunkId)}`
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
-
-      chunkModalBody.className = 'modal-body';
-      chunkModalBody.textContent = data.text;
-    } catch (err) {
-      chunkModalBody.className = 'modal-body muted';
-      chunkModalBody.textContent = `Could not load block text: ${err.message}`;
-    }
+  downloadCsvBtn.addEventListener('click', () => {
+    const hasRecords = latestBatches.some((b) => b.records && b.records.length);
+    if (!hasRecords) return; // shouldn't be clickable when there's nothing to export, but guard anyway
+    const csv = buildAttributeResultsCsv(latestBatches);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const workspaceId = getWorkspaceId() || 'results';
+    a.download = `${workspaceId}-comparison.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 
   form.addEventListener('submit', async (e) => {
@@ -889,6 +1235,7 @@ function init() {
     resultEl.style.display = 'none';
     sourcesBody.innerHTML = '';
     confidenceNote.textContent = '';
+    tokenUsageNote.textContent = '';
     answerEl.textContent = '';
     lengthNote.style.display = 'none';
     lengthNote.textContent = '';
@@ -896,6 +1243,13 @@ function init() {
     reasoningEl.textContent = '';
     reasoningWrap.style.display = 'none';
     reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
+    latestBatches = [];
+    attributeResultsBody.innerHTML = '';
+    attributeResultsWrap.style.display = 'none';
+    // The answer section specifically is forced open for every new
+    // query — see initSectionToggle()'s doc comment above for why this
+    // doesn't clobber someone's own stored preference for next time.
+    answerToggle.forceOpen();
 
     const workspaceId = requireWorkspace(errorEl);
     if (!workspaceId) return;
@@ -928,6 +1282,15 @@ function init() {
       ? undefined
       : Number(rawNumCtx);
     const idealTopicId = idealTopicSelect.value || undefined;
+    // Same blank-means-omit convention as maxTokens/numCtx above: left
+    // blank, every attribute of the selected topic goes into a single
+    // call, exactly as before this setting existed. Only matters when
+    // idealTopicId is also set — see batchAttributes() in
+    // src/idealProposals.js.
+    const rawAttributesPerCall = document.getElementById('attributesPerCall').value;
+    const attributesPerCall = rawAttributesPerCall === '' || Number.isNaN(Number(rawAttributesPerCall))
+      ? undefined
+      : Number(rawAttributesPerCall);
     // Checked (the default) omits `think` entirely, leaving Ollama's
     // own default in place (thinking on, for models that support it) —
     // unchecked explicitly requests `think: false`. See the think
@@ -974,16 +1337,46 @@ function init() {
     const controller = new AbortController();
     currentQueryController = controller;
 
+    // Accumulates sources across every batch (keyed by chunk id, or a
+    // fallback key when one's missing) rather than replacing the table
+    // each batch, so a multi-batch comparison ends up showing the full
+    // set of evidence used across all of them, not just whichever
+    // batch happened to run last. Kept to the higher of two scores if
+    // the same block is retrieved by more than one batch.
+    const sourcesById = new Map();
+    const addSources = (sources) => {
+      for (const s of sources) {
+        const key = s.id || `${s.sourceFile}::${s.chunkIndex}`;
+        const existing = sourcesById.get(key);
+        if (!existing || s.score > existing.score) sourcesById.set(key, s);
+      }
+      renderSources(Array.from(sourcesById.values()), threshold, topK);
+    };
+
+    // Batching status phrasing only mentions batches at all once
+    // there's more than one — a plain question or a comparison left at
+    // "all" attributes per call never shows "batch 1 of 1" noise.
+    const batchSuffix = (event) =>
+      event.totalBatches && event.totalBatches > 1 ? ` (batch ${event.batchIndex + 1} of ${event.totalBatches})` : '';
+
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, think, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the
           // confidence-threshold coloring) shows up right away instead
           // of waiting on generation too.
-          renderSources(event.sources, threshold, topK);
+          //
+          // A separator is inserted into the answer box right here,
+          // just before a second-or-later batch's tokens start
+          // arriving, so each batch's text is visually set apart
+          // instead of running straight into the previous batch's.
+          if (event.batchIndex > 0 && answerEl.textContent) {
+            answerEl.textContent += '\n\n———\n\n';
+          }
+          addSources(event.sources);
           if (event.sources.length) {
-            statusEl.textContent = 'Generating answer…';
+            statusEl.textContent = `Generating answer…${batchSuffix(event)}`;
             // There's an unavoidable gap here — however long the model
             // takes to produce its first fragment — with no percentage
             // to show (we don't know the answer's eventual length), so
@@ -1004,7 +1397,7 @@ function init() {
           // without taking up space unless someone opens it.
           gotAnyThinking = true;
           queryProgressWrap.style.display = 'none';
-          statusEl.textContent = 'Model is thinking…';
+          statusEl.textContent = `Model is thinking…${batchSuffix(event)}`;
           reasoningWrap.style.display = 'block';
           reasoningEl.textContent += event.text;
         } else if (event.type === 'token') {
@@ -1013,9 +1406,27 @@ function init() {
           // blank until everything is done.
           gotAnyToken = true;
           queryProgressWrap.style.display = 'none';
-          statusEl.textContent = 'Generating answer…';
+          statusEl.textContent = `Generating answer…${batchSuffix(event)}`;
           answerEl.textContent += event.text;
           resultEl.style.display = 'block';
+        } else if (event.type === 'batch-done') {
+          // Parsed per-attribute rows for this batch (see
+          // parseComparisonAnswer() in src/responseParser.js) — appended
+          // and re-rendered immediately, rather than waiting for every
+          // batch to finish, so the results table (and what the Download
+          // CSV button would export) grows the same way the answer text
+          // above it does. Empty for a plain document question or for a
+          // batch that had no attributes.
+          latestBatches.push({
+            batchIndex: event.batchIndex,
+            totalBatches: event.totalBatches,
+            records: event.records || [],
+            sources: event.sources || [],
+            promptTokens: event.promptTokens,
+            answerTokens: event.answerTokens,
+            doneReason: event.doneReason,
+          });
+          renderAttributeResults(latestBatches, numCtx, threshold);
         }
       }, controller.signal);
 
@@ -1024,6 +1435,23 @@ function init() {
       if (!gotAnyToken) {
         answerEl.textContent = finalEvent.answer;
         renderSources(finalEvent.sources || [], threshold, topK);
+      }
+
+      // Fallback for the unlikely case where "done" carries records
+      // that "batch-done" handling above somehow missed (e.g. an
+      // older/differently-behaving server) — never double-counts,
+      // since it only fills in when nothing was accumulated already.
+      if (!latestBatches.length && finalEvent.records && finalEvent.records.length) {
+        latestBatches = [{
+          batchIndex: 0,
+          totalBatches: finalEvent.totalBatches || 1,
+          records: finalEvent.records,
+          sources: finalEvent.sources || [],
+          promptTokens: finalEvent.promptTokens,
+          answerTokens: finalEvent.answerTokens,
+          doneReason: finalEvent.doneReason,
+        }];
+        renderAttributeResults(latestBatches, numCtx, threshold);
       }
 
       // doneReason "length" means Ollama cut generation short instead of
@@ -1042,6 +1470,8 @@ function init() {
           : 'Cut off before finishing, even with no answer length limit set — this usually means the AI ran out of room to work with. Try raising "Request size" in Advanced settings, or lowering "Blocks to search" to leave more room for the answer within the room it already has.';
         lengthNote.style.display = 'block';
       }
+
+      renderTokenUsage(finalEvent.promptTokens, finalEvent.answerTokens, numCtx, finalEvent.totalBatches);
 
       statusEl.textContent = '';
       queryProgressWrap.style.display = 'none';

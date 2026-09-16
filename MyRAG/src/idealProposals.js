@@ -28,28 +28,11 @@ const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'idealProposals.json');
 // doesn't define a file-level `defaultCompareInstruction` either (e.g.
 // a minimal or very old file). The normal, hand-editable default lives
 // in the JSON file, not here: see getTopic()'s fallback chain below.
-/*
 const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
   'Compare and contrast the proposal under review with the ideal proposal ' +
   'described above. For each attribute, note whether the reviewed proposal ' +
   'matches, falls short of, or exceeds the ideal, and flag anything the ' +
-      'ideal calls for that the reviewed proposal does not appear to address at all.';
-*/
-
-/*
-const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
-  'The proposal under review is the document context provided to you separately, ' +
-  'not the ideal-attribute list above — compare and contrast that reviewed ' +
-  'proposal with the ideal proposal described above. For each attribute listed ' +
-  'above, in order, respond with exactly one line in the form "<attribute name>: ' +
-  'Matches / Falls short / Exceeds / Not addressed — <one-sentence reason>", ' +
-  'based only on what the provided context actually says. If the context does ' +
-  'not mention that attribute at all, mark it "Not addressed" rather than ' +
-  'guessing. State your line for each attribute once and move on — do not ' +
-  'revisit an attribute after you\'ve addressed it.';
-*/
-
-const HARDCODED_FALLBACK_COMPARE_INSTRUCTION = "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.";
+  'ideal calls for that the reviewed proposal does not appear to address at all.';
 
 /**
  * Reads and parses idealProposals.json fresh from disk.
@@ -152,10 +135,17 @@ function getTopic(id) {
  *   still narrow a comparison ("...focusing especially on the
  *   environmental review process") without losing the rest of the
  *   ideal attributes.
+ * @param {Array<{name: string, proposal: string}>} [attributesOverride] -
+ *   a subset of the topic's attributes to fold in instead of the whole
+ *   list — this is what makes per-batch comparison questions possible
+ *   (see batchAttributes() below and the "attributes per call" setting
+ *   in index.js's /query and /query/stream). Omit to use every one of
+ *   the topic's attributes, i.e. today's un-batched behavior.
  * @returns {string}
  */
-function composeComparisonQuestion(topic, userQuestion) {
-  const attributeLines = (topic.attributes || [])
+function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
+  const attributes = attributesOverride || topic.attributes || [];
+  const attributeLines = attributes
     .map((a) => `- ${a.name}: ${a.proposal}`)
     .join('\n');
 
@@ -174,10 +164,44 @@ function composeComparisonQuestion(topic, userQuestion) {
   return parts.join('\n\n');
 }
 
+/**
+ * Splits a topic's attributes into batches for the "attributes per
+ * call" Advanced setting — the fix for a comparison with a lot of
+ * attributes growing one giant question (and one giant embed+chat
+ * call) without bound. Each batch becomes its own retrieval + chat
+ * call in index.js's /query and /query/stream, via its own
+ * composeComparisonQuestion(topic, question, batch) call.
+ *
+ * @param {Array<{name: string, proposal: string}>} attributes
+ * @param {number} [attributesPerCall] - how many attributes per batch.
+ *   Follows the same "blank/0 means don't restrict" convention as
+ *   maxTokens and numCtx elsewhere in this app: undefined, 0, a
+ *   negative number, or a number at least as large as the attribute
+ *   count all just mean "one batch with everything" — today's
+ *   behavior, unchanged. Anything else splits `attributes` into
+ *   consecutive chunks of that size (the last chunk may be smaller).
+ * @returns {Array<Array<{name: string, proposal: string}>>} always at
+ *   least one batch (an empty array if `attributes` itself is empty),
+ *   so callers can always do `for (const batch of batchAttributes(...))`
+ *   without a special case for "no topic"/"no attributes".
+ */
+function batchAttributes(attributes, attributesPerCall) {
+  const list = attributes || [];
+  if (!attributesPerCall || attributesPerCall <= 0 || attributesPerCall >= list.length) {
+    return [list];
+  }
+  const batches = [];
+  for (let i = 0; i < list.length; i += attributesPerCall) {
+    batches.push(list.slice(i, i + attributesPerCall));
+  }
+  return batches;
+}
+
 module.exports = {
   loadTopics,
   listTopicSummaries,
   getTopic,
   composeComparisonQuestion,
+  batchAttributes,
   HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
 };

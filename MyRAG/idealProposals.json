@@ -2,132 +2,938 @@
     "defaultCompareInstruction": "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.",
     "topics": [
 	{
-	    "id": "offshore-wind",
-	    "label": "Offshore Wind",
-	    "description": "Policy proposals for offshore wind development.",
-	    "compareInstruction": "Two things are being compared here. \"The rubric\" is the list of ideal attributes given above. \"The proposal\" is the separate document material provided to you elsewhere in this conversation — the actual thing under review. From this point on, always use exactly these two names, \"the proposal\" and \"the rubric\" — never call either one \"the context,\" \"the ideal,\" \"the ideal attribute,\" or any other name.\n\nFor each attribute in the rubric, in order, use this test: if the proposal explicitly and directly describes what that rubric attribute calls for, mark it \"Matches\" (or \"Exceeds\" if the proposal goes further than the rubric requires); if the proposal only mentions something related, partial, or in the same general area without actually addressing the specific thing the rubric describes, mark it \"Falls short\"; if the proposal says nothing on the topic at all, mark it \"Not addressed\".\n\nRespond with exactly one line per attribute, in this exact form: \"<attribute name>: <Matches, Falls short, Exceeds, or Not addressed> — <one-sentence reason describing what the proposal itself does or does not say>\". The rubric is only the standard you are checking against — never say the rubric is \"mentioned in\" or \"part of\" the proposal, and never say an attribute is addressed \"in the rubric\"; only the proposal can match, fall short of, exceed, or fail to address an attribute.\n\nMake this call once per attribute and move on immediately — do not re-examine, re-derive, or change your answer for an attribute once you have stated it. If you find yourself genuinely torn between two categories for the same attribute, choose \"Falls short\" and continue — do not keep switching between them.\n\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with the line for the first attribute.",
+	    "id": "inland-flooding",
+	    "label": "Inland Flooding",
+	    "description": "Policy proposals for inland flooding.",
 	    "attributes": [
 		{
-		    "name": "Transmission Systems",
-		    "proposal": "Work with neighboring states, federal agencies, and other relevant entities to develop a regional plan for offshore wind transmission."
+		    "name": "IF1 - Vulnerability and Risk Assessment - Definitions",
+		    "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?"
 		},
 		{
-		    "name": "Education and Training",
-		    "proposal": "Advance education and training programs to grow a new offshore wind workforce."
+		    "name": "IF2 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "Does the plan identify the number of projected extreme INLAND OR STORMWATER FLOODING days by 2050, and how does it compare to current conditions?"
 		},
 		{
-		    "name": "Supply Chains",
-		    "proposal": "Expand local supply chains to support the development of the offshore wind industry."
+		    "name": "IF3 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "Does the plan specify which regions or municipalities face the highest projected INLAND OR STORMWATER FLOODING risk?"
 		},
 		{
-		    "name": "Port Infrastructure",
-		    "proposal": "Support the redevelopment of and improvements to critical port infrastructure to support the offshore wind industry.  Should include specific funding proposals."
+		    "name": "IF4 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "Which specific neighborhoods or census tracts are most vulnerable to INLAND OR STORMWATER FLOODING?"
+		},
+		{
+		    "name": "IF5 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "Does the plan address risks associated with different types of inland flooding?"
+		},
+		{
+		    "name": "IF6 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "How the plan improve the quality and accuracy of flood monitoring and forecasting?"
+		},
+		{
+		    "name": "IF7 - Policy and Regulatory Implementation - Building Codes",
+		    "proposal": "Does the plan propose changes to building codes that promote resilience to flooding?"
+		},
+		{
+		    "name": "IF8 - Policy and Regulatory Implementation - Disclosure",
+		    "proposal": "Does the plan create statewide flood risk disclosure requirements for the rental and sale of residential properties?"
+		},
+		{
+		    "name": "IF9 - Policy and Regulatory Implementation - Zoning",
+		    "proposal": "Does the plan propose zoning reforms to discourage or prevent development within floodplains?"
+		},
+		{
+		    "name": "IF10 - Policy and Regulatory Implementation - Regulatory",
+		    "proposal": "Does the plan create incentives for the insurance industry to offer discounts to homeowners who implement flood mitigation measures?"
+		},
+		{
+		    "name": "IF11 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "How does the plan support municipalities in developing local INLAND OR STORMWATER FLOODING resilience plans?"
+		},
+		{
+		    "name": "IF12 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "Does the plan encourage municipalities to collaborate in adaptation planning at the watershed level?"
+		},
+		{
+		    "name": "IF13 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "Does the plan assist municipalities in identifying physical assets most vulnerable to flooding?"
+		},
+		{
+		    "name": "IF14 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "Does the plan assist municipalities in indentifying neighborhoods and populations most vulnerable to flooding?"
+		},
+		{
+		    "name": "IF15 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "Does the plan encourage municipal participation in the Community Rating System (CRS) to create discounts National Flood Insurance Program (NFIP) premiums for its residents?"
+		},
+		{
+		    "name": "IF16 - Local Capacity Building - Community Outreach",
+		    "proposal": "Does the plan outline public education campaigns about inland flooding risks?"
+		},
+		{
+		    "name": "IF17 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Does the plan improve and fund flood monitoring and early warning systems?"
+		},
+		{
+		    "name": "IF18 - Disaster Response and Preparedness - Emergency Identification",
+		    "proposal": "Does the plan promote real time control of reservoirs and detention basins?"
+		},
+		{
+		    "name": "IF19 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Does the plan promote and fund the creation of Resilience Hubs?"
+		},
+		{
+		    "name": "IF20 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Does the plan outline protocols for protecting unhoused residents during inland flooding events?"
+		},
+		{
+		    "name": "IF21 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Does the plan include surge capacity planning for hospitals and EMS during inland flooding events?"
+		},
+		{
+		    "name": "IF22 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+		    "proposal": "What strategies will be used to protect or restore floodplains?"
+		},
+		{
+		    "name": "IF23 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+		    "proposal": "What strategies will be used to repair or remove dams at risk of failure?"
+		},
+		{
+		    "name": "IF24 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+		    "proposal": "Does the plan create or protect riparian buffers?"
+		},
+		{
+		    "name": "IF25 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+		    "proposal": "Does the plan encourage the use of green infrastructure to reduce runoff?"
+		},
+		{
+		    "name": "IF26 - Adaptation Strategies & Long-Term Actions - Buyouts",
+		    "proposal": "Does the plan offer voluntary buyouts or relocation assistance to people living in floodplains?"
+		},
+		{
+		    "name": "IF27 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+		    "proposal": "Does that plan reduce flooding risk by elevating structures, utilities, and roads?"
+		},
+		{
+		    "name": "IF28 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+		    "proposal": "Does the plan explicitly address flooding risks to drinking water and wastewater utilities?"
+		},
+		{
+		    "name": "IF29 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+		    "proposal": "Does the plan address the impact of flooding on combined sewer overflows (CSOs)?"
+		},
+		{
+		    "name": "IF30 - Equity & Environmental Justice - Distribution of Impacts",
+		    "proposal": "How does the plan address disproportionate risk of flooding in low-income communities?"
+		},
+		{
+		    "name": "IF31 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "What community engagement processes does the plan require for resilience strategies for inland flooding?"
+		},
+		{
+		    "name": "IF32 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents facing flooding risks?"
+		},
+		{
+		    "name": "IF33 - Equity & Environmental Justice - System Adaptation",
+		    "proposal": "How does the plan ensure that flood resilience investments do not contribute to displacement or gentrification?"
+		},
+		{
+		    "name": "IF34 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "Does the plan address multilingual or culturally specific communication needs?"
+		},
+		{
+		    "name": "IF35 - Equity & Environmental Justice - Distribution of Impacts",
+		    "proposal": "Does the plan commit to prioritizing flood mitigation in environmental justice communities?"
+		},
+		{
+		    "name": "IF36 - Accountability & Governance - Roles and Responsibilities",
+		    "proposal": "Which agencies are responsible for implementing different components of the state’s inland flooding resilience strategies?"
+		},
+		{
+		    "name": "IF37 - Accountability & Governance - Funding and financing",
+		    "proposal": "Does the plan identify funding sources for inland flooding resilience work?"
+		},
+		{
+		    "name": "IF38 - Accountability & Governance - Costs",
+		    "proposal": "Does the plan estimate the cost of proposed inland flooding resilience actions?"
+		},
+		{
+		    "name": "IF39 - Accountability & Governance - Funding and financing",
+		    "proposal": "Are there funding mechanisms dedicated to inland flooding mitigation and resilience?"
+		},
+		{
+		    "name": "IF40 - Accountability & Governance - Indicators",
+		    "proposal": "What metrics does the plan propose to track progress on reducing flood risk?"
 		}
 	    ]
 	},
 	{
-	    "id": "transportation",
-	    "label": "Transportation",
-	    "description": "Policy proposals related to the transportation sector",
+	    "id": "coastal-resilience",
+	    "label": "Coastal Resilience",
+	    "description": "Policy proposals for coastal resilience.",
 	    "attributes": [
 		{
-		    "name": "EVs on the road",
-		    "proposal": "Set a specific target, or targets, for EVs on the road by certain dates."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards",
+		    "proposal": "Does the plan incorporate projections of increased frequency, severity and extent of extreme climatic events into its vulnerability and risk assessments?"
 		},
 		{
-		    "name": "Charging stations",
-		    "proposal": "Set a specific target, or targets, for charging stations by certain dates."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards (2)",
+		    "proposal": "To what extent does the plan account for anticipated long-term climate trends, including projected sea level rise and increasing water temperatures, over the planning period?"
 		},
 		{
-		    "name": "Single Occupancy Vehicles",
-		    "proposal": "Set specific goals for reducing single-occupancy vehicles on the roads by certain dates."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards (3)",
+		    "proposal": "What specific methods and data sources does the plan use to analyze the potential for coastal inundation under various climate change scenarios (e.g., dynamic flood hazard modeling)?"
 		},
 		{
-		    "name": "Telework",
-		    "proposal": "Investigate, discuss the use of teleworking to reduce vehicular traffic."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards (4)",
+		    "proposal": "What methodologies are used to analyze and project the impacts of storm surge flooding, including considerations for storm intensity and storm track?"
 		},
 		{
-		    "name": "eBikes",
-		    "proposal": "Launch an eBike incentive program to promote eBike use."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards (5)",
+		    "proposal": "Does the plan assess the risk of saltwater intrusion into groundwater resources?"
 		},
 		{
-		    "name": "Bicycle Infratructure",
-		    "proposal": "Invest in bicycle and pedestrian infrastructure to increase utilization of non-vehicular modes of transportation."
+		    "name": "Vulnerability and Risk Assessment - Natural Hazards (6)",
+		    "proposal": "Does the plan analyze the potential impacts of rising water tables on coastal infrastructure and ecosystems?"
 		},
 		{
-		    "name": "Multimodal Transportation",
-		    "proposal": "Implement policies to promote multimodal transportation, prioritizing transportation infrastructure projects that benefit all road users over those that promote exclusive use of automobiles."
+		    "name": "Vulnerability and Risk Assessment - Pollutants",
+		    "proposal": "Does the plan assess the vulnerability of coastal areas to non-point source pollution?"
+		},
+		{
+		    "name": "Vulnerability and Risk Assessment - Pollutants (2)",
+		    "proposal": "Does the plan analyze the potential for increased introduction of toxins into coastal ecosystems?"
+		},
+		{
+		    "name": "Vulnerability and Risk Assessment - Species Migration",
+		    "proposal": "How does the plan consider the potential impacts of species migration on coastal ecosystems and human communities?"
+		},
+		{
+		    "name": "Vulnerability and Risk Assessment - Social Vulnerability",
+		    "proposal": "How comprehensively does the plan integrate a social vulnerability lens throughout its vulnerability and risk assessment, considering factors like demographics, socioeconomic status, and historical inequities?"
+		},
+		{
+		    "name": "Vulnerability and Risk Assessment - Social Vulnerability (2)",
+		    "proposal": "How does the plan's assessment of social vulnerability address the needs of environmental justice populations, including low-income and historically marginalized communities?"
+		},
+		{
+		    "name": "Vulnerability and Risk Assessment - Prediction Accuracy",
+		    "proposal": "How does the plan integrate both historical climate data and future climate projections to inform its vulnerability and risk assessments?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Human Life and Health",
+		    "proposal": "How does the plan address potential increases in illnesses, injuries, and loss of life due to climate change impacts?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Infrastructure",
+		    "proposal": "How does the plan address potential damage uytility (electricity, gas, sewer, water) transmission and distribution systems (e.g., through hardening, redundancy, decentralization, cybersecurity, and system monitoring) in coastal communities?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Infrastructure (2)",
+		    "proposal": "What measures does the plan include to address potential damage to coastal buildings and port facilities?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Infrastructure (3)",
+		    "proposal": "How does the plan address potential disruptions to energy production and resources and improve the resilience of energy supply chains in coastal communities?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Infrastructure (4)",
+		    "proposal": "Does the plan address the potential for damage to nuclear waste disposal sites, including the ability of the site and containment structures to withstand flooding?"
+		},
+		{
+		    "name": "Resilience Strategies - Protect Infrastructure (5)",
+		    "proposal": "How does the plan assess and mitigate risks to waste disposal sites from climate change impacts?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms",
+		    "proposal": "How does the plan account for potential destruction and damage to coastal property and infrastructure?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (2)",
+		    "proposal": "Does the plan address the economic losses associated with the degradation, alteration, or migration of coastal ecosystems?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (3)",
+		    "proposal": "How does the plan address the potential loss of beach access due to erosion and sea level rise?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (4)",
+		    "proposal": "What strategies does the plan include to address potential damage to maritime-based industries (e.g., tourism; shipping; fishing; aquaculture)?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (5)",
+		    "proposal": "How does the plan address the potential impacts of climate change on maritime-based industries (e.g., tourism; shipping; fishing; aquaculture)?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (6)",
+		    "proposal": "How does the plan address the economic impacts of the decline in quantity and quality of freshwater resources in coastal communities?"
+		},
+		{
+		    "name": "Resilience Strategies - Minimize Socioeconomic Harms (7)",
+		    "proposal": "Does the plan address the potential loss of cultural resources due to climate change impacts?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Prioritization",
+		    "proposal": "How clearly does the plan outline criteria for prioritizing elevation and relocation projects, considering factors such as risk assessments, economic viability, and community needs?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Funding",
+		    "proposal": "Does the plan identify potential funding sources for these projects, such as grants, loans, and public-private partnerships?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Funding (2)",
+		    "proposal": "Does the plan aign potential funding sources for these projects (e.g, grants, loans, and public-private partnerships) with project types?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping",
+		    "proposal": "To what extent does the plan incorporate green infrastructure elements, such as bioswales, rain gardens, and green roofs, as part of its adaptation strategy?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (2)",
+		    "proposal": "To what extent does the plan prioritize the use of nature-based solutions and living shorelines over built solutions for coastal adaptation?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (3)",
+		    "proposal": "How does the plan address wet floodproofing (e.g., flood barriers, waterproofing buildings)?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (4)",
+		    "proposal": "How does the plan address dry floodproofing (e.g, elevating critical equipment)?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (5)",
+		    "proposal": "How does the plan address the protection of vulnerable areas from erosion through the construction of both 'grey' infrastructure (e.g., seawalls, breakwaters, groins) and 'green' infrastructure (e.g., dune restoration, beach nourishment)?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (6)",
+		    "proposal": "Does the plan call for the management, conservation, and restoration of coastal vegetation, including salt marshes, seagrass beds, and oyster reefs?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (7)",
+		    "proposal": "Does the plan call for the management and preservation of coastal habitats and protected areas to help maintain biodiversity?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (8)",
+		    "proposal": "How effective are the proposed strategies for managed retreat from at-risk areas, including financial assistance programs for property buyouts, relocation assistance, and community planning for resettlement?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (9)",
+		    "proposal": "Does the plan address potential conflicts between zoning regulations and the needs of vulnerable populations?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (10)",
+		    "proposal": "What policy and regulatory actions does the plan recommend for insurance reform that incentivizes climate adaptation?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (11)",
+		    "proposal": "What policy and regulatory actions does the plan suggest for the protection of ports and working waterfronts?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (12)",
+		    "proposal": "What policy and regulatory actions does the plan suggest for job creation tied to ecosystem restoration and preservation?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (13)",
+		    "proposal": "What policy and regulatory actions does the plan suggest for job creation tied to infrastructure construction and improvement?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Solution Shaping (14)",
+		    "proposal": "What policy and regulatory actions does the plan suggest for economic diversification in coastal communities?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Equity",
+		    "proposal": "How does the plan ensure that the burdens and benefits of climate adaptation are distributed equitably across the coastal region's population?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Land Use and Zoning",
+		    "proposal": "How does the plan address updating building codes to account for the identified hazards and how does it address zoning and permitting reform to account for these hazards?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Land Use and Zoning (2)",
+		    "proposal": "How does the plan address updating land use laws and regulations to account for the identified hazards?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Land Use and Zoning (3)",
+		    "proposal": "What policy and regulatory actions does the plan recommend for building resilient affordable housing?"
+		},
+		{
+		    "name": "Policy and Regulatory Implementation - Land Use and Zoning (4)",
+		    "proposal": "What policy and regulatory actions does the plan recommend for anti-displacement measures that prevent climate gentrification?"
+		},
+		{
+		    "name": "Local Capacity Building - Community Outreach",
+		    "proposal": "How does the plan outline strategies for building the capacity of local communities to conduct community outreach and education?"
+		},
+		{
+		    "name": "Local Capacity Building - Community Outreach (2)",
+		    "proposal": "How does the plan call for building the capacity of local communities to increase access to information, including for vulnerable or marginalized communities?"
+		},
+		{
+		    "name": "Local Capacity Building - Land Use and Zoning",
+		    "proposal": "How does the plan call for building the capacity of local communities for local land use planning and zoning?"
+		},
+		{
+		    "name": "Local Capacity Building - Social Capital",
+		    "proposal": "How does the plan call for building the capacity of local communities for strengthening human or social capital?"
+		},
+		{
+		    "name": "Local Capacity Building - Social Capital (2)",
+		    "proposal": "How does the plan otherwise call for providing local communities with technical assistance and financial assistance?"
+		},
+		{
+		    "name": "Disaster Response and Preparedness - Accountability",
+		    "proposal": "Does the plan delineate lines of authority and responsibility for disaster response, with specific accountability measures for all levels of government and key stakeholders?"
+		},
+		{
+		    "name": "Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Are disaster response teams staffed and trained for extreme climate-exacerbated weather events?"
+		},
+		{
+		    "name": "Disaster Response and Preparedness - Evacuation Planning",
+		    "proposal": "Does the plan address evacuation planning for coastal communities, including designated safe routes and shelter locations?"
+		},
+		{
+		    "name": "Disaster Response and Preparedness - Preparedness",
+		    "proposal": "Does the plan ensure that the state and coastal communities are prepared for more climate related disasters?"
+		},
+		{
+		    "name": "Disaster Response and Preparedness - Preparedness (2)",
+		    "proposal": "Does the plan ensure that disaster warning systems are operating, adequately funded, and well-managed?"
 		}
 	    ]
 	},
 	{
-	    "id": "sea-level-rise",
-	    "label": "Sea Level Rise",
-	    "description": "Policy proposals related to sea level rise",
+	    "id": "community-engagement-equity",
+	    "label": "Community Engagement Equity",
+	    "description": "Policy proposals for community engagement and equity.",
 	    "attributes": [
 		{
-		    "name": "Manage likely sea level rise",
-		    "proposal": "Commit to managing for (around) 1.5 feet of relative sea-level rise by 2050 and (around) 3.9 feet by 2100."
+		    "name": "CEE1 - Identifying and Understanding Impacts Upon Communities - Community Identification",
+		    "proposal": "Identify how the climate adaptation plan describes the process for identifying Environmental Justice (EJ) and \nequity-deserving populations."
 		},
 		{
-		    "name": "Manage worst caese sea level rise",
-		    "proposal": "Consider preparing to manage for (around) 3 feet of relative sea-level rise by 2050 and (around) 8.8 feet by 2100."
+		    "name": "CEE2 - Identifying and Understanding Impacts Upon Communities - Community Identification",
+		    "proposal": "According to the climate adaptation plan, were community-based organizations (CBOs) and civil society organizations (CSOs)  involved in the identification of communities at risk, the development of the adaptation plan, its implementation, and the evaluation of its effectiveness?"
 		},
 		{
-		    "name": "Develop regulations",
-		    "proposal": "Incorporate official state sea-level rise projections into regulations by 2022 and require regular updates to ensure the projections utilize the latest scientific data."
+		    "name": "CEE3 - Identifying and Understanding Impacts Upon Communities - Community Identification",
+		    "proposal": "Does the climate adaptation plan detail the extent to which Environmental Justice (EJ) and equity-deserving populations \n(including low-income, people of color, rural communities, people with disabilities, elderly, youth, Indigenous peoples, LGBTQIA+)  were involved in all stages of the policy design and implementation process?"
 		},
 		{
-		    "name": "Develop guidance",
-		    "proposal": "Develop guidance to support flood risk reductions for communities and state infrastructure."
+		    "name": "CEE4 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan include an analysis of how the adverse impacts of climate change are distributed across \ndifferent communities?"
 		},
 		{
-		    "name": "Deploy expertise",
-		    "proposal": "Establish cabinet-level leadership (for example, a state resilience officer) and coordination across state agencies and with nonprofits, university experts, and other partners."
+		    "name": "CEE5 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan identify specific populations that are considered to be more vulnerable to the impacts of climate change?"
 		},
 		{
-		    "name": "Funding",
-		    "proposal": "Increase funds to incentivize regional resilience planning and cooperation and the inclusion of climate resilience in local and regional plans, regulations, and capital-investment plans."
+		    "name": "CEE6 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan identify specific populations that are likely to experience a greater magnitude of climate change impacts?"
+		},
+		{
+		    "name": "CEE7 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan identify specific populations that are likely to experience a greater frequency of climate change impacts?"
+		},
+		{
+		    "name": "CEE8 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan acknowledge that certain populations may face multiple, overlapping climate change \nimpacts?"
+		},
+		{
+		    "name": "CEE9 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan compare the distribution of climate change impacts with indicators of socioeconomic vulnerability?  Indicators of vulnerability include: age, low income, disability, chronic illness, non-native English speakers, immigration status, etc.?"
+		},
+		{
+		    "name": "CEE10 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan describe whether impacted communities were involved in the process of identifying and \nanalyzing climate change impacts?"
+		},
+		{
+		    "name": "CEE11 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan state that the impact analysis incorporates community-generated data, traditional \necological knowledge, stories, and lived experiences alongside technical models and projections?"
+		},
+		{
+		    "name": "CEE12 - Identifying and Understanding Impacts Upon Communities - Distributional Impact Analysis",
+		    "proposal": "Does the climate adaptation plan address the risk of climate gentrification and the potential for increased housing costs in \nvulnerable communities?"
+		},
+		{
+		    "name": "CEE13 - Participation - Barriers",
+		    "proposal": "Does the climate adaptation plan describe efforts made to remove barriers to community participation, such as providing  translation, accessible meeting locations and times, childcare, etc.?"
+		},
+		{
+		    "name": "CEE14 - Participation - Communication",
+		    "proposal": "What types of information about climate change were provided to community members, and in what formats, according to the climate adaptation plan?"
+		},
+		{
+		    "name": "CEE15 - Participation - Communication",
+		    "proposal": "Were trusted members of the impacted communities involved in the communication efforts related to the climate adaptation plan, as described in the plan?"
+		},
+		{
+		    "name": "CEE16 - Participation - Continuing Engagement",
+		    "proposal": "What measures are outlined in the climate adaptation plan to empower communities to sustain adaptation efforts over the long -term?"
+		},
+		{
+		    "name": "CEE17 - Participation - Continuing Engagement",
+		    "proposal": "Does the climate adaptation plan specify how progress will be reported back to communities in transparent and accessible ways to encourage ongoing participation?"
+		},
+		{
+		    "name": "CEE18 - Participation - Continuing Engagement",
+		    "proposal": "Does the climate adaptation plan outline a process for course correction if evidence suggests unintended inequitable pathways or outcomes are emerging?"
+		},
+		{
+		    "name": "CEE19 - Participation - Continuing Engagement",
+		    "proposal": "How does the climate adaptation plan involve communities in ongoing monitoring, evaluation, and accountability measures related to the adaptation efforts?"
+		},
+		{
+		    "name": "CEE20 - Solutions - Prioritization",
+		    "proposal": "For each major proposed adaptation measure in the climate adaptation plan, is an assessment of the distribution of benefits and costs considered?"
+		},
+		{
+		    "name": "CEE21 - Solutions - Prioritization",
+		    "proposal": "Does the climate adaptation plan state that adaptation measures are prioritized taking into account the burdens and \nvulnerabilities of Environmental Justice (EJ) communities and equity-deserving populations?"
+		},
+		{
+		    "name": "CEE22 - Solutions - Prioritization",
+		    "proposal": "What specific indicators are tracked to measure equity outcomes in the climate adaptation plan (e.g., reductions in \nheat-related illness, displacement rates, access to green space, continuity of utility services, access to continuity of transporation services, community satisfaction and trust)?"
+		},
+		{
+		    "name": "CEE23 - Solutions - Prioritization",
+		    "proposal": "Does the climate adaptation plan define what successful adaptation would look like from the perspective of Environmental Justice (EJ) and equity-deserving communities?"
+		},
+		{
+		    "name": "CEE24 - Solutions - Prioritization",
+		    "proposal": "How does the climate adaptation plan consider Indigenous rights and cultures in adaptation priorities?"
+		},
+		{
+		    "name": "CEE25 - Solutions - Specific Considerations",
+		    "proposal": "Does the climate adaptation plan include anti-displacement tools, such as tenant protections, affordable housing \ninitiatives, or community land trusts, as a measure to mitigate the risk of climate gentrification?"
+		},
+		{
+		    "name": "CEE26 - Solutions - Resources",
+		    "proposal": "Does the climate adaptation plan address distributive equity by specifying a percentage of climate adaptation resources to be dedicated to disadvantaged communities?"
+		},
+		{
+		    "name": "CEE27 - Solutions - Resources",
+		    "proposal": "Does the climate adaptation plan outline the creation or expansion of programs to provide technical assistance to local municipalities and tribal communities for their own climate adaptation planning?"
+		},
+		{
+		    "name": "CEE28 - Solutions - Resources",
+		    "proposal": "How do the funding criteria and scoring systems for climate adaptation projects in the plan reward, penalize, or inhibit \nprojects that primarily serve Environmental Justice (EJ) and equity-deserving communities?"
+		},
+		{
+		    "name": "CEE29 - Solutions - Resources",
+		    "proposal": "Are there dedicated funding streams within the climate adaptation plan specifically for EJ-led, Indigenous-led, or \ncommunity-based projects, in addition to large-scale infrastructure projects led by state agencies?"
+		},
+		{
+		    "name": "CEE30 - Solutions - Resources",
+		    "proposal": "Is a defined share of adaptation funds for participatory budgeting or other resident-led allocation processes?"
+		},
+		{
+		    "name": "CEE31 - Governance - Decentralization",
+		    "proposal": "Does the climate adaptation plan allocate a defined share of adaptation funds for participatory budgeting or other \nresident-led allocation processes?"
+		},
+		{
+		    "name": "CEE34 - Governance - Decentralization",
+		    "proposal": "Does the climate adaptation plan provide information that enables local municipalities and tribal communities to assess  their own climate and social vulnerability?"
+		},
+		{
+		    "name": "CEE35 - Governance - Structure",
+		    "proposal": "Do relevant governance structures (boards, advisory councils, community oversight committees) outlined in the climate adaptation plan include representatives from Environmental Justice (EJ) and equity-deserving communities with real authority over priorities, budgets, and trade-offs?"
+		},
+		{
+		    "name": "CEE36 - Governance - Redress & Accountability",
+		    "proposal": "What mechanisms are in place within the climate adaptation plan to allow communities to challenge decisions, file \ncomplaints, or seek remedies if adaptation projects cause harm?"
 		}
 	    ]
 	},
 	{
-	    "id": "natural-gas",
-	    "label": "Natural Gas",
-	    "description": "Policy proposals related to natural gas",
+	    "id": "high-wind",
+	    "label": "DRAFT of High Wind",
+	    "description": "Policy proposals for high wind.",
 	    "attributes": [
 		{
-		    "name": "Pipeline costs",
-		    "proposal": "Mitigate the risks of locking in additional investments and costs of pipeline systems that must eventually be paid for by either ratepayers or gas utilities’ shareholders."
+		    "name": "HW1 - Accountability & Governance - Roles and Responsibilities",
+		    "proposal": "How will state agencies coordinate high wind response with municipalities, utilities and community-based organizations?"
 		},
 		{
-		    "name": "Decommision",
-		    "proposal": "Investigating the decommissioning of the gas distribution system to support a just and equitable transition toward electrified heating."
+		    "name": "HW2 - Accountability & Governance - Funding and financing",
+		    "proposal": "What is the cost of proposed high wind resilience actions?"
 		},
 		{
-		    "name": "Pipeline maintenance",
-		    "proposal": "Evaluate options to reduce maintenance costs for the natural gas pipeline system while prioritizing reliability and safety, including assessing the need for full replacement versus lower-cost repairs to avoid the risks of installing stranded assets."
+		    "name": "HW3 - Accountability & Governance - Costs",
+		    "proposal": "What is the potential impact and cost of high wind?"
 		},
 		{
-		    "name": "Regulation",
-		    "proposal": "Develop a regulatory framework to guide gas utilities and align with decarbonization efforts, as seen in DPU’s Docket 20-80 on the Future of Gas."
+		    "name": "HW4 - Accountability & Governance - Indicators",
+		    "proposal": "What are specific funding sources and mechanisms for high windresilience?"
+		},
+		{
+		    "name": "HW5 - Accountability & Governance - Transparency",
+		    "proposal": "What indicators will measure long-term high wind resilience (including on human health)?"
+		},
+		{
+		    "name": "HW6 - Accountability & Governance - Coordination",
+		    "proposal": "Which agencies are responsible for implementing the state’s extreme hgih wind strategies?"
+		},
+		{
+		    "name": "HW9 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
+		    "proposal": "What measures will be taken to reduce wind vulnerability?"
+		},
+		{
+		    "name": "HW10 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
+		    "proposal": "Coastal wetlands or dune systems that buffer wind impacts"
+		},
+		{
+		    "name": "HW11 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
+		    "proposal": "Does the plan deploy green infrastructure for high‑wind resilience in urban and suburban areas"
 		}
 	    ]
 	},
 	{
-	    "id": "electric-vehicles",
-	    "label": "Electric Vehicles",
-	    "description": "Policy proposals related to electric vehicles",
+	    "id": "extreme-heat",
+	    "label": "Extreme Heat",
+	    "description": "Policy proposals for extreme heat.",
 	    "attributes": [
 		{
-		    "name": "Accessibility",
-		    "proposal": "Increase the size of incentives, shift to point-of-sale rebates, target funds towards lower-income households."
+		    "name": "EH1 - Vulnerability and Risk Assessment - Definitions",
+		    "proposal": "How is extreme heat defined?"
 		},
 		{
-		    "name": "Charging infrastructure",
-		    "proposal": "Improve charger reliabiity, support vehicle-to-grid technologies, integrate EV planning with local infrastructure efforts."
+		    "name": "EH2 - Vulnerability and Risk Assessment - Human health",
+		    "proposal": "What are the key impacts on human health from extreme heat?"
+		},
+		{
+		    "name": "EH3 - Vulnerability and Risk Assessment - Infrastructure",
+		    "proposal": "What are the key impacts on physical assets from extreme heat?"
+		},
+		{
+		    "name": "EH4 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "how many extreme heat days are predicted?"
+		},
+		{
+		    "name": "EH5 - Vulnerability and Risk Assessment - Forecasts",
+		    "proposal": "Which geographies face the highest risk and how are they identified?"
+		},
+		{
+		    "name": "EH6 - Vulnerability and Risk Assessment - Human health",
+		    "proposal": "Does the plan identify specific populations as vulnerable to extreme heat?"
+		},
+		{
+		    "name": "EH7 - Vulnerability and Risk Assessment - Human health",
+		    "proposal": "What other climate change risks to human health are likely to compound heat risk?"
+		},
+		{
+		    "name": "EH8 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+		    "proposal": "How will building codes change in response to extreme heat risk?"
+		},
+		{
+		    "name": "EH9 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+		    "proposal": "What state or municipal ordinances are related to heat mitigation?"
+		},
+		{
+		    "name": "EH10 - Policy and Regulatory Implementation - Physical Assets",
+		    "proposal": "what mandatory cooling standards for rental housing or public buildings exist or are proposed?"
+		},
+		{
+		    "name": "EH11 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+		    "proposal": "How are existing regulations limiting heat resilience strategies?"
+		},
+		{
+		    "name": "EH12 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "How will the development of municipal heat resilience plans be supported?"
+		},
+		{
+		    "name": "EH13 - Local Capacity Building - Supporting Local Governments",
+		    "proposal": "Will technical assistance and funding be provided for local heat mitigation projects?"
+		},
+		{
+		    "name": "EH14 - Local Capacity Building - Capacity building",
+		    "proposal": "How will local officials and emergency managers be trained to respond to extreme heat?"
+		},
+		{
+		    "name": "EH15 - Local Capacity Building - Community Outreach",
+		    "proposal": "How will the response of community-based organizations to extreme heat be supported?"
+		},
+		{
+		    "name": "EH16 - Local Capacity Building - Data",
+		    "proposal": "What data will be collected to assess and respond to extreme heat?"
+		},
+		{
+		    "name": "EH17 - Local Capacity Building - Community Outreach",
+		    "proposal": "How will the public be informed about extreme heat risk?"
+		},
+		{
+		    "name": "EH18 - Local Capacity Building - Legal and Regulatory Frameworks",
+		    "proposal": "How will zoning and land use regulations change in response to extreme heat risk?"
+		},
+		{
+		    "name": "EH19 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "What heat emergency response measures does the plan include?"
+		},
+		{
+		    "name": "EH20 - Disaster Response and Preparedness - Emergency Identification",
+		    "proposal": "What early warning systems are in place for heat waves?"
+		},
+		{
+		    "name": "EH21 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "Are cooling centers available and accessible?"
+		},
+		{
+		    "name": "EH22 - Disaster Response and Preparedness - Emergency Response",
+		    "proposal": "How will vulnerable populations be protected during extreme heat events?"
+		},
+		{
+		    "name": "EH23 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+		    "proposal": "What strategies will be used to reduce urban heat islands?"
+		},
+		{
+		    "name": "EH24 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+		    "proposal": "What long-term cooling infrastructure investments will be made?"
+		},
+		{
+		    "name": "EH25 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+		    "proposal": "Which nature-based solutions are proposed?"
+		},
+		{
+		    "name": "EH26 - Adaptation Strategies & Long-Term Actions - System Adaptation",
+		    "proposal": "How does heat resilience integrate with decarbonization and electrification goals?"
+		},
+		{
+		    "name": "EH27 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+		    "proposal": "What criticial facilities require backup power for heat events?"
+		},
+		{
+		    "name": "EH28 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+		    "proposal": "What incentives will vulnerable communities receive for energy-efficient cooling?"
+		},
+		{
+		    "name": "EH29 - Equity & Environmental Justice - Distribution of Impacts",
+		    "proposal": "How does the plan address disproportionate heat exposure in low-income communities?"
+		},
+		{
+		    "name": "EH30 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "How are communities engaged in desgning heat resilience?"
+		},
+		{
+		    "name": "EH31 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "What barriers do vulnerable populations face during extreme heat events?"
+		},
+		{
+		    "name": "EH32 - Equity & Environmental Justice - System Adaptation",
+		    "proposal": "Will heat resilience investments contribute to gentrification?"
+		},
+		{
+		    "name": "EH33 - Equity & Environmental Justice - Community Outreach",
+		    "proposal": "What ways will heat response be communicated?"
+		},
+		{
+		    "name": "EH34 - Equity & Environmental Justice - Distribution of Impacts",
+		    "proposal": "Will environmental justice communities be prioritized for cooling investments?"
+		},
+		{
+		    "name": "EH35 - Accountability & Governance - Roles and Responsibilities",
+		    "proposal": "Which agencies are responsible for implementing the state’s extreme heat strategies?"
+		},
+		{
+		    "name": "EH36 - Accountability & Governance - Funding and financing",
+		    "proposal": "What are the funding sources and mechanisms for heat resilience investments?"
+		},
+		{
+		    "name": "EH37 - Accountability & Governance - Costs",
+		    "proposal": "How much will heat resilience actions cost?"
+		},
+		{
+		    "name": "EH38 - Accountability & Governance - Indicators",
+		    "proposal": "How will heat risk and resilience be measured in the long-term?"
+		},
+		{
+		    "name": "EH39 - Accountability & Governance - Transparency",
+		    "proposal": "How will heat risk and resilience be reported?"
+		},
+		{
+		    "name": "EH40 - Accountability & Governance - Coordination",
+		    "proposal": "How will state and local governments, community-based organizations, and utitlities coordinate their efforts during extreme heat events?"
+		}
+	    ]	    
+	},
+	{
+	    "id": "governance",
+	    "label": "Governance",
+	    "description": "Policy proposals for governance.",
+	    "attributes": [
+		{
+		    "name": "G1 - Participation - Access to Information",
+		    "proposal": "Can stakeholders easily and independently access key scientific analysis, technical documents and policy papers to inform their opinions about risks and responses?"
+		},
+		{
+		    "name": "G2 - Participation - Access to Information",
+		    "proposal": "Does such information relate to climate adaptation as a whole, or particular risks?"
+		},
+		{
+		    "name": "G3 - Participation - Access to Information",
+		    "proposal": "Is information made available in the appropriate languages and formats?"
+		},
+		{
+		    "name": "G4 - Participation - Access to Information",
+		    "proposal": "How is the information communicated to non-technical audiences?"
+		},
+		{
+		    "name": "G5 - Participation - Meaningful Opportunities",
+		    "proposal": "Are stakeholders provided with meaningful opportunities to participate in climate change preparation and adaption?"
+		},
+		{
+		    "name": "G6 - Participation - Meaningful Opportunities",
+		    "proposal": "What measures beyond traditional notice and comment period are provided?"
+		},
+		{
+		    "name": "G7 - Participation - Inclusiveness",
+		    "proposal": "Can you please provide examples where state plans identify populations in states of vulnerability (e.g., disabled, EJ populations, youth, immigrants, etc.) and facilitate their participation in policy-making?"
+		},
+		{
+		    "name": "G8 - Participation - On-going Involvement",
+		    "proposal": "Is the on-going involvement of key stakeholders encouraged (e.g., maintaining active dialogues, informing participations of the results and impact of their inputs, etc.)?"
+		},
+		{
+		    "name": "G9 - Institutions - Goal Definition",
+		    "proposal": "Is there a clear definition of what ‘climate resilience’ and ‘climate adaptation’ would mean in the state?"
+		},
+		{
+		    "name": "G10 - Institutions - Goal Definition",
+		    "proposal": "Are the policy measures to achieve that goal gathered in one plan that is periodically revised?"
+		},
+		{
+		    "name": "G11 - Institutions - Political Leadership",
+		    "proposal": "Is strong political leadership shaping and supporting climate adaptation policy?"
+		},
+		{
+		    "name": "G12 - Institutions - Political Leadership",
+		    "proposal": "Is the climate adaptation plan required by statue or an executive order?"
+		},
+		{
+		    "name": "G13 - Institutions - Technical Leadership",
+		    "proposal": "Is there a dedicated climate resilience officer at the highest level of state government?"
+		},
+		{
+		    "name": "G14 - Institutions - Technical Leadership",
+		    "proposal": "Is there an administrative office committed to climate adaptation?"
+		},
+		{
+		    "name": "G15 - Institutions - Technical Leadership",
+		    "proposal": "Are the roles and responsibilities of the office committed to cliamte adapatation defined in enabling legislation or state policy?"
+		},
+		{
+		    "name": "G16 - Institutions - Agency Cooperation",
+		    "proposal": "Are there strong mechanisms to ensure that government agencies are achieving the same climate adaptation ends in ways that increase efficiency through cooperation?"
+		},
+		{
+		    "name": "G17 - Institutions - Agency Cooperation",
+		    "proposal": "Is there an explicit understanding of how climate adaptation can be reflected in such departments priorities?"
+		},
+		{
+		    "name": "G18 - Institutions - Legal and Regulatory Framework",
+		    "proposal": "Are the governance arrangements for the climate adaptation plan supported by a framework of laws and executive orders?"
+		},
+		{
+		    "name": "G19 - Institutions - Expertise",
+		    "proposal": "Does the institutional framework encourage the use of best scientific evidence for risk identification and responsive policy design?"
+		},
+		{
+		    "name": "G20 - Institutions - Expertise",
+		    "proposal": "Is there a process for incorporating new findings as they emerge?"
+		},
+		{
+		    "name": "G21 - Institutions - Expertise",
+		    "proposal": "Does the plan mention consultation with expert bodies (e.g., climate scientists, engineers)?"
+		},
+		{
+		    "name": "G22 - Institutions - Expertise",
+		    "proposal": "Is there a formal advisory council of experts to guide the plan's development and evaluation?"
+		},
+		{
+		    "name": "G23 - Institutions - Expertise",
+		    "proposal": "Are mechanisms in place to allow for expert input during planning, implementation, monitoring and evaluation?"
+		},
+		{
+		    "name": "G24 - Institutions - Capacity Development",
+		    "proposal": "Does the climate adaptation plan address increasing the capability of government departments and employees to identify and address risks arising from climate adaptation?"
+		},
+		{
+		    "name": "G25 - Transparency - Quality",
+		    "proposal": "Does the data provided give the public an on-going sense of the risks of climate adaptation and the progress of policy measures to prepare, respond to and recover from them?"
+		},
+		{
+		    "name": "G26 - Transparency - Quality",
+		    "proposal": "Is there a clear audit trail and verification mechanism?"
+		},
+		{
+		    "name": "G27 - Transparency - Granularity",
+		    "proposal": "Are the data and reports provided sufficiently granular to provide a clear picture at the community level, without masking outcomes or impacts on vulnerable populations?"
+		},
+		{
+		    "name": "G28 - Transparency - Granularity",
+		    "proposal": "Have clear, useful metrics been developed?"
+		},
+		{
+		    "name": "G29 - Transparency - Speed and Frequency",
+		    "proposal": "Is information provided sufficiently quickly and with enough frequency to give stakeholders a solid understanding of a climate adaptation risk or policy?"
+		},
+		{
+		    "name": "G30 - Transparency - Speed and Frequency",
+		    "proposal": "Are data and reports stale or irrelevant by the time the public has access?"
+		},
+		{
+		    "name": "G31 - Transparency - Reach",
+		    "proposal": "Is the information made available to all impacted stakeholders in a manner that facilitates their understanding?"
+		},
+		{
+		    "name": "G32 - Accountability - Clarity",
+		    "proposal": "Are roles, responsibilities and objectives clearly delineated?"
+		},
+		{
+		    "name": "G33 - Accountability - Enforceability",
+		    "proposal": "Do citizens have statutory rights to enforce the climate adaptation policy or pursue breaches?"
+		},
+		{
+		    "name": "G34 - Accountability - Enforceability",
+		    "proposal": "Does the plan outline the consequences for departments or entities that fail to meet their obligations?"
+		},
+		{
+		    "name": "G35 - Accountability - Systematic",
+		    "proposal": "Is there a systematic approach to monitoring, evaluation, publication and learning to maximize positive outcomes and learning?"
+		},
+		{
+		    "name": "G36 - Resources - Human Resources",
+		    "proposal": "Are enough people with a broad range of skills giving enough attention to the critical climate adaptation risks?"
+		},
+		{
+		    "name": "G37 - Resources - Human Resources",
+		    "proposal": "Does the plan invest in building the skills of state employees needed to address climate adaptation issues?"
+		},
+		{
+		    "name": "G38 - Resources - Public Financial Resources",
+		    "proposal": "Does the plan provide estimated costs of increasing the resilience of key physical and natural assets?  Are funding mechanisms identified to cover those costs?"
+		},
+		{
+		    "name": "G39 - Resources - Public Financial Resources",
+		    "proposal": "Is it identified and protected in state budgets?"
+		},
+		{
+		    "name": "G40 - Resources - Public Financial Resources",
+		    "proposal": "Does the plan provide dedicated funding for proactive climate adaptation measures, separate from funding for disaster recovery?"
+		},
+		{
+		    "name": "G41 - Resources - Private Financial Resources",
+		    "proposal": "Does the plan provide incentives that encourage private investment in climate resilience measures? Are the resources required from private investment quantified?"
+		},
+		{
+		    "name": "G42 - Resources - Private Financial Resources",
+		    "proposal": "Do these incentives advance or detract from efforts to ensure public climate readiness?"
+		},
+		{
+		    "name": "G43 - Resources - Access",
+		    "proposal": "Are financial, human and knowledge resources made available to regional/municipal entities?"
 		}
 	    ]
-	}				
+	}
     ]
 }

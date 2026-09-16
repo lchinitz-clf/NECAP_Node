@@ -1,0 +1,164 @@
+{
+  "attributes": [
+    {
+      "name": "IF1 - Vulnerability and Risk Assessment - Definitions",
+      "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?"
+    },
+    {
+      "name": "IF2 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "Does the plan identify the number of projected extreme INLAND OR STORMWATER FLOODING days by 2050, and how does it compare to current conditions?"
+    },
+    {
+      "name": "IF3 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "Does the plan specify which regions or municipalities face the highest projected INLAND OR STORMWATER FLOODING risk?"
+    },
+    {
+      "name": "IF4 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "Which specific neighborhoods or census tracts are most vulnerable to INLAND OR STORMWATER FLOODING?"
+    },
+    {
+      "name": "IF5 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "Does the plan address risks associated with different types of inland flooding?"
+    },
+    {
+      "name": "IF6 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "How the plan improve the quality and accuracy of flood monitoring and forecasting?"
+    },
+    {
+      "name": "IF7 - Policy and Regulatory Implementation - Building Codes",
+      "proposal": "Does the plan propose changes to building codes that promote resilience to flooding?"
+    },
+    {
+      "name": "IF8 - Policy and Regulatory Implementation - Disclosure",
+      "proposal": "Does the plan create statewide flood risk disclosure requirements for the rental and sale of residential properties?"
+    },
+    {
+      "name": "IF9 - Policy and Regulatory Implementation - Zoning",
+      "proposal": "Does the plan propose zoning reforms to discourage or prevent development within floodplains?"
+    },
+    {
+      "name": "IF10 - Policy and Regulatory Implementation - Regulatory",
+      "proposal": "Does the plan create incentives for the insurance industry to offer discounts to homeowners who implement flood mitigation measures?"
+    },
+    {
+      "name": "IF11 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "How does the plan support municipalities in developing local INLAND OR STORMWATER FLOODING resilience plans?"
+    },
+    {
+      "name": "IF12 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "Does the plan encourage municipalities to collaborate in adaptation planning at the watershed level?"
+    },
+    {
+      "name": "IF13 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "Does the plan assist municipalities in identifying physical assets most vulnerable to flooding?"
+    },
+    {
+      "name": "IF14 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "Does the plan assist municipalities in indentifying neighborhoods and populations most vulnerable to flooding?"
+    },
+    {
+      "name": "IF15 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "Does the plan encourage municipal participation in the Community Rating System (CRS) to create discounts National Flood Insurance Program (NFIP) premiums for its residents?"
+    },
+    {
+      "name": "IF16 - Local Capacity Building - Community Outreach",
+      "proposal": "Does the plan outline public education campaigns about inland flooding risks?"
+    },
+    {
+      "name": "IF17 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "Does the plan improve and fund flood monitoring and early warning systems?"
+    },
+    {
+      "name": "IF18 - Disaster Response and Preparedness - Emergency Identification",
+      "proposal": "Does the plan promote real time control of reservoirs and detention basins?"
+    },
+    {
+      "name": "IF19 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "Does the plan promote and fund the creation of Resilience Hubs?"
+    },
+    {
+      "name": "IF20 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "Does the plan outline protocols for protecting unhoused residents during inland flooding events?"
+    },
+    {
+      "name": "IF21 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "Does the plan include surge capacity planning for hospitals and EMS during inland flooding events?"
+    },
+    {
+      "name": "IF22 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+      "proposal": "What strategies will be used to protect or restore floodplains?"
+    },
+    {
+      "name": "IF23 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+      "proposal": "What strategies will be used to repair or remove dams at risk of failure?"
+    },
+    {
+      "name": "IF24 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+      "proposal": "Does the plan create or protect riparian buffers?"
+    },
+    {
+      "name": "IF25 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
+      "proposal": "Does the plan encourage the use of green infrastructure to reduce runoff?"
+    },
+    {
+      "name": "IF26 - Adaptation Strategies & Long-Term Actions - Buyouts",
+      "proposal": "Does the plan offer voluntary buyouts or relocation assistance to people living in floodplains?"
+    },
+    {
+      "name": "IF27 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+      "proposal": "Does that plan reduce flooding risk by elevating structures, utilities, and roads?"
+    },
+    {
+      "name": "IF28 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+      "proposal": "Does the plan explicitly address flooding risks to drinking water and wastewater utilities?"
+    },
+    {
+      "name": "IF29 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+      "proposal": "Does the plan address the impact of flooding on combined sewer overflows (CSOs)?"
+    },
+    {
+      "name": "IF30 - Equity & Environmental Justice - Distribution of Impacts",
+      "proposal": "How does the plan address disproportionate risk of flooding in low-income communities?"
+    },
+    {
+      "name": "IF31 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "What community engagement processes does the plan require for resilience strategies for inland flooding?"
+    },
+    {
+      "name": "IF32 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents facing flooding risks?"
+    },
+    {
+      "name": "IF33 - Equity & Environmental Justice - System Adaptation",
+      "proposal": "How does the plan ensure that flood resilience investments do not contribute to displacement or gentrification?"
+    },
+    {
+      "name": "IF34 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "Does the plan address multilingual or culturally specific communication needs?"
+    },
+    {
+      "name": "IF35 - Equity & Environmental Justice - Distribution of Impacts",
+      "proposal": "Does the plan commit to prioritizing flood mitigation in environmental justice communities?"
+    },
+    {
+      "name": "IF36 - Accountability & Governance - Roles and Responsibilities",
+      "proposal": "Which agencies are responsible for implementing different components of the state’s inland flooding resilience strategies?"
+    },
+    {
+      "name": "IF37 - Accountability & Governance - Funding and financing",
+      "proposal": "Does the plan identify funding sources for inland flooding resilience work?"
+    },
+    {
+      "name": "IF38 - Accountability & Governance - Costs",
+      "proposal": "Does the plan estimate the cost of proposed inland flooding resilience actions?"
+    },
+    {
+      "name": "IF39 - Accountability & Governance - Funding and financing",
+      "proposal": "Are there funding mechanisms dedicated to inland flooding mitigation and resilience?"
+    },
+    {
+      "name": "IF40 - Accountability & Governance - Indicators",
+      "proposal": "What metrics does the plan propose to track progress on reducing flood risk?"
+    }
+  ]
+}

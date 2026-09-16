@@ -1,0 +1,164 @@
+{
+  "attributes": [
+    {
+      "name": "EH1 - Vulnerability and Risk Assessment - Definitions",
+      "proposal": "How is extreme heat defined?"
+    },
+    {
+      "name": "EH2 - Vulnerability and Risk Assessment - Human health",
+      "proposal": "What are the key impacts on human health from extreme heat?"
+    },
+    {
+      "name": "EH3 - Vulnerability and Risk Assessment - Infrastructure",
+      "proposal": "What are the key impacts on physical assets from extreme heat?"
+    },
+    {
+      "name": "EH4 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "how many extreme heat days are predicted?"
+    },
+    {
+      "name": "EH5 - Vulnerability and Risk Assessment - Forecasts",
+      "proposal": "Which geographies face the highest risk and how are they identified?"
+    },
+    {
+      "name": "EH6 - Vulnerability and Risk Assessment - Human health",
+      "proposal": "Does the plan identify specific populations as vulnerable to extreme heat?"
+    },
+    {
+      "name": "EH7 - Vulnerability and Risk Assessment - Human health",
+      "proposal": "What other climate change risks to human health are likely to compound heat risk?"
+    },
+    {
+      "name": "EH8 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+      "proposal": "How will building codes change in response to extreme heat risk?"
+    },
+    {
+      "name": "EH9 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+      "proposal": "What state or municipal ordinances are related to heat mitigation?"
+    },
+    {
+      "name": "EH10 - Policy and Regulatory Implementation - Physical Assets",
+      "proposal": "what mandatory cooling standards for rental housing or public buildings exist or are proposed?"
+    },
+    {
+      "name": "EH11 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+      "proposal": "How are existing regulations limiting heat resilience strategies?"
+    },
+    {
+      "name": "EH12 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "How will the development of municipal heat resilience plans be supported?"
+    },
+    {
+      "name": "EH13 - Local Capacity Building - Supporting Local Governments",
+      "proposal": "Will technical assistance and funding be provided for local heat mitigation projects?"
+    },
+    {
+      "name": "EH14 - Local Capacity Building - Capacity building",
+      "proposal": "How will local officials and emergency managers be trained to respond to extreme heat?"
+    },
+    {
+      "name": "EH15 - Local Capacity Building - Community Outreach",
+      "proposal": "How will the response of community-based organizations to extreme heat be supported?"
+    },
+    {
+      "name": "EH16 - Local Capacity Building - Data",
+      "proposal": "What data will be collected to assess and respond to extreme heat?"
+    },
+    {
+      "name": "EH17 - Local Capacity Building - Community Outreach",
+      "proposal": "How will the public be informed about extreme heat risk?"
+    },
+    {
+      "name": "EH18 - Local Capacity Building - Legal and Regulatory Frameworks",
+      "proposal": "How will zoning and land use regulations change in response to extreme heat risk?"
+    },
+    {
+      "name": "EH19 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "What heat emergency response measures does the plan include?"
+    },
+    {
+      "name": "EH20 - Disaster Response and Preparedness - Emergency Identification",
+      "proposal": "What early warning systems are in place for heat waves?"
+    },
+    {
+      "name": "EH21 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "Are cooling centers available and accessible?"
+    },
+    {
+      "name": "EH22 - Disaster Response and Preparedness - Emergency Response",
+      "proposal": "How will vulnerable populations be protected during extreme heat events?"
+    },
+    {
+      "name": "EH23 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+      "proposal": "What strategies will be used to reduce urban heat islands?"
+    },
+    {
+      "name": "EH24 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+      "proposal": "What long-term cooling infrastructure investments will be made?"
+    },
+    {
+      "name": "EH25 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+      "proposal": "Which nature-based solutions are proposed?"
+    },
+    {
+      "name": "EH26 - Adaptation Strategies & Long-Term Actions - System Adaptation",
+      "proposal": "How does heat resilience integrate with decarbonization and electrification goals?"
+    },
+    {
+      "name": "EH27 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+      "proposal": "What criticial facilities require backup power for heat events?"
+    },
+    {
+      "name": "EH28 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+      "proposal": "What incentives will vulnerable communities receive for energy-efficient cooling?"
+    },
+    {
+      "name": "EH29 - Equity & Environmental Justice - Distribution of Impacts",
+      "proposal": "How does the plan address disproportionate heat exposure in low-income communities?"
+    },
+    {
+      "name": "EH30 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "How are communities engaged in desgning heat resilience?"
+    },
+    {
+      "name": "EH31 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "What barriers do vulnerable populations face during extreme heat events?"
+    },
+    {
+      "name": "EH32 - Equity & Environmental Justice - System Adaptation",
+      "proposal": "Will heat resilience investments contribute to gentrification?"
+    },
+    {
+      "name": "EH33 - Equity & Environmental Justice - Community Outreach",
+      "proposal": "What ways will heat response be communicated?"
+    },
+    {
+      "name": "EH34 - Equity & Environmental Justice - Distribution of Impacts",
+      "proposal": "Will environmental justice communities be prioritized for cooling investments?"
+    },
+    {
+      "name": "EH35 - Accountability & Governance - Roles and Responsibilities",
+      "proposal": "Which agencies are responsible for implementing the state’s extreme heat strategies?"
+    },
+    {
+      "name": "EH36 - Accountability & Governance - Funding and financing",
+      "proposal": "What are the funding sources and mechanisms for heat resilience investments?"
+    },
+    {
+      "name": "EH37 - Accountability & Governance - Costs",
+      "proposal": "How much will heat resilience actions cost?"
+    },
+    {
+      "name": "EH38 - Accountability & Governance - Indicators",
+      "proposal": "How will heat risk and resilience be measured in the long-term?"
+    },
+    {
+      "name": "EH39 - Accountability & Governance - Transparency",
+      "proposal": "How will heat risk and resilience be reported?"
+    },
+    {
+      "name": "EH40 - Accountability & Governance - Coordination",
+      "proposal": "How will state and local governments, community-based organizations, and utitlities coordinate their efforts during extreme heat events?"
+    }
+  ]
+}

@@ -129,7 +129,7 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   pending `reader.read()` below reject with an AbortError, which
  *   propagates out of this function uncaught — same "let it surface
  *   as-is" treatment the initial-connect catch block below gives it.
- * @returns {Promise<{text: string, thinking: string, doneReason: string|undefined}>}
+ * @returns {Promise<{text: string, thinking: string, doneReason: string|undefined, promptTokens: number|undefined, answerTokens: number|undefined}>}
  *   `text` is the full answer, same as this always returned before.
  *   `thinking` is the full reasoning trace accumulated from
  *   `message.thinking` fragments — an empty string for a model that
@@ -138,16 +138,23 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   `"stop"` (the model reached a natural end, e.g. hit its own
  *   end-of-turn token), or `"length"` if it was cut off by a limit
  *   instead: either `maxTokens`/`num_predict` above if that was set, OR,
- *   just as commonly, Ollama's `num_ctx` context-window ceiling being
+ *   just as commonly, the model's `num_ctx` context-window ceiling being
  *   exhausted by the prompt + answer combined — that one is NOT
- *   controlled by maxTokens at all, isn't set anywhere in this file, and
- *   so is silently using Ollama's own default (2048 tokens for many
- *   models unless the Modelfile says otherwise) regardless of what the
- *   model itself could support. A caller can't tell those two "length"
- *   causes apart from doneReason alone — only from whether it itself
- *   passed maxTokens. (See the `think` param above for a third
- *   "length" cause specific to reasoning models: the shared
- *   thinking+answer token budget being exhausted by thinking alone.)
+ *   controlled by maxTokens at all; unless `numCtx` above is set, this
+ *   silently uses the model's own default regardless of what the model
+ *   itself could support. A caller can't tell those two "length" causes
+ *   apart from doneReason alone — only from whether it itself passed
+ *   maxTokens. (See the `think` param above for a third "length" cause
+ *   specific to reasoning models: the shared thinking+answer token
+ *   budget being exhausted by thinking alone.)
+ *   `promptTokens` (from Ollama's `prompt_eval_count`) is exactly how
+ *   many tokens the request you sent — system instructions + retrieved
+ *   chunks + question, everything — was counted as; `answerTokens`
+ *   (from `eval_count`) is how many tokens the generated answer (and,
+ *   for a reasoning model, its thinking) came to. Both are Ollama's own
+ *   count, not an estimate computed here, and both are `undefined` if
+ *   Ollama's response is ever missing them (older versions, or an
+ *   unusual response shape) rather than this function guessing.
  */
 async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
@@ -185,6 +192,8 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
       text: data.message.content,
       thinking: (data.message && data.message.thinking) || '',
       doneReason: data.done_reason,
+      promptTokens: data.prompt_eval_count,
+      answerTokens: data.eval_count,
     };
   }
 
@@ -209,6 +218,8 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
   let full = '';
   let fullThinking = '';
   let doneReason;
+  let promptTokens;
+  let answerTokens;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -231,11 +242,18 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
         full += piece;
         onToken(piece);
       }
-      if (obj.done) doneReason = obj.done_reason;
+      // prompt_eval_count/eval_count only appear on this final line,
+      // same as done_reason above — every earlier fragment has
+      // done: false and neither field at all.
+      if (obj.done) {
+        doneReason = obj.done_reason;
+        promptTokens = obj.prompt_eval_count;
+        answerTokens = obj.eval_count;
+      }
     }
   }
 
-  return { text: full, thinking: fullThinking, doneReason };
+  return { text: full, thinking: fullThinking, doneReason, promptTokens, answerTokens };
 }
 
 /**
