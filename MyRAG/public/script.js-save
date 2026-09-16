@@ -558,10 +558,19 @@ function renderSourceChips(sources, threshold) {
     .map((s) => {
       const ok = threshold === undefined || s.score >= threshold;
       const scoreClass = ok ? 'score-meets' : 'score-below';
-      const label = `${escapeHtml(s.sourceFile)} #${s.chunkIndex}`;
+      // Chunk number only, not the source file name too — with several
+      // chips per row this column got too cramped once file names were
+      // included (especially long, real-world document names). The
+      // file name isn't lost: it's on the chip as a hover title, and
+      // shown as the modal's subtitle once you click through to the
+      // block text — same as the main sources table already handles
+      // this trade-off, just applied here for a row that can carry
+      // several chips at once instead of one file name per row.
+      const label = `#${s.chunkIndex}`;
+      const title = escapeHtml(s.sourceFile);
       return s.id
-        ? `<button type="button" class="chunk-link chip ${scoreClass}" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${escapeHtml(s.sourceFile)}" data-chunk-index="${s.chunkIndex}">${label}</button>`
-        : `<span class="chip">${label}</span>`;
+        ? `<button type="button" class="chunk-link chip ${scoreClass}" title="${title}" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${title}" data-chunk-index="${s.chunkIndex}">${label}</button>`
+        : `<span class="chip" title="${title}">${label}</span>`;
     })
     .join(' ');
 }

@@ -93,6 +93,23 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   starts; raising this is the direct fix for both. The UI exposes
  *   this as "Request size" in Advanced settings, deliberately avoiding
  *   the `num_ctx` name itself.
+ * @param {number} [opts.repeatPenalty] - passed through as Ollama's
+ *   `repeat_penalty`: how strongly recently-generated tokens are
+ *   down-weighted when the model picks its next one. Ollama's own
+ *   default is 1.1 (mild); 1.0 disables it entirely; noticeably higher
+ *   values (1.3-1.4+) push harder against the model repeating itself.
+ *   This is the direct fix for a specific failure mode weaker/smaller
+ *   models are prone to under this app's fairly low default
+ *   temperature: getting stuck restating a slight variant of what they
+ *   just said instead of ever reaching a natural stop, generating
+ *   several near-duplicate paragraphs in a row (each subtly reworded)
+ *   until `maxTokens` or `numCtx` cuts it off, if either is even set —
+ *   see the doc on `doneReason` below for what happens when neither
+ *   is. Left out entirely when omitted, same "absence means don't
+ *   override" convention `maxTokens`/`numCtx`/`think` all follow, so
+ *   Ollama's own default (or the model's own Modelfile, if it sets
+ *   one) applies unless a caller deliberately raises this. The UI
+ *   exposes this as "Repeat penalty" in Advanced settings.
  * @param {(piece: string) => void} [opts.onToken] - if provided, switches
  *   to streaming mode and is called once per fragment of generated text.
  * @param {boolean} [opts.think] - for reasoning models (deepseek-r1,
@@ -156,11 +173,12 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   Ollama's response is ever missing them (older versions, or an
  *   unusual response shape) rather than this function guessing.
  */
-async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, onToken, think, onThinking, signal } = {}) {
+async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, repeatPenalty, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
   const options = { temperature };
   if (maxTokens !== undefined) options.num_predict = maxTokens;
   if (numCtx !== undefined) options.num_ctx = numCtx;
+  if (repeatPenalty !== undefined) options.repeat_penalty = repeatPenalty;
   const body = { model, messages, stream: streaming, options };
   // Top-level, not inside `options` — see the `think` doc comment above
   // for why. Omitted entirely (not even `think: undefined`, which

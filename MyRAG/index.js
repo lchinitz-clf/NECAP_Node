@@ -530,7 +530,7 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
 
 /**
  * POST /query
- * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "numCtx": 8192, "idealTopicId": "offshore-wind" }
+ * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "numCtx": 8192, "repeatPenalty": 1.3, "idealTopicId": "offshore-wind" }
  *
  * `question` is normally required, but is optional if `idealTopicId`
  * is given — see the "Comparing against an ideal proposal" section in
@@ -581,7 +581,7 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think, attributesPerCall } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -654,7 +654,7 @@ app.post('/query', async (req, res) => {
       // interpreted, since only the caller knows whether it itself set
       // maxTokens (in which case "length" was requested) or not (in
       // which case "length" means Ollama's own context window ran out).
-      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, think });
+      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, repeatPenalty, think });
 
       combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
       allSources = allSources.concat(sourcesSummary(matches));
@@ -746,7 +746,7 @@ app.post('/query', async (req, res) => {
  * "batch-done" immediately before "done".
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, idealTopicId, think, attributesPerCall } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -879,6 +879,7 @@ app.post('/query/stream', async (req, res) => {
         temperature,
         maxTokens,
         numCtx,
+        repeatPenalty,
         think,
         signal: controller.signal,
         onToken: (piece) => send({ type: 'token', batchIndex: i, totalBatches, text: piece }),
@@ -935,7 +936,7 @@ app.post('/query/stream', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3500;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`local-rag server listening on http://localhost:${PORT}`);
 });

@@ -831,6 +831,14 @@ let answerToggle;
  *   chat()'s `numCtx` option in ollamaClient.js for what this
  *   actually controls). Undefined when left blank, same "absence
  *   means don't override" convention maxTokens follows.
+ * @param {number} [repeatPenalty] - the "Repeat penalty" Advanced
+ *   setting — passed straight through to Ollama's `repeat_penalty`
+ *   (see the doc on chat()'s `repeatPenalty` option in
+ *   ollamaClient.js for what this actually controls, and why it
+ *   exists: a weaker/smaller model getting stuck restating slight
+ *   variants of the same answer instead of stopping). Undefined when
+ *   left blank, same "absence means don't override" convention
+ *   maxTokens/numCtx follow.
  * @param {number} [attributesPerCall] - the "Attributes per call"
  *   Advanced setting. Only has any effect when `idealTopicId` is also
  *   set — see batchAttributes() in src/idealProposals.js. Undefined
@@ -845,20 +853,21 @@ let answerToggle;
  *   fetch spec's own name for it) rather than the usual thrown
  *   Error; the caller below checks err.name to tell the two apart.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // chatModel/temperature/maxTokens/numCtx/idealTopicId/attributesPerCall/think
+    // chatModel/temperature/maxTokens/numCtx/repeatPenalty/idealTopicId/attributesPerCall/think
     // undefined (nothing usable selected, or the field was cleared)
     // just omits that key from the JSON body entirely, and
     // /query/stream's own default takes over server-side — for
     // maxTokens that's "no cap," for numCtx that's "use the model's
-    // own default," for idealTopicId that's "answer normally, no
-    // comparison," for attributesPerCall that's "ask about every
-    // attribute in one call," for think that's "leave Ollama's own
-    // default alone" (see the think param doc above).
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think }),
+    // own default," for repeatPenalty that's "use the model's own
+    // default (usually 1.1)," for idealTopicId that's "answer
+    // normally, no comparison," for attributesPerCall that's "ask
+    // about every attribute in one call," for think that's "leave
+    // Ollama's own default alone" (see the think param doc above).
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think }),
     signal,
   });
 
@@ -1281,6 +1290,13 @@ function init() {
     const numCtx = rawNumCtx === '' || Number.isNaN(Number(rawNumCtx))
       ? undefined
       : Number(rawNumCtx);
+    // Same blank-means-omit convention as maxTokens/numCtx above: an
+    // empty field leaves Ollama's own repeat_penalty default (usually
+    // 1.1) in place, rather than this app silently picking a value.
+    const rawRepeatPenalty = document.getElementById('repeatPenalty').value;
+    const repeatPenalty = rawRepeatPenalty === '' || Number.isNaN(Number(rawRepeatPenalty))
+      ? undefined
+      : Number(rawRepeatPenalty);
     const idealTopicId = idealTopicSelect.value || undefined;
     // Same blank-means-omit convention as maxTokens/numCtx above: left
     // blank, every attribute of the selected topic goes into a single
@@ -1360,7 +1376,7 @@ function init() {
       event.totalBatches && event.totalBatches > 1 ? ` (batch ${event.batchIndex + 1} of ${event.totalBatches})` : '';
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, idealTopicId, attributesPerCall, think, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the
