@@ -29,10 +29,12 @@ const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'idealProposals.json');
 // a minimal or very old file). The normal, hand-editable default lives
 // in the JSON file, not here: see getTopic()'s fallback chain below.
 const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
-  'Compare and contrast the proposal under review with the ideal proposal ' +
-  'described above. For each attribute, note whether the reviewed proposal ' +
-  'matches, falls short of, or exceeds the ideal, and flag anything the ' +
-  'ideal calls for that the reviewed proposal does not appear to address at all.';
+  'Compare the proposal (between the PROPOSAL START and PROPOSAL END markers ' +
+  'you were given separately) against the rubric (between the RUBRIC START and ' +
+  'RUBRIC END markers above). For each attribute, note whether the ' +
+  'proposal matches, falls short of, or exceeds the rubric, and flag ' +
+  'anything the rubric calls for that the proposal does not appear to ' +
+  'address at all.';
 
 /**
  * Reads and parses idealProposals.json fresh from disk.
@@ -45,7 +47,7 @@ const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
  * the top-level "topics" array) throws instead, since that's a real
  * configuration mistake worth surfacing rather than silently ignoring.
  *
- * @returns {{defaultCompareInstruction?: string, topics: Array<{id: string, label: string, description?: string, compareInstruction?: string, attributes: Array<{name: string, proposal: string}>}>}}
+ * @returns {{defaultCompareInstruction?: string|string[], topics: Array<{id: string, label: string, description?: string, compareInstruction?: string|string[], attributes: Array<{name: string, proposal: string}>}>}}
  */
 function loadTopics() {
   if (!fs.existsSync(IDEAL_PROPOSALS_PATH)) return { topics: [] };
@@ -79,23 +81,52 @@ function listTopicSummaries() {
 }
 
 /**
+ * Normalizes a `compareInstruction`/`defaultCompareInstruction` value
+ * from idealProposals.json into a single string. Accepts either form
+ * the JSON field can take: the original plain string, or an array of
+ * paragraph strings — one array entry per paragraph, joined back
+ * together with a blank line between them. The array form exists
+ * purely for readability/hand-editing: a long instruction as one
+ * escaped, line-wrapped JSON string (every paragraph break written
+ * out as a literal `\n\n`) is genuinely hard to read or edit by hand;
+ * as an array, each paragraph is just its own line in the file, no
+ * `\n` escaping needed anywhere (JSON's usual `"` escaping inside a
+ * paragraph's own text still applies either way — that's unavoidable
+ * in JSON regardless of which form is used).
+ *
+ * @param {string|string[]|undefined} value
+ * @returns {string|undefined} undefined if `value` was missing or
+ *   neither a string nor an array — callers' own fallback chains
+ *   (see getTopic() below) still apply in that case.
+ */
+function resolveInstructionText(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value.filter((p) => typeof p === 'string').join('\n\n');
+  }
+  return undefined;
+}
+
+/**
  * Looks up one topic by id, full detail included — used server-side
  * once a query actually requests this topic. Returns undefined if no
  * topic with that id exists (including when idealProposals.json is
  * missing entirely).
  *
- * The returned topic's `compareInstruction` is always populated,
- * resolved through a three-level fallback: the topic's own
- * `compareInstruction` if it set one (the rare case — a topic that
- * genuinely needs different phrasing from every other topic), else
- * the file's top-level `defaultCompareInstruction` (the normal case —
- * one general instruction, hand-editable in idealProposals.json,
- * shared by every topic that doesn't override it), else
- * HARDCODED_FALLBACK_COMPARE_INSTRUCTION as a last resort if the file
- * doesn't define a file-level default either. Resolving this here,
- * once, keeps composeComparisonQuestion() below simple — it just reads
- * `topic.compareInstruction` and doesn't need to know this fallback
- * chain exists at all.
+ * The returned topic's `compareInstruction` is always populated (as a
+ * single string, whichever form it was written in — see
+ * resolveInstructionText() above), resolved through a three-level
+ * fallback: the topic's own `compareInstruction` if it set one (the
+ * rare case — a topic that genuinely needs different phrasing from
+ * every other topic), else the file's top-level
+ * `defaultCompareInstruction` (the normal case — one general
+ * instruction, hand-editable in idealProposals.json, shared by every
+ * topic that doesn't override it), else HARDCODED_FALLBACK_COMPARE_INSTRUCTION
+ * as a last resort if the file doesn't define a file-level default
+ * either. Resolving this here, once, keeps composeComparisonQuestion()
+ * below simple — it just reads `topic.compareInstruction` as a plain
+ * string and doesn't need to know either this fallback chain or the
+ * string-vs-array question exists at all.
  * @param {string} id
  * @returns {object|undefined}
  */
@@ -106,7 +137,9 @@ function getTopic(id) {
   return {
     ...topic,
     compareInstruction:
-      topic.compareInstruction || data.defaultCompareInstruction || HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
+      resolveInstructionText(topic.compareInstruction) ||
+      resolveInstructionText(data.defaultCompareInstruction) ||
+      HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
   };
 }
 
@@ -151,9 +184,51 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
 
   const instruction = topic.compareInstruction || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
 
+  // Wrapped in explicit start/end markers rather than just left as a
+  // list a compareInstruction refers back to with a word like "above"
+  // — a purely positional reference like that is exactly the kind of
+  // thing a small/weak chat model can lose track of once there's a
+  // system message, a batch of proposal text, and this instruction
+  // all competing for its attention. A named landmark ("the list
+  // between RUBRIC START and RUBRIC END") is unambiguous regardless of
+  // model size or how this question gets batched. See buildRagMessages()
+  // in index.js for the matching PROPOSAL START/PROPOSAL END markers
+  // around the retrieved document material this gets compared against
+  // — both use two plain words rather than a colon-suffixed single
+  // label like "RUBRIC:", specifically so neither marker resembles a
+  // `[Source: file, chunk N]` citation tag closely enough for a weak
+  // model to cite the marker itself by mistake (see buildRagMessages()'
+  // own doc comment for the real failure this caused before that fix).
+  const rubricBlock = `RUBRIC START\n${attributeLines}\nRUBRIC END`;
+
+  // A separate, code-generated guard against a real failure mode seen
+  // in practice even with a single-attribute batch (attributesPerCall
+  // set to 1, so the model is asked about exactly ONE attribute and
+  // nothing else is even in the rubric block above): a weak model
+  // still went on to invent commentary about a DIFFERENT attribute id
+  // it was never given ("HW2 is not present in this proposal..."),
+  // apparently free-associating from naming patterns in the source
+  // material or its own training rather than anything actually in
+  // this prompt. Naming the exact attribute(s) actually in play here,
+  // in plain generated text rather than relying on the (user-edited,
+  // easy to fall out of sync) compareInstruction to cover this case,
+  // gives the model one more concrete, hard-to-misread anchor for
+  // what it's allowed to talk about. This doesn't guarantee
+  // compliance from every model — nothing here can force that — but
+  // costs nothing to include, and responseParser.js's quote-boundary
+  // trimming (see its module doc comment) already discards whatever
+  // a model says about other attributes after its real answer, so
+  // this is a second layer on top of that safety net, not a
+  // replacement for it.
+  const attributeNames = attributes.map((a) => `"${a.name}"`).join(', ');
+  const scopeGuard = attributes.length === 1
+    ? `You are being asked about exactly one attribute right now: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or rubric item — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related. Respond only about ${attributeNames} and nothing else.`
+    : `You are being asked about exactly these attributes right now, and no others: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or rubric item — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related.`;
+
   const parts = [
     `An ideal ${topic.label} proposal has the following attributes:`,
-    attributeLines,
+    rubricBlock,
+    scopeGuard,
     instruction,
   ];
 
@@ -203,5 +278,6 @@ module.exports = {
   getTopic,
   composeComparisonQuestion,
   batchAttributes,
+  resolveInstructionText,
   HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
 };

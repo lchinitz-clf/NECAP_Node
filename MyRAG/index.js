@@ -552,8 +552,41 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
  * both /query and /query/stream so the prompt only exists in one
  * place.
  */
-function buildRagMessages(question, matches) {
-  const contextBlock = matches
+/**
+ * @param {string} question
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} matches
+ * @param {string} [materialLabel] - what to call the retrieved material
+ *   in the system prompt — "source material" by default (plain
+ *   document Q&A), or "proposal" when a comparison topic is active
+ *   (see the two /query and /query/stream call sites below). This
+ *   exists to fix a real inconsistency: idealProposals.json's
+ *   compareInstruction tells the model to always call the reviewed
+ *   document "the proposal" and never "the context" — but this system
+ *   prompt used to call it "the context" itself, in the very message
+ *   where that material lives. Two different names for the same thing
+ *   from two different parts of the same conversation is exactly the
+ *   kind of contradiction a small/weak model is liable to get tangled
+ *   in, so the caller now picks one name and this function uses it
+ *   consistently, wrapping the block in matching START/END markers the
+ *   same way composeComparisonQuestion() in src/idealProposals.js now
+ *   wraps the rubric — a named landmark either instruction can point
+ *   at, instead of vaguer language like "elsewhere in this
+ *   conversation."
+ *
+ *   The markers are deliberately two plain words ("PROPOSAL START" /
+ *   "PROPOSAL END"), NOT a colon-suffixed single-word label like
+ *   "PROPOSAL:" — an earlier version used that shape and a small model
+ *   ended up citing "(PROPOSAL:, chunk 12)" as though the marker
+ *   itself were the source document's name. That marker sat directly
+ *   above the real `[Source: file, chunk N]` tag it was supposed to
+ *   cite instead, so with two "WORD:"-shaped labels stacked right on
+ *   top of each other, a weak model grabbed the outer one. Dropping
+ *   the colon removes that resemblance — there's now only one
+ *   citation-shaped label near each chunk, the real one.
+ */
+function buildRagMessages(question, matches, materialLabel = 'source material') {
+  const label = materialLabel.toUpperCase();
+  const block = matches
     .map((m) => `[Source: ${m.sourceFile}, chunk ${m.chunkIndex}]\n${m.text}`)
     .join('\n\n---\n\n');
 
@@ -561,11 +594,13 @@ function buildRagMessages(question, matches) {
     {
       role: 'system',
       content:
-        'Answer the question using ONLY the context provided below. ' +
-        'Do not use any outside knowledge. If the answer is not contained ' +
-        'in the context, say clearly that you don\'t have that information ' +
-        'in the provided documents rather than guessing.\n\n' +
-        `Context:\n${contextBlock}`,
+        `Answer the question using ONLY the ${materialLabel} between the ${label} START and ${label} END ` +
+        'markers below. Do not use any outside knowledge. If the answer is not contained ' +
+        `in the ${materialLabel}, say clearly that you don't have that information ` +
+        `in the provided documents rather than guessing. The ${label} START and ${label} END markers ` +
+        `are section boundaries, not a citation — never use "${label}" as a source name; only the file ` +
+        'name inside a [Source: ...] tag is a real one.\n\n' +
+        `${label} START\n${block}\n${label} END`,
     },
     { role: 'user', content: question },
   ];
@@ -647,7 +682,7 @@ app.post('/query', async (req, res) => {
         });
       }
 
-      const messages = buildRagMessages(effectiveQuestion, matches);
+      const messages = buildRagMessages(effectiveQuestion, matches, topic ? 'proposal' : undefined);
       // doneReason ("stop" vs "length") is Ollama's own account of why
       // generation ended — see the long comment on chat()'s return value
       // in ollamaClient.js. Passed straight through here rather than
@@ -668,7 +703,12 @@ app.post('/query', async (req, res) => {
       // src/responseParser.js, and its module-level caveat about how
       // reliable this parsing actually is.
       if (attributesSubset && attributesSubset.length) {
-        allRecords = allRecords.concat(parseComparisonAnswer(answer, attributesSubset));
+        // `matches` (this batch's own retrieved chunks, full text
+        // included) is what lets parseComparisonAnswer() mechanically
+        // verify any quote the model claims came from a specific
+        // [Source: file, chunk N] tag — see verifyQuote() in
+        // src/responseParser.js.
+        allRecords = allRecords.concat(parseComparisonAnswer(answer, attributesSubset, matches));
       }
     }
 
@@ -873,7 +913,7 @@ app.post('/query/stream', async (req, res) => {
         continue;
       }
 
-      const messages = buildRagMessages(effectiveQuestion, matches);
+      const messages = buildRagMessages(effectiveQuestion, matches, topic ? 'proposal' : undefined);
       const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, {
         model: chatModel,
         temperature,
@@ -891,8 +931,11 @@ app.post('/query/stream', async (req, res) => {
       totalAnswerTokens += answerTokens || 0;
       lastDoneReason = doneReason;
 
+      // `matches` here plays the same role as in /query above — lets
+      // parseComparisonAnswer() verify any quote against this batch's
+      // own retrieved chunk text.
       const records = attributesSubset && attributesSubset.length
-        ? parseComparisonAnswer(answer, attributesSubset)
+        ? parseComparisonAnswer(answer, attributesSubset, matches)
         : [];
       allRecords = allRecords.concat(records);
 
