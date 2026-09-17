@@ -403,7 +403,13 @@
       </details>
     </div>
 
-    <div id="retrievalQueryNote" class="hint"></div>
+    <!-- Hidden by default — a debugging aid (see script.js's "sources"
+         event handler and retrievalQuery on index.js's /query and
+         /query/stream), not something a normal user needs to see. Still
+         populated on every query, just not displayed; flip this to
+         style="display:block;" (or delete the inline style) to bring it
+         back without touching any JS. -->
+    <div id="retrievalQueryNote" class="hint" style="display:none;"></div>
     <div id="confidenceNote"></div>
     <div id="tokenUsageNote"></div>
     <table>
