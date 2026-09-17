@@ -5,7 +5,7 @@ const fs = require('fs');
 const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
 const { embed, chat, listModels } = require('./src/ollamaClient');
-const { search, listDocuments, getChunk, deleteDocument } = require('./src/store');
+const { search, listDocuments, getChunk, listChunksForDocument, deleteDocument } = require('./src/store');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { listTopicSummaries, getTopic, composeComparisonQuestion, batchAttributes } = require('./src/idealProposals');
@@ -132,6 +132,43 @@ app.get('/workspaces/:workspaceId/chunks/:chunkId', (req, res) => {
       return res.status(404).json({ error: `No chunk found with id "${chunkId}" in workspace "${workspaceId}"` });
     }
     res.json(chunk);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /workspaces/:workspaceId/documents/:sourceFile/chunks
+ *
+ * Lists every chunk recorded for one document — shown to the user as
+ * a "block", never a "chunk" (see public/script.js and index.html:
+ * this app's UI language is "block" throughout; "chunk" stays an
+ * internal/API implementation detail, matching the existing
+ * GET .../chunks/:chunkId endpoint and getChunk() in store.js) — as
+ * {chunkIndex, id} pairs, sorted ascending. This is what powers the
+ * "pick a document, then pick a block, then view its text" lookup
+ * tool on the "Documents in this area" panel: the browser calls this
+ * once a document is picked to populate the block dropdown, then
+ * reuses each entry's `id` directly against
+ * GET /workspaces/:workspaceId/chunks/:chunkId above to fetch that
+ * block's text — no separate id-construction step needed on the
+ * client.
+ *
+ * :sourceFile must be URL-encoded by the caller (the UI does this
+ * automatically), same as DELETE .../documents/:sourceFile below.
+ * An unknown sourceFile isn't an error — it just comes back with an
+ * empty `chunks` array, same "read-only summary, no such thing as a
+ * 404 for an empty result" philosophy as GET .../documents above.
+ */
+app.get('/workspaces/:workspaceId/documents/:sourceFile/chunks', (req, res) => {
+  const { workspaceId, sourceFile } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  try {
+    const chunks = listChunksForDocument(workspaceId, sourceFile);
+    res.json({ workspaceId, sourceFile, chunks });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

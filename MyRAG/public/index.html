@@ -48,6 +48,30 @@
       <p class="error" id="documentsError"></p>
 
       <div class="workspace-actions">
+        <h3>Look up a block</h3>
+        <p class="hint">
+          Pick a document, then a block number, to view that block's exact
+          text — the same view a block number opens elsewhere in this app.
+        </p>
+        <div class="row">
+          <div>
+            <label for="blockLookupDocument">Document</label>
+            <select id="blockLookupDocument">
+              <option value="">Select a document…</option>
+            </select>
+          </div>
+          <div>
+            <label for="blockLookupIndex">Block</label>
+            <select id="blockLookupIndex" disabled>
+              <option value="">Select a document first…</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" id="blockLookupBtn" class="btn-secondary" disabled>View block</button>
+        <p class="error" id="blockLookupError"></p>
+      </div>
+
+      <div class="workspace-actions">
         <h3>Area maintenance</h3>
         <div class="row">
           <div>

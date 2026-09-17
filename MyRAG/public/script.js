@@ -169,6 +169,8 @@ function requireWorkspace(errorEl) {
 // ---- Documents-in-workspace list ----
 
 let documentsWrap, documentsEmpty, documentsBody, documentsError;
+let blockLookupDocument, blockLookupIndex, blockLookupBtn, blockLookupError;
+let blockLookupChunks = []; // the currently-selected document's {chunkIndex, id} list, once loaded
 
 // Shows what's actually embedded (grouped by source filename) in
 // whatever workspace is currently entered above, with a Remove
@@ -179,6 +181,7 @@ async function refreshDocuments() {
   const id = getWorkspaceId();
   if (!id) {
     documentsWrap.style.display = 'none';
+    resetBlockLookup();
     return;
   }
 
@@ -193,6 +196,7 @@ async function refreshDocuments() {
 
     if (data.documents.length === 0) {
       documentsEmpty.textContent = `No documents imported into "${id}" yet.`;
+      resetBlockLookup();
       return;
     }
 
@@ -207,12 +211,105 @@ async function refreshDocuments() {
       `;
       documentsBody.appendChild(tr);
     }
+    populateBlockLookupDocuments(data.documents);
   } catch (err) {
     // Non-fatal — an invalid/incomplete workspace name typed
     // mid-edit will 400 here transiently, which is fine; just hide
     // the section rather than showing an error for that.
     console.warn('Could not load documents:', err);
     documentsWrap.style.display = 'none';
+    resetBlockLookup();
+  }
+}
+
+// ---- Block lookup tool (Documents in this area panel) ----
+//
+// Lets someone pick a document, then a specific block number, and
+// view that block's exact text on demand — reachable directly from
+// the "Documents in this area" panel rather than only via a source
+// citation's block-number link after running a query. Populated from
+// GET /workspaces/:workspaceId/documents/:sourceFile/chunks (see
+// listChunksForDocument() in src/store.js), which returns each
+// block's {chunkIndex, id} — the `id` is exactly what showChunkModal()
+// below needs, so no client-side id construction
+// (`${sourceFile}::${chunkIndex}`) happens here at all.
+//
+// Always says "block," never "chunk," to the user — same UI language
+// as the rest of this app (Block size/overlap on the import form, the
+// Blocks column above, the block-view modal); "chunk" stays purely an
+// internal/API word, matching store.js and index.js.
+
+/** Clears both selects back to their empty/disabled starting state. */
+function resetBlockLookup() {
+  blockLookupDocument.innerHTML = '<option value="">Select a document…</option>';
+  blockLookupDocument.disabled = true;
+  resetBlockLookupIndex();
+  blockLookupError.style.display = 'none';
+  blockLookupError.textContent = '';
+}
+
+/** Clears just the block select — used both on reset and whenever the chosen document changes. */
+function resetBlockLookupIndex() {
+  blockLookupChunks = [];
+  blockLookupIndex.innerHTML = '<option value="">Select a document first…</option>';
+  blockLookupIndex.disabled = true;
+  blockLookupBtn.disabled = true;
+}
+
+/**
+ * Rebuilds the document dropdown from the same document list
+ * refreshDocuments() just loaded for the table above, so the two stay
+ * in sync automatically on every refresh — no separate fetch. Keeps
+ * the previous selection (and re-loads its block list) across a
+ * refresh when that document is still present, rather than always
+ * resetting to blank, so re-checking a workspace mid-lookup doesn't
+ * throw away what was picked.
+ */
+function populateBlockLookupDocuments(documents) {
+  const previousValue = blockLookupDocument.value;
+  blockLookupDocument.innerHTML = '<option value="">Select a document…</option>' +
+    documents.map((d) => `<option value="${escapeHtml(d.sourceFile)}">${escapeHtml(d.sourceFile)} (${d.chunks} block${d.chunks === 1 ? '' : 's'})</option>`).join('');
+  blockLookupDocument.disabled = false;
+
+  if (previousValue && documents.some((d) => d.sourceFile === previousValue)) {
+    blockLookupDocument.value = previousValue;
+    loadBlockLookupIndex(previousValue);
+  } else {
+    resetBlockLookupIndex();
+  }
+}
+
+/** Loads the block list for one document into the block select. */
+async function loadBlockLookupIndex(sourceFile) {
+  resetBlockLookupIndex();
+  if (!sourceFile) return;
+
+  const workspaceId = getWorkspaceId();
+  if (!workspaceId) return;
+
+  blockLookupIndex.innerHTML = '<option value="">Loading…</option>';
+  blockLookupError.style.display = 'none';
+
+  try {
+    const res = await fetch(
+      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}/chunks`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+    blockLookupChunks = data.chunks;
+    if (blockLookupChunks.length === 0) {
+      blockLookupIndex.innerHTML = '<option value="">No blocks found</option>';
+      return;
+    }
+
+    blockLookupIndex.innerHTML = '<option value="">Select a block…</option>' +
+      blockLookupChunks.map((c) => `<option value="${c.chunkIndex}">Block ${c.chunkIndex}</option>`).join('');
+    blockLookupIndex.disabled = false;
+  } catch (err) {
+    blockLookupIndex.innerHTML = '<option value="">Could not load blocks</option>';
+    blockLookupError.textContent = `Could not load blocks: ${err.message}`;
+    blockLookupError.style.display = 'block';
   }
 }
 
@@ -934,6 +1031,11 @@ function init() {
   documentsBody = document.getElementById('documentsBody');
   documentsError = document.getElementById('documentsError');
 
+  blockLookupDocument = document.getElementById('blockLookupDocument');
+  blockLookupIndex = document.getElementById('blockLookupIndex');
+  blockLookupBtn = document.getElementById('blockLookupBtn');
+  blockLookupError = document.getElementById('blockLookupError');
+
   deleteWorkspaceBtn = document.getElementById('deleteWorkspaceBtn');
   deleteWorkspaceStatus = document.getElementById('deleteWorkspaceStatus');
   deleteWorkspaceError = document.getElementById('deleteWorkspaceError');
@@ -1000,6 +1102,28 @@ function init() {
   workspaceInput.addEventListener('input', () => {
     clearTimeout(documentsDebounce);
     documentsDebounce = setTimeout(refreshDocuments, 400);
+  });
+
+  blockLookupDocument.addEventListener('change', () => {
+    loadBlockLookupIndex(blockLookupDocument.value);
+  });
+
+  blockLookupIndex.addEventListener('change', () => {
+    blockLookupBtn.disabled = !blockLookupIndex.value;
+  });
+
+  blockLookupBtn.addEventListener('click', () => {
+    const sourceFile = blockLookupDocument.value;
+    const chunkIndex = blockLookupIndex.value;
+    if (!sourceFile || chunkIndex === '') return;
+    // blockLookupIndex's option values are chunkIndex numbers rendered
+    // as strings by the DOM, so compare as strings here rather than
+    // coercing back to Number — avoids any edge case with a
+    // non-integer chunkIndex (shouldn't happen — see embedPipeline.js
+    // — but this comparison doesn't need to assume it never will).
+    const entry = blockLookupChunks.find((c) => String(c.chunkIndex) === chunkIndex);
+    if (!entry) return;
+    showChunkModal(entry.id, sourceFile, entry.chunkIndex);
   });
 
   // One delegated listener on the table body handles every Remove

@@ -128,6 +128,33 @@ function getChunk(workspaceId, chunkId) {
 }
 
 /**
+ * Lists every chunk recorded for one document in a workspace, sorted
+ * by chunkIndex ascending — the data behind a "pick a document, then
+ * pick a block" lookup tool (see GET
+ * /workspaces/:workspaceId/documents/:sourceFile/chunks in index.js).
+ * Each entry's `id` is exactly what getChunk() above expects, so a UI
+ * can go straight from this list to fetching a specific block's full
+ * text with no separate lookup step.
+ *
+ * Chunk indices are normally contiguous 0..N-1 (chunkIndex is assigned
+ * as a plain array index at embed time — see embedPipeline.js), but
+ * this reads the real records rather than assuming that and returning
+ * a computed range, so the result can never drift out of sync with
+ * what store.json actually contains (e.g. after a partial delete or a
+ * store hand-edited outside this app).
+ *
+ * @param {string} workspaceId
+ * @param {string} sourceFile
+ * @returns {Array<{chunkIndex: number, id: string}>}
+ */
+function listChunksForDocument(workspaceId, sourceFile) {
+  return loadStore(workspaceId)
+    .filter((r) => r.sourceFile === sourceFile)
+    .map((r) => ({ chunkIndex: r.chunkIndex, id: r.id }))
+    .sort((a, b) => a.chunkIndex - b.chunkIndex);
+}
+
+/**
  * Removes every chunk belonging to one document (matched by exact
  * sourceFile) from a workspace's store, and — when that document was
  * uploaded through this app — deletes its underlying file too.
@@ -199,4 +226,4 @@ function deleteDocument(workspaceId, sourceFile) {
   };
 }
 
-module.exports = { loadStore, saveStore, appendRecords, cosineSimilarity, search, listDocuments, getChunk, deleteDocument };
+module.exports = { loadStore, saveStore, appendRecords, cosineSimilarity, search, listDocuments, getChunk, listChunksForDocument, deleteDocument };
