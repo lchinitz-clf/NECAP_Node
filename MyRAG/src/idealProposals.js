@@ -147,13 +147,35 @@ function getTopic(id) {
  * Turns one topic into the actual text folded into the question for a
  * comparison query — this is "approach 1" from README.md's "Comparing
  * against an ideal proposal" section: the result of this function
- * becomes (or is very nearly) the `question` passed to both embed()
- * and buildRagMessages() in index.js. That's what makes this approach
- * different from just adding an instruction to the system prompt —
- * because this text is what gets embedded for retrieval, selecting a
- * topic actually steers WHICH chunks get retrieved from the document
- * under review toward passages relevant to these attributes, not just
- * how the model is told to talk about whatever got retrieved anyway.
+ * becomes (or is very nearly) the `question` passed to
+ * buildRagMessages() in index.js, i.e. the literal user-turn message
+ * the chat model sees. That's what makes this approach different from
+ * just adding an instruction to the system prompt — selecting a topic
+ * steers not just how the model is told to talk about whatever got
+ * retrieved, but (via composeRetrievalQuery() below, NOT this
+ * function — see its own doc comment for why the two are deliberately
+ * different texts) which chunks get retrieved in the first place.
+ *
+ * IMPORTANT: despite the "approach 1" framing above, this function's
+ * output is no longer what gets embedded for retrieval — only what
+ * gets sent to the chat model. It used to be both (hence the doc
+ * comments elsewhere still describing this as "the text that drives
+ * both retrieval and the prompt"), until a real failure surfaced the
+ * problem with that: this text includes not just the attribute(s)
+ * being asked about but the RUBRIC START/END wrapper, the scopeGuard
+ * sentence, and every paragraph of compareInstruction — a few hundred
+ * words of "compare the rubric to the proposal, note whether it
+ * matches, falls short of, or exceeds..." instructional boilerplate
+ * that's nearly IDENTICAL across every attribute in every topic.
+ * Embedding all of that pulls the query embedding toward that shared
+ * boilerplate and away from the attribute's own specific subject
+ * matter, which in practice retrieved a chunk of generic "nature-based
+ * solutions" text for a rubric item specifically about wind-buffering
+ * wetlands — a chunk a plain, bare-attribute-text search (what
+ * composeRetrievalQuery() below now provides instead) did not
+ * retrieve at all. See composeRetrievalQuery()'s doc comment for the
+ * full reasoning, and the "Comparing against an ideal proposal"
+ * section of README.md for the write-up of this split.
  *
  * @param {object} topic - as returned by getTopic() — note that its
  *   `compareInstruction` is expected to already be resolved (getTopic()
@@ -240,6 +262,62 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
 }
 
 /**
+ * Builds JUST the text that should be embedded for retrieval when a
+ * comparison topic is active — deliberately NOT composeComparisonQuestion()
+ * above, which is what actually gets sent to the chat model as the
+ * user-turn message. The two used to be the same text (one function,
+ * doing double duty), until a real case showed why that was a bug:
+ * composeComparisonQuestion()'s output is mostly instructional
+ * boilerplate — the RUBRIC START/END wrapper, the scopeGuard sentence,
+ * and every paragraph of compareInstruction ("compare the rubric to
+ * the proposal, note whether it matches, falls short of, or
+ * exceeds...") — and that boilerplate is nearly IDENTICAL across every
+ * attribute in every topic. Embedding all of it for retrieval pulls
+ * the query embedding toward that shared instructional language and
+ * away from the attribute's own specific subject matter, diluting
+ * exactly the signal retrieval depends on.
+ *
+ * The concrete failure this caused: a rubric item asking specifically
+ * about "coastal wetlands or dune systems that buffer WIND impacts"
+ * retrieved a chunk of generic "nature-based solutions" boilerplate
+ * (ecosystems, biodiversity, reciprocity with the land — nothing
+ * about wind specifically) when run through comparison mode, but
+ * correctly came back "I do not have that information" when the exact
+ * same substantive question was typed directly into the plain Ask
+ * form. Both requests searched the same store — the only real
+ * difference was what text got embedded to search it: comparison mode
+ * embedded the whole multi-paragraph composed question (rubric wrapper
+ * + scope guard + every instruction paragraph), while the plain Ask
+ * form embedded just the question itself. This function makes
+ * comparison mode do the same thing the plain form already did
+ * correctly: embed only the substance being searched for, not the
+ * instructions about how to answer once something's found. The chat
+ * model still receives the FULL composeComparisonQuestion() text
+ * (with every instruction intact) as its own separate message — this
+ * only changes what steers retrieval.
+ *
+ * @param {object} topic
+ * @param {string} [userQuestion] - same meaning as in
+ *   composeComparisonQuestion() above — folded in here too, so a
+ *   reviewer's own typed guidance still steers retrieval, not just the
+ *   model's eventual answer.
+ * @param {Array<{name: string, proposal: string}>} [attributesOverride] -
+ *   same meaning as in composeComparisonQuestion() above — this batch's
+ *   attributes, or every one of the topic's if omitted.
+ * @returns {string}
+ */
+function composeRetrievalQuery(topic, userQuestion, attributesOverride) {
+  const attributes = attributesOverride || topic.attributes || [];
+  const attributeLines = attributes
+    .map((a) => `${a.name}: ${a.proposal}`)
+    .join('\n');
+
+  return userQuestion && userQuestion.trim()
+    ? `${attributeLines}\n\n${userQuestion.trim()}`
+    : attributeLines;
+}
+
+/**
  * Splits a topic's attributes into batches for the "attributes per
  * call" Advanced setting — the fix for a comparison with a lot of
  * attributes growing one giant question (and one giant embed+chat
@@ -277,6 +355,7 @@ module.exports = {
   listTopicSummaries,
   getTopic,
   composeComparisonQuestion,
+  composeRetrievalQuery,
   batchAttributes,
   resolveInstructionText,
   HARDCODED_FALLBACK_COMPARE_INSTRUCTION,

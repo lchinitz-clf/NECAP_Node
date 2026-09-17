@@ -8,7 +8,7 @@ const { embed, chat, listModels } = require('./src/ollamaClient');
 const { search, listDocuments, getChunk, listChunksForDocument, deleteDocument } = require('./src/store');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { listTopicSummaries, getTopic, composeComparisonQuestion, batchAttributes } = require('./src/idealProposals');
+const { listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
 const { parseComparisonAnswer } = require('./src/responseParser');
 
 const app = express();
@@ -700,13 +700,21 @@ app.post('/query', async (req, res) => {
       // See composeComparisonQuestion()'s big comment in
       // src/idealProposals.js: when a topic is selected, ITS text
       // (plus whatever the user additionally typed) becomes the
-      // actual question — driving both retrieval below and the
-      // prompt sent to the chat model, not just an instruction
-      // layered on top after the fact. `attributesSubset` narrows
-      // that to just this batch's attributes.
+      // actual question sent to the chat model, not just an
+      // instruction layered on top after the fact. `attributesSubset`
+      // narrows that to just this batch's attributes.
       const effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
 
-      const queryVector = await embed(effectiveQuestion, embedModel);
+      // Retrieval uses a DIFFERENT, shorter text — see
+      // composeRetrievalQuery()'s doc comment in src/idealProposals.js
+      // for why: embedding the full instructional composeComparisonQuestion()
+      // text (in place of a bare, focused query) was pulling in
+      // topically-adjacent-but-irrelevant chunks, since that text is
+      // mostly boilerplate shared across every attribute rather than
+      // this attribute's own specific subject matter.
+      const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
+
+      const queryVector = await embed(retrievalQuery, embedModel);
       const matches = search(workspaceId, queryVector, topK);
 
       if (matches.length === 0) {
@@ -890,9 +898,15 @@ app.post('/query/stream', async (req, res) => {
   // after the first reports a retrieval failure as a stream
   // {"type":"error"} event instead (inside the loop below).
   const firstQuestion = topic ? composeComparisonQuestion(topic, question, batches[0]) : question;
+  // See composeRetrievalQuery()'s doc comment in src/idealProposals.js:
+  // retrieval deliberately embeds a shorter, more focused text than
+  // firstQuestion above (which is what the chat model actually sees) —
+  // embedding firstQuestion's full instructional boilerplate was
+  // pulling in topically-adjacent-but-irrelevant chunks.
+  const firstRetrievalQuery = topic ? composeRetrievalQuery(topic, question, batches[0]) : firstQuestion;
   let firstMatches;
   try {
-    const queryVector = await embed(firstQuestion, embedModel, undefined, controller.signal);
+    const queryVector = await embed(firstRetrievalQuery, embedModel, undefined, controller.signal);
     firstMatches = search(workspaceId, queryVector, topK);
   } catch (err) {
     if (clientGone) return; // stopped before retrieval even finished — no one to report back to
@@ -936,7 +950,8 @@ app.post('/query/stream', async (req, res) => {
         effectiveQuestion = firstQuestion;
       } else {
         effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
-        const queryVector = await embed(effectiveQuestion, embedModel, undefined, controller.signal);
+        const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
+        const queryVector = await embed(retrievalQuery, embedModel, undefined, controller.signal);
         matches = search(workspaceId, queryVector, topK);
       }
 
