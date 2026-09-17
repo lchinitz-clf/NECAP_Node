@@ -845,10 +845,11 @@ function wireChunkLinkDelegate(container) {
 
 // ---- Collapsible section toggles ----
 //
-// Backs the three <details class="section-toggle"> wrappers in
-// index.html (Documents in this area, the answer text block, and the
-// per-attribute results table) — plain native <details>/<summary>
-// elements, so no library is needed for the collapse/expand behavior
+// Backs the four <details class="section-toggle"> wrappers in
+// index.html (Import a document, Documents in this area, the answer
+// text block, and the per-attribute results table) — plain native
+// <details>/<summary> elements, so no library is needed for the
+// collapse/expand behavior
 // itself. What this adds on top:
 //
 //   1. Persistence: whichever state someone leaves a section in
@@ -905,7 +906,7 @@ function initSectionToggle(details, storageKey) {
   };
 }
 
-let documentsDetails, answerDetails, attributeResultsDetails;
+let documentsDetails, answerDetails, attributeResultsDetails, importDetails;
 let answerToggle;
 
 /**
@@ -1085,6 +1086,7 @@ function init() {
   documentsDetails = document.getElementById('documentsDetails');
   answerDetails = document.getElementById('answerDetails');
   attributeResultsDetails = document.getElementById('attributeResultsDetails');
+  importDetails = document.getElementById('importDetails');
 
   // ---- Collapsible section toggles ----
   // Documents-in-this-area and the per-attribute results table just
@@ -1094,6 +1096,7 @@ function init() {
   initSectionToggle(documentsDetails, 'local-rag:documentsOpen');
   answerToggle = initSectionToggle(answerDetails, 'local-rag:answerOpen');
   initSectionToggle(attributeResultsDetails, 'local-rag:attributeResultsOpen');
+  initSectionToggle(importDetails, 'local-rag:importOpen');
 
   // ---- Event listeners ----
 

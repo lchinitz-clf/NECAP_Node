@@ -113,51 +113,55 @@
 </section>
 
 <section class="card">
-  <h2>1. Import a document</h2>
-  <form id="embedForm">
-    <div>
-      <label for="pdfFile">Document (PDF, DOCX, or TXT)</label>
-      <input type="file" id="pdfFile" accept=".pdf,.docx,.txt" required />
-    </div>
-
-    <details class="advanced">
-      <summary>Advanced settings</summary>
-      <div class="row">
+  <details class="section-toggle" id="importDetails" open>
+    <summary><h2>1. Import a document</h2></summary>
+    <div class="section-toggle-body">
+      <form id="embedForm">
         <div>
-          <label for="maxWords">Block size (words)</label>
-          <input type="number" id="maxWords" value="300" min="20" max="1000" step="10" />
+          <label for="pdfFile">Document (PDF, DOCX, or TXT)</label>
+          <input type="file" id="pdfFile" accept=".pdf,.docx,.txt" required />
         </div>
-        <div>
-          <label for="overlapWords">Block overlap (words)</label>
-          <input type="number" id="overlapWords" value="40" min="0" max="500" step="5" />
-        </div>
-      </div>
-      <p class="hint">
-        Controls how this document is split into blocks for searching.
-      </p>
-      <details class="tip">
-        <summary aria-label="More information">&#9432;</summary>
-        <span>
-          Smaller blocks help find precise matches but include less
-          surrounding context; overlap repeats a few words at the start
-          of the next block so a sentence split across the boundary
-          isn't lost. In practice, raising this much past 300-400 words
-          usually won't make blocks bigger — only lowering it will
-          have much effect. This only applies to the document you're
-          about to import; documents already in this area keep
-          whatever size they were imported with.
-        </span>
-      </details>
-    </details>
 
-    <button type="submit" id="embedSubmitBtn">Import into this area</button>
-    <div class="status" id="embedStatus"></div>
-    <div id="embedProgressWrap" style="display:none;">
-      <progress id="embedProgressBar"></progress>
+        <details class="advanced">
+          <summary>Advanced settings</summary>
+          <div class="row">
+            <div>
+              <label for="maxWords">Block size (words)</label>
+              <input type="number" id="maxWords" value="300" min="20" max="1000" step="10" />
+            </div>
+            <div>
+              <label for="overlapWords">Block overlap (words)</label>
+              <input type="number" id="overlapWords" value="40" min="0" max="500" step="5" />
+            </div>
+          </div>
+          <p class="hint">
+            Controls how this document is split into blocks for searching.
+          </p>
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Smaller blocks help find precise matches but include less
+              surrounding context; overlap repeats a few words at the start
+              of the next block so a sentence split across the boundary
+              isn't lost. In practice, raising this much past 300-400 words
+              usually won't make blocks bigger — only lowering it will
+              have much effect. This only applies to the document you're
+              about to import; documents already in this area keep
+              whatever size they were imported with.
+            </span>
+          </details>
+        </details>
+
+        <button type="submit" id="embedSubmitBtn">Import into this area</button>
+        <div class="status" id="embedStatus"></div>
+        <div id="embedProgressWrap" style="display:none;">
+          <progress id="embedProgressBar"></progress>
+        </div>
+        <div class="error" id="embedError"></div>
+        <div id="embedResult"></div>
+      </form>
     </div>
-    <div class="error" id="embedError"></div>
-    <div id="embedResult"></div>
-  </form>
+  </details>
 </section>
 
 <section class="card">
