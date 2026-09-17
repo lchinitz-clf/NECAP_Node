@@ -277,7 +277,9 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
  * away from the attribute's own specific subject matter, diluting
  * exactly the signal retrieval depends on.
  *
- * The concrete failure this caused: a rubric item asking specifically
+ * The concrete failure this caused, confirmed by directly comparing
+ * retrieved chunks with retrievalQuery exposed in the UI (see the
+ * "sources" event in index.js): a rubric item asking specifically
  * about "coastal wetlands or dune systems that buffer WIND impacts"
  * retrieved a chunk of generic "nature-based solutions" boilerplate
  * (ecosystems, biodiversity, reciprocity with the land — nothing
@@ -285,16 +287,36 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
  * correctly came back "I do not have that information" when the exact
  * same substantive question was typed directly into the plain Ask
  * form. Both requests searched the same store — the only real
- * difference was what text got embedded to search it: comparison mode
- * embedded the whole multi-paragraph composed question (rubric wrapper
- * + scope guard + every instruction paragraph), while the plain Ask
- * form embedded just the question itself. This function makes
- * comparison mode do the same thing the plain form already did
+ * difference was what text got embedded to search it. This function
+ * makes comparison mode do the same thing the plain form already did
  * correctly: embed only the substance being searched for, not the
  * instructions about how to answer once something's found. The chat
  * model still receives the FULL composeComparisonQuestion() text
  * (with every instruction intact) as its own separate message — this
  * only changes what steers retrieval.
+ *
+ * IMPORTANT: this deliberately embeds ONLY each attribute's `proposal`
+ * text, NOT its `name`. That wasn't the original design — an earlier
+ * version embedded `"<name>: <proposal>"`, on the reasoning that the
+ * name might carry useful searchable context too — but comparing
+ * retrieved chunks side by side (same store, three retrieval texts:
+ * bare proposal text, "<name>: <proposal>", and the full
+ * composeComparisonQuestion() output) proved that was itself the
+ * entire remaining source of drift once the instructional boilerplate
+ * was already removed: `name` fields built by joining several
+ * spreadsheet columns (e.g. "HW10 - Adaptation Strategies &
+ * Long-Term Actions - Nature-based solutions" — see
+ * excel_to_json.py's JOIN_SEPARATOR) carry broad category language
+ * ("Adaptation Strategies," "Nature-based solutions") that's shared
+ * across many attributes in the same category, and prepending it
+ * pulled the retrieval embedding toward that shared category instead
+ * of staying anchored to the specific proposal sentence — "<name>:
+ * <proposal>" and the full instructional text retrieved the identical
+ * (wrong) chunk set, while the bare proposal text alone retrieved the
+ * same chunks as typing the sentence directly into the plain Ask
+ * form. `name` is still what gets shown to the person (in the rubric
+ * block, in the results table, everywhere else) — it's excluded ONLY
+ * from what gets embedded here.
  *
  * @param {object} topic
  * @param {string} [userQuestion] - same meaning as in
@@ -308,8 +330,13 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
  */
 function composeRetrievalQuery(topic, userQuestion, attributesOverride) {
   const attributes = attributesOverride || topic.attributes || [];
+  // `|| a.name` is only a last-resort fallback for a malformed
+  // attribute with no `proposal` text at all — normal attributes
+  // always have one, and this never adds `name` alongside a `proposal`
+  // that's already there (see the doc comment above for why not).
   const attributeLines = attributes
-    .map((a) => `${a.name}: ${a.proposal}`)
+    .map((a) => a.proposal || a.name || '')
+    .filter(Boolean)
     .join('\n');
 
   return userQuestion && userQuestion.trim()
