@@ -452,7 +452,7 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 
 // ---- Query form ----
 
-let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote;
+let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
 let thinkCheckbox, reasoningWrap, reasoningEl;
 let attributeResultsWrap, attributeResultsBody, downloadCsvBtn;
@@ -1062,6 +1062,7 @@ function init() {
   lengthNote = document.getElementById('lengthNote');
   sourcesBody = document.getElementById('sourcesBody');
   confidenceNote = document.getElementById('confidenceNote');
+  retrievalQueryNote = document.getElementById('retrievalQueryNote');
   tokenUsageNote = document.getElementById('tokenUsageNote');
   submitBtn = document.getElementById('submitBtn');
   stopBtn = document.getElementById('stopBtn');
@@ -1369,6 +1370,7 @@ function init() {
     sourcesBody.innerHTML = '';
     confidenceNote.textContent = '';
     tokenUsageNote.textContent = '';
+    retrievalQueryNote.innerHTML = '';
     answerEl.textContent = '';
     lengthNote.style.display = 'none';
     lengthNote.textContent = '';
@@ -1515,6 +1517,25 @@ function init() {
             answerEl.textContent += '\n\n———\n\n';
           }
           addSources(event.sources);
+
+          // Shows exactly what text was embedded to retrieve this
+          // batch's sources — the fastest way to check, directly in
+          // the UI, whether a comparison run and a plain question that
+          // "should" retrieve the same way are actually searching with
+          // the same text. See the "sources" event's retrievalQuery
+          // field in index.js and composeRetrievalQuery() in
+          // src/idealProposals.js. One line per batch, in case
+          // different batches (different attribute subsets) searched
+          // with different text.
+          if (event.retrievalQuery) {
+            const label = event.totalBatches && event.totalBatches > 1
+              ? `Retrieval query used (batch ${event.batchIndex + 1} of ${event.totalBatches}): `
+              : 'Retrieval query used: ';
+            const line = `<strong>${escapeHtml(label)}</strong>${escapeHtml(event.retrievalQuery)}`;
+            retrievalQueryNote.innerHTML = retrievalQueryNote.innerHTML
+              ? `${retrievalQueryNote.innerHTML}<br>${line}`
+              : line;
+          }
           if (event.sources.length) {
             statusEl.textContent = `Generating answer…${batchSuffix(event)}`;
             // There's an unavoidable gap here — however long the model

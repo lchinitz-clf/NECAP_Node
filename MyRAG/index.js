@@ -692,6 +692,7 @@ app.post('/query', async (req, res) => {
     let allSources = [];
     let allRecords = [];
     const thinkingParts = [];
+    const retrievalQueries = [];
     let totalPromptTokens = 0;
     let totalAnswerTokens = 0;
     let lastDoneReason;
@@ -713,6 +714,7 @@ app.post('/query', async (req, res) => {
       // mostly boilerplate shared across every attribute rather than
       // this attribute's own specific subject matter.
       const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
+      retrievalQueries.push(retrievalQuery);
 
       const queryVector = await embed(retrievalQuery, embedModel);
       const matches = search(workspaceId, queryVector, topK);
@@ -769,6 +771,12 @@ app.post('/query', async (req, res) => {
       answerTokens: totalAnswerTokens,
       records: allRecords,
       totalBatches: batches.length,
+      // One entry per batch, same order as `sources`/`records` were
+      // accumulated in — the exact text embedded to retrieve that
+      // batch's chunks. See composeRetrievalQuery() in
+      // src/idealProposals.js and the matching field on /query/stream's
+      // "sources" event.
+      retrievalQueries,
       ...(thinkingParts.length ? { thinking: thinkingParts.join('\n\n') } : {}),
     });
   } catch (err) {
@@ -789,7 +797,14 @@ app.post('/query', async (req, res) => {
  * the workspace) is fast enough that it can still fail as a normal
  * HTTP error — nothing has streamed yet at that point. Once retrieval
  * succeeds, this sends the sources immediately:
- *   {"type":"sources","sources":[...]}
+ *   {"type":"sources","sources":[...],"retrievalQuery":"..."}
+ * `retrievalQuery` is the exact text that was embedded to produce this
+ * batch's search — see composeRetrievalQuery() in src/idealProposals.js.
+ * For a plain (non-comparison) question it's just the question itself,
+ * but for a topic-driven comparison batch it's deliberately NOT the
+ * full text sent to the chat model (see that function's doc comment) —
+ * exposing it here is what lets someone directly check, in the UI,
+ * whether two runs that "should" retrieve the same way actually are.
  * then switches Ollama's chat call into streaming mode and relays
  * each fragment of the answer as it's generated — for a reasoning
  * model with thinking enabled (the default; see the `think` param on
@@ -944,18 +959,28 @@ app.post('/query/stream', async (req, res) => {
       // and search — a fresh retrieval scoped to just that batch's
       // attributes, which is the whole point of batching (see the
       // big comment on batchAttributes() in src/idealProposals.js).
-      let matches, effectiveQuestion;
+      let matches, effectiveQuestion, retrievalQuery;
       if (i === 0) {
         matches = firstMatches;
         effectiveQuestion = firstQuestion;
+        retrievalQuery = firstRetrievalQuery;
       } else {
         effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
-        const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
+        retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
         const queryVector = await embed(retrievalQuery, embedModel, undefined, controller.signal);
         matches = search(workspaceId, queryVector, topK);
       }
 
-      send({ type: 'sources', batchIndex: i, totalBatches, sources: sourcesSummary(matches) });
+      // retrievalQuery is included here (not just used internally)
+      // specifically so someone can see, directly in the UI, exactly
+      // what text was embedded for this batch's search — the fastest
+      // way to check whether a comparison run and a plain query that
+      // "should" behave the same are actually searching with the same
+      // text, without needing to hand anyone their private rubric
+      // content to debug it. See composeRetrievalQuery()'s doc comment
+      // in src/idealProposals.js for the retrieval-vs-chat-prompt split
+      // this is meant to make visible.
+      send({ type: 'sources', batchIndex: i, totalBatches, sources: sourcesSummary(matches), retrievalQuery });
 
       if (matches.length === 0) {
         // Shouldn't normally happen once batch 0 already found
