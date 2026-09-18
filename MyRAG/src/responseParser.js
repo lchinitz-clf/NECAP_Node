@@ -286,7 +286,7 @@ function extractCategoryAndResult(segment, attributeName) {
  * from (see resolveCitation() below) rather than just trusted
  * outright.
  *
- * Recognizes two shapes, tried in this order:
+ * Recognizes three shapes, tried in this order:
  *   1. An explicit "Quote: "..." [file, chunk N]" label — the format
  *      compareInstruction actually asks for.
  *   2. No label at all: some models (observed in practice with a 3B
@@ -299,6 +299,23 @@ function extractCategoryAndResult(segment, attributeName) {
  *      punctuation/whitespace in between), so an ordinary quoted word
  *      inside a reasoning sentence that ISN'T followed by a citation
  *      is left alone rather than mistaken for one.
+ *   3. Neither a label NOR quotation marks: a model has also been
+ *      observed writing bare "none" (or "n/a"/"no quote") directly
+ *      followed by a citation bracket and nothing else marking it as
+ *      a quote placeholder — e.g. `Not addressed — none [Source:
+ *      report.pdf, chunk 106]`. This is really the same "I have no
+ *      quote to give" case pattern 1 already handles via its `(none|
+ *      n/a|no quote)` alternative, just missing both the "Quote:"
+ *      label and the quotes a model would normally wrap an actual
+ *      quote in. Recognized as its own pattern (not folded into
+ *      pattern 1, which requires the literal word "Quote") so this
+ *      shows up as a clean, citation-free reason instead of leaving a
+ *      dangling "none [...]" fragment — with a fabricated-looking
+ *      citation attached to a nonexistent quote — sitting in
+ *      resultText. Like pattern 2, the bracket must immediately
+ *      follow (only light punctuation/whitespace in between), so an
+ *      incidental "none" elsewhere in ordinary prose isn't mistaken
+ *      for this placeholder.
  *
  * Neither pattern is anchored to the end of `text`. That's
  * deliberate and fixes a real failure mode: a batched answer's LAST
@@ -342,41 +359,42 @@ function extractQuoteAndCitation(text) {
   // would make that whole segment fall through unrecognized instead.
   const labeledRe = /[\s.;:—–-]*Quote\s*:?\s*(?:["“]([^"”]*)["”]|(none|n\/a|no quote))\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])?/i;
   const inlineRe = /["“]([^"”]+)["”]\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/i;
+  const bareNoneRe = /(?:none|n\/a|no quote)\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/i;
 
   const labeledMatch = labeledRe.exec(text);
   const inlineMatch = inlineRe.exec(text);
+  const bareNoneMatch = bareNoneRe.exec(text);
 
-  // Both patterns are searched for unconditionally, and whichever one
-  // starts EARLIER in the text wins — not "labeled beats inline" by
-  // fixed priority. That matters once a model rambles past its real
-  // answer: relaxing the colon above means a stray, out-of-place
-  // "Quote none" further down a rambling response (see this module's
-  // doc comment for the real example that surfaced this) can now
-  // match the labeled pattern too, and if labeled always won outright,
-  // that LATER stray match would be picked over the real, earlier
-  // inline citation right after the actual answer — silently letting
-  // everything in between (the ramble this whole function exists to
-  // cut off) leak back into resultText. Taking whichever match has the
-  // smaller index keeps this landmark-based cut at the first
-  // quote-shaped thing in the text, which is always the real answer
-  // when the model followed instructions at all, regardless of which
-  // of the two shapes it used.
+  // All three patterns are searched for unconditionally, and whichever
+  // one starts EARLIEST in the text wins — not by fixed priority.
+  // That matters once a model rambles past its real answer: relaxing
+  // the colon above means a stray, out-of-place "Quote none" further
+  // down a rambling response (see this module's doc comment for the
+  // real example that surfaced this) can now match the labeled
+  // pattern too, and if labeled always won outright, that LATER stray
+  // match would be picked over the real, earlier inline citation right
+  // after the actual answer — silently letting everything in between
+  // (the ramble this whole function exists to cut off) leak back into
+  // resultText. Taking whichever match has the smaller index keeps
+  // this landmark-based cut at the first quote-shaped thing in the
+  // text, which is always the real answer when the model followed
+  // instructions at all, regardless of which of the three shapes it
+  // used.
   let chosen = null;
-  if (labeledMatch && inlineMatch) {
-    chosen = labeledMatch.index <= inlineMatch.index
-      ? { m: labeledMatch, labeled: true }
-      : { m: inlineMatch, labeled: false };
-  } else if (labeledMatch) {
-    chosen = { m: labeledMatch, labeled: true };
-  } else if (inlineMatch) {
-    chosen = { m: inlineMatch, labeled: false };
+  for (const candidate of [
+    labeledMatch && { m: labeledMatch, kind: 'labeled' },
+    inlineMatch && { m: inlineMatch, kind: 'inline' },
+    bareNoneMatch && { m: bareNoneMatch, kind: 'bareNone' },
+  ]) {
+    if (!candidate) continue;
+    if (!chosen || candidate.m.index < chosen.m.index) chosen = candidate;
   }
 
   if (!chosen) {
     return { resultText: text, quote: '', claimedSourceFile: null, claimedChunkIndex: null };
   }
 
-  const { m, labeled } = chosen;
+  const { m, kind } = chosen;
   // No `|| text.trim()` fallback here: an empty prefix is a normal,
   // expected result (the quote itself doubling as the whole reason,
   // with nothing said before it) — not a failure to recover from.
@@ -385,19 +403,97 @@ function extractQuoteAndCitation(text) {
   // rambled on AFTER them) right back onto resultText, undoing the
   // whole point of finding this landmark in the first place.
   const resultText = text.slice(0, m.index).trim();
-  return labeled
-    ? {
-        resultText,
-        quote: (m[1] || '').trim(),
-        claimedSourceFile: m[3] ? m[3].trim() : null,
-        claimedChunkIndex: m[4] !== undefined ? m[4].trim() : null,
-      }
-    : {
-        resultText,
-        quote: (m[1] || '').trim(),
-        claimedSourceFile: m[2] ? m[2].trim() : null,
-        claimedChunkIndex: m[3] !== undefined ? m[3].trim() : null,
-      };
+  if (kind === 'labeled') {
+    return {
+      resultText,
+      quote: (m[1] || '').trim(),
+      claimedSourceFile: m[3] ? m[3].trim() : null,
+      claimedChunkIndex: m[4] !== undefined ? m[4].trim() : null,
+    };
+  }
+  if (kind === 'inline') {
+    return {
+      resultText,
+      quote: (m[1] || '').trim(),
+      claimedSourceFile: m[2] ? m[2].trim() : null,
+      claimedChunkIndex: m[3] !== undefined ? m[3].trim() : null,
+    };
+  }
+  // bareNone: never has a quote to capture — "none" itself isn't the
+  // quote text, it's the model saying there ISN'T one — so quote stays
+  // '' just like the labeled "Quote: none" case does.
+  return {
+    resultText,
+    quote: '',
+    claimedSourceFile: m[1] ? m[1].trim() : null,
+    claimedChunkIndex: m[2] !== undefined ? m[2].trim() : null,
+  };
+}
+
+// Matches an ellipsis a model used to shorten a quote — "...", a
+// spaced-out ". . .", the single Unicode "…" character, or any of
+// those wrapped in brackets ("[...]"). The bracketed alternatives are
+// tried FIRST in the alternation so a bracket is consumed as part of
+// the same match as the dots inside it — otherwise splitting on just
+// the inner "..." would leave stray "[" / "]" characters stuck onto
+// the pieces on either side.
+const ELLIPSIS_RE = /\[\s*(?:\.\s*){3,}\s*\]|\[\s*…\s*\]|(?:\.\s*){3,}|…/g;
+
+/**
+ * Splits a quote on any ellipsis it contains into the pieces on
+ * either side, trimmed, with empty pieces dropped (a quote that
+ * starts or ends with an ellipsis produces one). A quote with no
+ * ellipsis at all comes back as a single-element array holding the
+ * whole (trimmed) quote — the same shape either way, so callers don't
+ * need to special-case "was there an ellipsis or not."
+ * @param {string} quote
+ * @returns {string[]}
+ */
+function splitQuoteOnEllipsis(quote) {
+  return quote
+    .split(ELLIPSIS_RE)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+// A floor below which a single piece of an ellipsis-shortened quote
+// is too short to trust as real, distinguishing evidence on its own —
+// see chunkContainsOrderedPieces()'s doc comment for why this only
+// applies to a MULTI-piece (ellipsis) quote, never a plain one.
+function isSubstantialPiece(piece) {
+  const words = piece.split(/\s+/).filter(Boolean);
+  return words.length >= 4 || piece.length >= 15;
+}
+
+/**
+ * Checks whether every one of `pieces` appears in `haystack`, in that
+ * same order, with each piece's match starting no earlier than where
+ * the previous one's match ended (never overlapping, never out of
+ * order). This is the piece-based generalization of a plain substring
+ * search: for an ordinary quote (a single piece, no ellipsis), it
+ * reduces to exactly that — one `indexOf` call, same as before.
+ *
+ * The ORDER requirement specifically is what keeps this from being too
+ * permissive once a quote is broken into pieces: checking only that
+ * each piece appears SOMEWHERE in the chunk (regardless of position)
+ * would let a fabricated quote stitched from unrelated fragments
+ * scattered across the chunk — in reverse order, or from opposite ends
+ * of a long chunk — come back "verified," which isn't what an
+ * ellipsis is supposed to represent (a shortened but still faithful,
+ * contiguous excerpt). Requiring pieces to appear in the chunk's own
+ * order, without overlapping, is a much closer match to that intent.
+ * @param {string} haystack - already normalized (see resolveCitation())
+ * @param {string[]} pieces - already normalized, in quote order
+ * @returns {boolean}
+ */
+function chunkContainsOrderedPieces(haystack, pieces) {
+  let searchFrom = 0;
+  for (const piece of pieces) {
+    const idx = haystack.indexOf(piece, searchFrom);
+    if (idx === -1) return false;
+    searchFrom = idx + piece.length;
+  }
+  return true;
 }
 
 /**
@@ -410,6 +506,23 @@ function extractQuoteAndCitation(text) {
  * unreliable enough to abandon entirely. A quote's real source is
  * unambiguous as long as its exact wording only appears in one place,
  * which is true of ordinary prose almost all the time.
+ *
+ * Handles a quote a model has shortened with an ellipsis ("Develop a
+ * coordination strategy ... to pursue federal funding") the same way:
+ * split on the ellipsis (splitQuoteOnEllipsis()), require each
+ * resulting piece to appear in the SAME chunk in the SAME order
+ * (chunkContainsOrderedPieces()) rather than requiring the literal
+ * shortened string to appear verbatim, which it by definition never
+ * will once words have been omitted from the middle. This was a real,
+ * observed gap: a genuinely accurate, verbatim-on-both-sides quote was
+ * coming back "not found" purely because the model — reasonably —
+ * shortened a long passage rather than quoting it in full. A single
+ * short/trivial piece (see isSubstantialPiece()) is dropped rather
+ * than required, so an ellipsis next to a throwaway word like "the"
+ * doesn't demand an exact position for it; this floor is skipped
+ * entirely for a plain, non-ellipsis quote, so an ordinary short
+ * quote is never newly rejected just for being short — only pieces
+ * created by SPLITTING an ellipsis are ever held to it.
  *
  * @param {string} quote
  * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} matches -
@@ -431,10 +544,21 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
 
   const normalize = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  const needle = normalize(quote);
-  if (!needle) return null;
 
-  const candidates = matches.filter((m) => normalize(m.text).includes(needle));
+  const rawPieces = splitQuoteOnEllipsis(quote);
+  if (rawPieces.length === 0) return null; // e.g. the "quote" was just an ellipsis with nothing else
+
+  // The length floor only kicks in once there's actually more than one
+  // piece to require (i.e. the model used an ellipsis) — see
+  // chunkContainsOrderedPieces()'s doc comment above for why a plain,
+  // single-piece quote is never filtered by length at all, same as
+  // before this change.
+  const requiredPieces = rawPieces.length > 1 ? rawPieces.filter(isSubstantialPiece) : rawPieces;
+  if (requiredPieces.length === 0) return { verified: false }; // every piece was too trivial to trust
+
+  const normalizedPieces = requiredPieces.map(normalize);
+
+  const candidates = matches.filter((m) => chunkContainsOrderedPieces(normalize(m.text), normalizedPieces));
   if (candidates.length === 0) return { verified: false };
 
   const claimed = claimedSourceFile != null && claimedChunkIndex != null
@@ -540,4 +664,4 @@ function parseComparisonAnswer(answerText, attributes, matches) {
   });
 }
 
-module.exports = { parseComparisonAnswer, extractQuoteAndCitation, resolveCitation };
+module.exports = { parseComparisonAnswer, extractQuoteAndCitation, resolveCitation, splitQuoteOnEllipsis };
