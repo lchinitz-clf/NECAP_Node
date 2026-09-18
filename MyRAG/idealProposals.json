@@ -12,6 +12,18 @@
     ],
     "topics": [
 	{
+	    "id": "test-rubric",
+	    "label": "Test Rubric",
+	    "description": "Place to test rubric wording.",
+	    "compareInsrtuction":[],
+	    "attributes": [
+		{
+		    "name": "IF1 - Vulnerability and Risk Assessment - Definitions",
+		    "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?"
+		}
+	    ]
+	},
+	{
 	    "id": "inland-flooding",
 	    "label": "Inland Flooding",
 	    "description": "Policy proposals for inland flooding.",

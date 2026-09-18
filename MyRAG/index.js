@@ -5,7 +5,8 @@ const fs = require('fs');
 const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
 const { embed, chat, listModels } = require('./src/ollamaClient');
-const { search, listDocuments, getChunk, listChunksForDocument, deleteDocument } = require('./src/store');
+const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = require('./src/store');
+const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
@@ -578,11 +579,18 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
  * in src/idealProposals.js builds it. An unrecognized `idealTopicId`
  * 400s with the id that wasn't found.
  *
- * Embeds the question, finds the most similar chunks stored in the
- * given workspace, and asks the chat model to answer using only that
+ * Embeds the question, then retrieves the most relevant chunks stored
+ * in the given workspace via hybridSearch() — a fusion of cosine-
+ * similarity vector search and BM25 keyword search, not vector search
+ * alone; see the doc comment in src/hybridSearch.js for why (in
+ * short: a short, exact-phrase query can otherwise rank poorly by
+ * embedding similarity even when a chunk contains that literal
+ * phrase) — and asks the chat model to answer using only that
  * retrieved context. Returns both the generated answer AND the raw
- * list of chunks/sources used, so you can see exactly what grounded
- * the answer rather than trusting the model's prose to mention it.
+ * list of chunks/sources used (each one's `matchedBy` says whether
+ * vector search, keyword search, or both surfaced it), so you can see
+ * exactly what grounded the answer rather than trusting the model's
+ * prose to mention it.
  */
 /**
  * Builds the system+user messages array for a RAG answer, shared by
@@ -649,6 +657,11 @@ function sourcesSummary(matches) {
     sourceFile: m.sourceFile,
     chunkIndex: m.chunkIndex,
     score: m.score,
+    // Which retrieval method(s) actually surfaced this chunk — see
+    // the doc comment on hybridSearch() in src/hybridSearch.js.
+    // Omitted only if matches ever came from something that doesn't
+    // set it (shouldn't happen post-hybridSearch, kept defensive).
+    ...(m.matchedBy ? { matchedBy: m.matchedBy } : {}),
   }));
 }
 
@@ -717,7 +730,13 @@ app.post('/query', async (req, res) => {
       retrievalQueries.push(retrievalQuery);
 
       const queryVector = await embed(retrievalQuery, embedModel);
-      const matches = search(workspaceId, queryVector, topK);
+      // hybridSearch() fuses cosine-similarity vector search with BM25
+      // keyword search (see its doc comment in src/hybridSearch.js) —
+      // this is what lets an exact-phrase query like "inland flooding"
+      // still find a chunk containing that phrase even when its
+      // embedding similarity alone wouldn't have ranked it highly
+      // enough to make a plain vector topK.
+      const matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK);
 
       if (matches.length === 0) {
         // Every batch would hit this same empty workspace, so there's
@@ -798,6 +817,9 @@ app.post('/query', async (req, res) => {
  * HTTP error — nothing has streamed yet at that point. Once retrieval
  * succeeds, this sends the sources immediately:
  *   {"type":"sources","sources":[...],"retrievalQuery":"..."}
+ * Each entry in `sources` also carries `matchedBy` (`["vector"]`,
+ * `["keyword"]`, or both) — which retrieval method(s) actually
+ * surfaced that chunk; see hybridSearch() in src/hybridSearch.js.
  * `retrievalQuery` is the exact text that was embedded to produce this
  * batch's search — see composeRetrievalQuery() in src/idealProposals.js.
  * For a plain (non-comparison) question it's just the question itself,
@@ -922,7 +944,10 @@ app.post('/query/stream', async (req, res) => {
   let firstMatches;
   try {
     const queryVector = await embed(firstRetrievalQuery, embedModel, undefined, controller.signal);
-    firstMatches = search(workspaceId, queryVector, topK);
+    // See the matching call in /query above and hybridSearch()'s doc
+    // comment in src/hybridSearch.js — same vector+keyword fusion,
+    // just for this route's first batch.
+    firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK);
   } catch (err) {
     if (clientGone) return; // stopped before retrieval even finished — no one to report back to
     console.error(err);
@@ -968,7 +993,7 @@ app.post('/query/stream', async (req, res) => {
         effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
         retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
         const queryVector = await embed(retrievalQuery, embedModel, undefined, controller.signal);
-        matches = search(workspaceId, queryVector, topK);
+        matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK);
       }
 
       // retrievalQuery is included here (not just used internally)

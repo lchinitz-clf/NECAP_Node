@@ -2,6 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const TurndownService = require('turndown');
+
+// Converts mammoth's HTML output to Markdown — real "#"/"##" headings
+// and "-"/"1." list items, driven by Word's own paragraph styles, not
+// a heuristic. This is what lets structuredText.js (chunker.js's
+// block parser) know for certain where a .docx's sections and lists
+// actually are, instead of guessing from plain text the way it has to
+// for PDFs — see that module's doc comment for the full contrast.
+// headingStyle: 'atx' picks "#"/"##" markers (what structuredText.js's
+// MD_HEADING_RE expects) over the alternative "underline" style;
+// bulletListMarker: '-' just picks one consistent bullet character
+// (turndown's own default) so parseBlocks()'s LIST_ITEM_RE has one
+// predictable shape to match rather than several.
+const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
 
 /**
  * Cleans up raw extracted text before it ever reaches the chunker.
@@ -56,19 +70,34 @@ async function extractPdfText(filePath) {
 
 /**
  * Reads a .docx (Word, OOXML format — NOT the old binary .doc) from
- * disk and returns its extracted, cleaned plain text. There's no
- * equivalent of a PDF "page" in a .docx file — Word only knows about
- * pages once it lays the document out for a specific paper size and
- * font, which isn't something we do here — so numPages is always null
- * for this type, same convention as the "no page count available" case
- * everywhere else in this app (the documents list already shows "—"
- * for that).
+ * disk and returns its extracted, cleaned text — as Markdown, not
+ * plain text, so headings and lists survive as real structure rather
+ * than being flattened away. This used to call mammoth's
+ * extractRawText(), which discards Word's paragraph styles entirely
+ * (a "Heading 2" and a body paragraph came out looking identical).
+ * Going through convertToHtml() instead, then converting THAT to
+ * Markdown with turndown, keeps those styles as genuine "#"/"##"
+ * headings and "-"/"1." list items — which is what lets chunker.js
+ * pack whole sections/list items together and prepend the right
+ * section heading to a chunk that starts mid-list, instead of cutting
+ * blindly by word count with no idea a list (or its heading) was ever
+ * there. See structuredText.js's module comment for the fuller
+ * picture, including why PDFs (no comparable structure to recover)
+ * don't get this same treatment.
+ *
+ * There's no equivalent of a PDF "page" in a .docx file — Word only
+ * knows about pages once it lays the document out for a specific
+ * paper size and font, which isn't something we do here — so
+ * numPages is always null for this type, same convention as the "no
+ * page count available" case everywhere else in this app (the
+ * documents list already shows "—" for that).
  * @param {string} filePath
  * @returns {Promise<{text: string, numPages: null}>}
  */
 async function extractDocxText(filePath) {
-  const result = await mammoth.extractRawText({ path: filePath });
-  return { text: cleanExtractedText(result.value), numPages: null };
+  const result = await mammoth.convertToHtml({ path: filePath });
+  const markdown = turndownService.turndown(result.value);
+  return { text: cleanExtractedText(markdown), numPages: null };
 }
 
 /**

@@ -54,6 +54,17 @@ Endpoints:
   UI — see "Viewing a chunk's text" below for why this is a
   fetch-on-demand endpoint rather than the query response carrying
   every retrieved chunk's full text up front.
+- `GET /workspaces/:workspaceId/documents/:sourceFile/chunks` — lists
+  every block recorded for one document, sorted ascending, e.g.
+  `{ "sourceFile": "ma-plan.pdf", "chunks": [{ "chunkIndex": 0, "id": "ma-plan.pdf::0" }, ...] }`.
+  `:sourceFile` must be URL-encoded (the UI does this automatically).
+  An unknown `sourceFile` isn't an error — it just comes back with an
+  empty `chunks` array. Each entry's `id` is exactly what
+  `GET /workspaces/:workspaceId/chunks/:chunkId` above expects, so a
+  caller can go straight from "pick a document" to "pick a block" to
+  "fetch its text" with no id-construction step. This is what backs
+  the "Look up a block" tool on the "Documents in this workspace"
+  section — see "Looking up a block directly" below.
 - `DELETE /workspaces/:workspaceId/documents/:sourceFile` — removes
   every chunk belonging to one document from a workspace's search
   index (`:sourceFile` must be URL-encoded — the UI does this
@@ -315,6 +326,19 @@ with text that's only useful the moment someone actually wants to read
 it. Fetching it lazily, one chunk at a time, only when someone clicks,
 keeps normal query responses lean and costs nothing extra for the
 common case of never opening a single source.
+
+### Looking up a block directly
+
+The chunk-viewing modal above only opens from a source citation after
+running a query. The "Documents in this workspace" section also has a
+standalone "Look up a block" tool for browsing block text directly,
+with no query needed: pick a document from the first dropdown, pick a
+block number from the second (populated from `GET
+/workspaces/:workspaceId/documents/:sourceFile/chunks` — see the
+endpoint list above), then click "View block" to open the same modal
+described above. The UI always calls a chunk a "block" — "chunk" is
+purely an internal/API word (matching `chunkIndex`, `getChunk()`, and
+this endpoint's own name), never shown to the user.
 
 ### Workspace maintenance
 
@@ -600,9 +624,14 @@ Returns:
   "sources": [
     { "sourceFile": "document.pdf", "chunkIndex": 42, "score": 0.81 },
     ...
-  ]
+  ],
+  "doneReason": "stop",
+  "promptTokens": 6200,
+  "answerTokens": 340
 }
 ```
+
+`promptTokens`/`answerTokens` are Ollama's own `prompt_eval_count`/`eval_count` for this exact request — see the doc on `chat()`'s return value in `src/ollamaClient.js`. `promptTokens` is the actual token count of everything sent to the model (system instructions + retrieved chunks + question combined) — the same number an "exceeds context size" error reports as `n_prompt_tokens` — so it's a direct, exact answer to "how much of my context window did this use," not an estimate. Both fields may be absent if Ollama's response ever omits them.
 
 The `sources` array is the part worth paying attention to — it tells
 you exactly which chunks the answer was actually grounded in (and how
@@ -615,7 +644,9 @@ Optional body parameters for `/query`: `topK` (how many chunks to
 retrieve, default 5), `chatModel` (default `llama3.1:8b`), `embedModel`
 (default `nomic-embed-text`), `temperature` (default 0.2), `maxTokens`
 (caps generation length via Ollama's `num_predict`; omit for no cap,
-the existing default behavior). Same parameters for `/query/stream`.
+the existing default behavior), `numCtx` (sets Ollama's `num_ctx` —
+see "A second gotcha" below; omit to use the model's own default, the
+existing default behavior). Same parameters for `/query/stream`.
 
 ## A gotcha worth knowing about: embedding context length
 
@@ -670,29 +701,45 @@ one you're looking at:
 
 1. **`maxTokens` was set** and generation hit that cap. Working as
    configured — raise it or clear the field for a longer answer.
-2. **Ollama's own `num_ctx` context window ran out**, even with
+2. **The model's `num_ctx` context window ran out**, even with
    `maxTokens` left blank ("no limit"). This is a *completely separate*
    setting from `maxTokens`/`num_predict` — it's the total budget
    (prompt + retrieved chunks + system instructions + the answer being
-   generated, all together) the model is allowed to use, and Ollama
-   defaults it to a fairly small value (commonly 2048 tokens) for many
-   models regardless of what that model could actually support. This
-   app never sets `num_ctx` anywhere, so every request uses whatever
-   Ollama's own default is. The bigger `topK` is, or the bigger your
-   chunk size, the more of that budget the retrieved context alone
-   eats up before the model even starts answering — leaving less room
-   for the answer, not more.
+   generated, all together) the model is allowed to use, and unless
+   `numCtx` is set on the request, this app leaves it at whatever the
+   model's own Modelfile default (or Ollama's own fallback) is —
+   commonly somewhere in the 2048-4096 range for many models,
+   regardless of what that model could actually support. The bigger
+   `topK` is, or the bigger your chunk size, the more of that budget
+   the retrieved context alone eats up before the model even starts
+   answering — leaving less room for the answer, not more. Past a
+   certain point this doesn't even get as far as a partial answer:
+   Ollama refuses the request outright with something like `"exceeds
+   the available context size (4096 tokens)"` before generation
+   starts at all.
 
-To tell these apart, `/query` and `/query/stream` both now return a
-`doneReason` field straight from Ollama: `"stop"` means the model
-reached a natural end on its own; `"length"` means it was cut off. The
-browser UI reads this and shows a note under the answer explaining
-which of the two above it was, based on whether *that request* itself
-sent `maxTokens`. If you keep hitting case 2, the practical fixes are:
-lower `topK` (fewer retrieved chunks = smaller prompt) or chunk size,
-or raise the model's `num_ctx` yourself — Ollama supports this per
-`Modelfile` (`PARAMETER num_ctx 8192`, for a model that supports it) or
-per-request; this app doesn't expose the latter as a setting yet.
+To tell the two truncation causes apart, `/query` and `/query/stream`
+both return a `doneReason` field straight from Ollama: `"stop"` means
+the model reached a natural end on its own; `"length"` means it was
+cut off. The browser UI reads this and shows a note under the answer
+explaining which of the two above it was, based on whether *that
+request* itself sent `maxTokens`. The outright-rejection case above
+surfaces differently — as a request error, not a `doneReason` — since
+it happens before any generation begins.
+
+If you keep hitting either case, the practical fixes are: raise
+`numCtx` (surfaced in the browser UI as "Request size" in Advanced
+settings, since `num_ctx` itself is meaningless to most users) so the
+model has more room to begin with, or lower `topK` (fewer retrieved
+chunks = smaller prompt) or chunk size so the existing room goes
+further. `numCtx`/"Request size" is left blank by default, same
+existing behavior as before it existed — a larger context window uses
+more memory, so this app doesn't pick a bigger number on your behalf
+without being asked. Raising a model's default permanently (rather
+than per-request) is also possible outside this app entirely, via a
+custom `Modelfile` (`PARAMETER num_ctx 8192`, for a model that
+supports it) or, on newer Ollama versions, `ollama run <model>
+--ctx-size 8192`.
 
 ## Inspecting the store
 
@@ -705,6 +752,126 @@ If you used the pipeline before workspaces existed, you may have a
 leftover `store.json` sitting in the project root — that one is no
 longer read by anything. Move whatever's in it into a named workspace
 by re-running `/embed` with a `workspaceId`, then delete the old file.
+
+## Chunking: structure-aware, not just word count
+
+`chunkText()` (`src/chunker.js`) used to be a blind word-count sliding
+window — grow a chunk word by word until `maxWords`/`maxChars`, cut,
+repeat, with no idea where a sentence, list item, or heading actually
+began or ended. That was a real, observed problem: a numbered/lettered
+list item ("c. Identify geographically isolated communities due to
+limited ingress/egress resulting from coastal and inland flooding
+events...") landed in its own chunk with zero visibility into which
+list — or which list's own heading — it was item c of, purely because
+a `maxWords` boundary happened to fall between the heading and the
+list. A chat model reading that chunk in isolation had no way to know
+what it was looking at, and answered accordingly.
+
+Chunking now goes through `src/structuredText.js`'s `parseBlocks()`
+first, which turns extracted text into an ordered sequence of
+**blocks** — headings, list items, and paragraphs — instead of one
+flat string. `chunkText()` then packs whole blocks into a chunk (never
+cutting mid-sentence or mid-list-item, except as a backstop for one
+single block that's larger than the whole chunk budget on its own),
+and — the part that actually fixes the list-item problem — prepends a
+synthesized `[Context: ...]` line to any chunk that doesn't itself
+open with a heading, built from whichever heading(s) are in effect at
+that point in the document. A chunk that starts mid-list now always
+carries something like `[Context: Task 3: Prioritizing Resiliency
+Actions]` ahead of it, however many chunks away from the real heading
+it's drifted, so the model always knows what section it's reading.
+
+Where the block boundaries themselves come from differs by file type:
+
+- **.docx** gets real structure. `extractDocxText()` now goes through
+  mammoth's `convertToHtml()` (driven by Word's own paragraph styles —
+  "Heading 2," a bulleted list, etc.) instead of `extractRawText()`
+  (which discarded all of that), then converts that HTML to Markdown
+  with the `turndown` library. The resulting `#`/`##` headings and
+  `-`/`1.` list items are genuine signals, not a guess.
+- **.pdf and .txt** have no comparable structure to recover —
+  pdf-parse and a raw text read both hand back plain characters, with
+  page layout, font size, and indentation already gone. For these,
+  `parseBlocks()` falls back to heuristics over plain lines of text
+  (ALL CAPS lines, "Task 3:"/"4.2"-style numbering, Title Case lines
+  with no trailing punctuation, lettered/numbered/bulleted list
+  markers) — see `looksLikeHeuristicHeading()`'s own doc comment for
+  exactly what it looks for. This is a genuine, honest limitation: a
+  heuristic over already-flattened text can miss a real heading or
+  misfire on an ordinary short sentence, in a way a truly layout-aware
+  PDF parser wouldn't. Tools like Unstructured.io and Docling do that
+  properly (real layout analysis on the PDF itself), but both are
+  Python libraries, and this app is deliberately Node-only — no Python
+  subprocess or microservice — so the heuristic approach is the
+  practical option that stays within that constraint.
+
+This only affects documents embedded (or re-embedded, or rebuilt) from
+here on — like any chunking or `embedModel` change, it doesn't
+retroactively rewrite chunks already sitting in an existing
+`store.json`. See the chunk-record schema note near the top of
+store.js for why a workspace's existing chunks are never silently
+altered after the fact.
+
+## Retrieval: hybrid vector + keyword search
+
+Every `/query` and `/query/stream` request retrieves chunks with
+`hybridSearch()` (`src/hybridSearch.js`), not cosine-similarity vector
+search alone. Vector search — comparing the question's embedding
+against every stored chunk's embedding — is good at finding
+conceptually related material even when the wording differs, but it
+has a real, reported failure mode: a short, exact phrase (e.g. "inland
+flooding") can fail to retrieve a chunk that contains that literal
+phrase, because an embedding model blends many words' meaning into one
+fixed-size vector, and a short query's vector doesn't always land
+close enough to a long chunk's vector even when the chunk plainly
+contains the words being searched for. Raising `topK` doesn't reliably
+fix this either, if the chunk's cosine similarity is simply low
+relative to everything else in the workspace.
+
+`hybridSearch()` adds a second retrieval method alongside vector
+search: BM25 keyword search (`src/keywordSearch.js`), the standard
+algorithm behind most "keyword search" products (Elasticsearch/Lucene
+use a close variant). It tokenizes the query and every chunk into
+individual words, drops a short list of common stopwords, and scores
+each chunk by which query keywords it contains, how often, and how
+rare each keyword is across the whole workspace — unlike naive
+substring matching, this is insensitive to word order, so "flooding in
+inland areas" and "coastal and inland flooding events" both score well
+against the query "inland flooding."
+
+The two methods' rankings are then combined via **reciprocal rank
+fusion (RRF)**: for each chunk, sum `1/(60 + rank)` across whichever
+method(s) ranked it, then sort by that sum. This fuses the two
+methods' rank *positions*, not their raw scores, which sidesteps the
+problem of putting a bounded cosine similarity and an unbounded,
+corpus-dependent BM25 score on one scale — and it means a chunk found
+by both methods rises above one found by only one, rather than every
+match being treated as equally good just for showing up somewhere.
+
+Every source in a response's `sources` array (or `/query/stream`'s
+`"sources"` event) carries a `matchedBy` field — `["vector"]`,
+`["keyword"]`, or both — showing which method(s) actually surfaced it;
+the browser UI shows this as a "Found by" column in the sources table,
+and as a hover tooltip on the per-attribute results table's source
+chips. `score` itself is unchanged: still a plain 0..1 cosine
+similarity, exactly as before — RRF only changes *which* chunks are
+selected and in what order, never what `score` means once a chunk is
+selected, so the existing relevance-threshold slider keeps working
+exactly as it did.
+
+Both methods rank the entire workspace (not just a pre-cut shortlist)
+before fusing and trimming to `topK` — see the doc comments in
+`src/hybridSearch.js` and `src/keywordSearch.js` for why a full scan
+is fine at this app's scale (hundreds to low thousands of chunks per
+workspace, same assumption `store.js` already makes), and why fusing
+full rankings, rather than two already-truncated top-K lists, is what
+actually lets a weak-vector/strong-keyword chunk get pulled in instead
+of being excluded before fusion ever sees it.
+
+**Current limitation:** no stemming or synonym handling — "flooding"
+and "flood" are distinct keyword tokens today. This didn't need
+solving to fix the specific word-order problem above, but would be a
+reasonable follow-up if it turns out to matter in practice.
 
 ## What's not here yet
 

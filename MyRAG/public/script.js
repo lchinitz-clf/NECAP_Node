@@ -527,6 +527,28 @@ let latestBatches = [];
 // area simply doesn't have topK blocks total, sources.length comes
 // back smaller than topK and there's nothing more to raise topK to
 // reach, so the suggestion is withheld in that case.
+/**
+ * Turns one source's `matchedBy` array (see hybridSearch() in
+ * src/hybridSearch.js — `["vector"]`, `["keyword"]`, or both) into a
+ * short human label for the "Found by" column: "Vector + keyword"
+ * when both retrieval methods independently surfaced this chunk,
+ * "Keyword only" when just the BM25 keyword layer did (this is the
+ * case hybrid search was specifically added for — a chunk containing
+ * the exact words searched for, that plain embedding-similarity
+ * search ranked too low to reach), or "Vector only" when just
+ * embedding similarity did. Falls back to an em dash for a response
+ * from before this field existed, rather than guessing.
+ */
+function formatMatchedBy(matchedBy) {
+  if (!matchedBy || matchedBy.length === 0) return '—';
+  const hasVector = matchedBy.includes('vector');
+  const hasKeyword = matchedBy.includes('keyword');
+  if (hasVector && hasKeyword) return 'Vector + keyword';
+  if (hasKeyword) return 'Keyword only';
+  if (hasVector) return 'Vector only';
+  return '—';
+}
+
 function renderSources(sources, threshold, topK) {
   sourcesBody.innerHTML = '';
   const meets = sources.filter((s) => s.score >= threshold);
@@ -562,6 +584,7 @@ function renderSources(sources, threshold, topK) {
       <td>${escapeHtml(s.sourceFile)}</td>
       <td>${chunkCell}</td>
       <td class="${ok ? 'score-meets' : 'score-below'}">${s.score.toFixed(4)}</td>
+      <td>${escapeHtml(formatMatchedBy(s.matchedBy))}</td>
     `;
     sourcesBody.appendChild(tr);
   }
@@ -664,9 +687,15 @@ function renderSourceChips(sources, threshold) {
       // this trade-off, just applied here for a row that can carry
       // several chips at once instead of one file name per row.
       const label = `#${s.chunkIndex}`;
-      const title = escapeHtml(s.sourceFile);
+      const sourceFile = escapeHtml(s.sourceFile);
+      // The hover title adds "Found by" info (see formatMatchedBy()
+      // above) alongside the file name; data-source-file stays the
+      // plain file name, since that's what feeds the block-view
+      // modal's subtitle (see showChunkModal()) — it shouldn't pick
+      // up the extra tooltip text.
+      const title = escapeHtml(`${s.sourceFile} — ${formatMatchedBy(s.matchedBy)}`);
       return s.id
-        ? `<button type="button" class="chunk-link chip ${scoreClass}" title="${title}" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${title}" data-chunk-index="${s.chunkIndex}">${label}</button>`
+        ? `<button type="button" class="chunk-link chip ${scoreClass}" title="${title}" data-chunk-id="${escapeHtml(s.id)}" data-source-file="${sourceFile}" data-chunk-index="${s.chunkIndex}">${label}</button>`
         : `<span class="chip" title="${title}">${label}</span>`;
     })
     .join(' ');
