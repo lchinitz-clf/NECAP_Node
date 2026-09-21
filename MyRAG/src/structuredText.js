@@ -68,6 +68,69 @@ const NUMBERED_HEADING_RE = /^\d+(?:\.\d+)*\.?\s+\S/; // "3.", "4.2", "12.1.3 Ti
  *   and not a list item.
  * @returns {boolean}
  */
+// Matches a line ending in terminal punctuation -- a period, question
+// mark, exclamation point, or colon -- allowing a trailing closing
+// quote or parenthesis (e.g. "...report)." or "...done.\""). A list
+// item whose own text ends in one of these is a grammatically
+// complete clause, so whatever comes after it is genuinely NEW
+// content, not a continuation of that same sentence.
+const TERMINAL_PUNCTUATION_RE = /[.!?:][)'"”’]*$/;
+
+/**
+ * Decides whether `line` is the wrapped continuation of the sentence
+ * in `precedingText` (the text of the block immediately before it),
+ * rather than the start of a new one. This only gets called for a
+ * line that didn't itself match a heading or list-item pattern -- see
+ * the call site in parseBlocks() below.
+ *
+ * Two signals, either one sufficient:
+ *   1. `line` starts with a lowercase letter. In ordinary English
+ *      prose this is a strong, simple tell: a genuinely new sentence
+ *      or paragraph is capitalized; a line starting lowercase is
+ *      continuing whatever came before it.
+ *   2. `precedingText` doesn't end in terminal punctuation at all --
+ *      if the preceding block's own sentence isn't even finished,
+ *      whatever comes next has to be its continuation, regardless of
+ *      how the next line itself starts (e.g. it could open with a
+ *      capitalized proper noun mid-sentence).
+ *
+ * This exists because of a real, observed failure: pdf-parse (see
+ * extract.js) preserves the PDF's own visual line breaks as literal
+ * "\n" characters in extracted text -- including the completely
+ * ordinary case of a long list item simply running past the width of
+ * one line on the page and wrapping onto the next, with NO blank line,
+ * no page break, nothing marking it as a continuation rather than a
+ * new line of content. Before this function existed, a list item like
+ * "c. Identify geographically isolated communities due to limited
+ * ingress/egress resulting from coastal and inland flooding events
+ * using 2050 SLR, storm surge and inland\nflooding predictions." would
+ * get split at that "\n" into a `listItem` block ending "...inland"
+ * and a completely separate `paragraph` block starting "flooding
+ * predictions." -- two blocks that could then land in different
+ * chunks, or have a synthesized "[Context: ...]" line inserted between
+ * them by chunker.js, breaking the sentence's literal contiguity in
+ * the chunk text. That in turn made an accurate, verbatim quote from
+ * that sentence impossible to verify against any single chunk, since
+ * no chunk actually contained it as one unbroken string anymore.
+ *
+ * Known false-positive risk, same tradeoff class as
+ * looksLikeHeuristicHeading() below: a list item written in a
+ * title/fragment style with no ending punctuation (e.g. "Review annual
+ * budget" as its own complete item), immediately followed by an
+ * unrelated new paragraph with no blank line between them, would get
+ * incorrectly merged. This is judged less common in practice than an
+ * ordinary sentence-style list item wrapping across a line, and PDF
+ * text with no real structural markup can't be parsed with certainty
+ * either way -- see this file's module comment.
+ * @param {string} line - already trimmed
+ * @param {string} precedingText - already trimmed
+ * @returns {boolean}
+ */
+function looksLikeContinuation(line, precedingText) {
+  if (/^[a-z]/.test(line)) return true;
+  return !TERMINAL_PUNCTUATION_RE.test(precedingText);
+}
+
 function looksLikeHeuristicHeading(line) {
   if (line.length > 90) return false; // real headings are short; a 90+ char line is a sentence
   if (/[.,;]$/.test(line)) return false; // headings rarely end mid-sentence like this (a trailing ":" is still fine)
@@ -96,7 +159,10 @@ function looksLikeHeuristicHeading(line) {
  * Blank lines separate blocks; consecutive non-blank lines that are
  * neither a heading nor a list item are joined (space-separated) into
  * one paragraph block, the same grouping a person reading the raw
- * text would infer.
+ * text would infer. A line that looks like neither, but appears to be
+ * the wrapped continuation of the immediately preceding list item's
+ * own sentence (see looksLikeContinuation() above), is appended onto
+ * that list item's text instead of starting a new paragraph block.
  * @param {string} text
  * @returns {Array<{type: string, level?: number, text: string}>}
  */
@@ -143,6 +209,32 @@ function parseBlocks(text) {
       continue;
     }
 
+    // Before treating this as the start of a new paragraph, check
+    // whether it's actually the wrapped continuation of the list item
+    // that immediately precedes it -- see looksLikeContinuation()'s
+    // doc comment above for why this check exists and what it's
+    // guarding against. Scoped narrowly on purpose: only fires when
+    // nothing has been accumulated into paragraphLines yet (i.e. this
+    // is the very next line right after that list item, not several
+    // lines into an unrelated paragraph) and the immediately preceding
+    // block is a listItem at all. Appending onto that block's own
+    // `.text` (rather than starting a fresh paragraph block) is what
+    // keeps the two physical lines as one unbroken block of text all
+    // the way through chunker.js -- a multi-line wrap handles itself
+    // naturally this way too, since each further wrapped line finds
+    // the same (now longer) listItem block still sitting at the end of
+    // `blocks` and paragraphLines still empty.
+    const precedingBlock = blocks[blocks.length - 1];
+    if (
+      paragraphLines.length === 0 &&
+      precedingBlock &&
+      precedingBlock.type === 'listItem' &&
+      looksLikeContinuation(line, precedingBlock.text)
+    ) {
+      precedingBlock.text += ' ' + line;
+      continue;
+    }
+
     paragraphLines.push(line);
   }
   flushParagraph();
@@ -150,4 +242,4 @@ function parseBlocks(text) {
   return blocks.filter((b) => b.text);
 }
 
-module.exports = { parseBlocks, LIST_ITEM_RE, MD_HEADING_RE, looksLikeHeuristicHeading };
+module.exports = { parseBlocks, LIST_ITEM_RE, MD_HEADING_RE, looksLikeHeuristicHeading, looksLikeContinuation };
