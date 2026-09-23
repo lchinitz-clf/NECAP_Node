@@ -753,6 +753,98 @@ leftover `store.json` sitting in the project root — that one is no
 longer read by anything. Move whatever's in it into a named workspace
 by re-running `/embed` with a `workspaceId`, then delete the old file.
 
+## Activity log
+
+Two separate audit-trail files live under `logs/`, each rotating to a
+new file automatically every month (`logs/activity-YYYY-MM.jsonl`,
+`logs/actions-YYYY-MM.jsonl`) so no single file grows without bound and
+an old month can be archived or deleted just by moving or removing
+that one file:
+
+- **`logs/activity-YYYY-MM.jsonl`** — full detail for every `/query`
+  and `/query/stream` request, a plain question or a rubric-topic
+  comparison alike: who asked (their IP address — see the caveats
+  below), when, which storage area, what was asked (or which rubric
+  topic was selected), which chat model actually answered it, and what
+  came back. A request that was aborted (Stop button, closed tab) or
+  that failed outright (Ollama unreachable, bad model name, etc.) is
+  logged too, with whatever partial answer had already been generated
+  and a `status` field saying which of the four outcomes it was — not
+  just successful ones — so the log reflects what actually happened
+  rather than only the happy path. See the doc comment on
+  `logQueryActivity()` in `src/activityLog.js` for the exact field list
+  and what each `status` value means.
+- **`logs/actions-YYYY-MM.jsonl`** — a terser record of every action
+  that changes something on disk: uploading or embedding a document,
+  deleting a document or a whole workspace, rebuilding a workspace's
+  index, and creating, updating, or deleting a rubric topic. Each line
+  is just who/when/where, the action's type, a `success` flag (with an
+  `error` message alongside it on failure), and a couple of small
+  identifying details specific to that action (a document's filename,
+  a rubric topic's id) — never the changed content itself, since this
+  is an audit trail of *what happened*, not a version-history/undo
+  system for reconstructing what things looked like before. Every
+  query and rubric analysis gets a one-line marker here too, alongside
+  every other action type, but only the terse who/when/where/success
+  shape — the actual question and answer stay exclusive to the activity
+  log above, so nothing is duplicated in full. Read-only routes (GET
+  `.../documents`, `.../chunks/:chunkId`, the xlsx-import preview
+  routes, `/ingest`) deliberately write to neither log file — including
+  viewing a chunk's text, which is a GET like the others but explicitly
+  excluded — since this file tracks changes, not every request that was
+  ever made.
+
+Both files share the same JSON-per-line shape — this is "JSONL"/NDJSON,
+the same newline-delimited-JSON shape the streaming routes themselves
+use, not a single JSON array. That's deliberate: unlike
+`idealProposals.json` or a workspace's `store.json` (both read-modify-
+write the *entire* file on every change, fine for something small and
+edited occasionally), appending one line is a cheap, constant-cost
+write no matter how big the log has already grown, and it's what keeps
+concurrent requests from corrupting each other's entries — each line
+is written in one `fs.appendFileSync` call, and POSIX guarantees a
+single `write()` to a file opened in append mode can't interleave with
+another process's `write()` to that same file. Open a log file directly
+to read it (a text editor, `grep`, or importing it into a spreadsheet
+tool that understands NDJSON all work), or `tail -f` the current
+month's file while the server runs to watch requests come in live.
+
+A few deliberate limits worth knowing:
+
+- **"Who" means an IP address, nothing more.** On this app's normal
+  setup — no reverse proxy in front of it — that's the real, direct
+  address of whoever connected, but it identifies a *machine*, not a
+  *person*: several people sharing one computer, or a NAT'd network
+  where everyone looks like one router address, both collapse to the
+  same logged IP. If this server is ever put behind a reverse proxy,
+  Express's `trust proxy` setting would need to be configured for the
+  logged IP to keep meaning the original caller rather than the proxy
+  itself — not a concern with today's direct-connection setup.
+- **`chatModel` is the model that ACTUALLY answered, not just whatever
+  was requested.** If a query didn't specify one, this app's own
+  default (`llama3.1:8b`) silently applied — `chatModel` records that
+  resolved value either way, so the log never has to be cross-
+  referenced against the app's source to know what really ran. Left
+  out of the line entirely when no chat call was ever reached at all
+  (e.g. a "no documents in this workspace yet" short-circuit).
+- **No chunk text, only chunk ids.** `sourceChunkIds` (activity log
+  only) records which chunks were retrieved (deduplicated, pooled
+  across every batch for a multi-batch rubric analysis — see
+  "Comparing against an ideal proposal" above), not their content —
+  look a chunk id up via `GET /workspaces/:id/chunks/:chunkId` if you
+  need the actual text later. This, together with leaving out
+  retrieval-query text, token counts, and per-batch detail that the
+  rest of the app tracks, is what keeps each logged line small.
+- **No rotation beyond the monthly file split, and no automatic
+  pruning.** Old months just sit in `logs/` until you archive or
+  delete them yourself — nothing in the app currently does this for
+  you.
+- **A logging failure never breaks the actual request.** If a write to
+  a log file itself fails (disk full, permissions), the error is
+  printed to the server console and the request the log entry would
+  have described is completely unaffected — see `appendToLog()`'s own
+  doc comment in `src/activityLog.js`.
+
 ## Chunking: structure-aware, not just word count
 
 `chunkText()` (`src/chunker.js`) used to be a blind word-count sliding

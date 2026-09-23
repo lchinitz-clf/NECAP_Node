@@ -146,6 +146,9 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   pending `reader.read()` below reject with an AbortError, which
  *   propagates out of this function uncaught — same "let it surface
  *   as-is" treatment the initial-connect catch block below gives it.
+ *   In streaming mode, whatever text/thinking had already been
+ *   generated before that happens is NOT lost — see `err.partialText`/
+ *   `err.partialThinking` below.
  * @returns {Promise<{text: string, thinking: string, doneReason: string|undefined, promptTokens: number|undefined, answerTokens: number|undefined}>}
  *   `text` is the full answer, same as this always returned before.
  *   `thinking` is the full reasoning trace accumulated from
@@ -172,6 +175,24 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   count, not an estimate computed here, and both are `undefined` if
  *   Ollama's response is ever missing them (older versions, or an
  *   unusual response shape) rather than this function guessing.
+ *
+ *   `model` is the resolved model name that was ACTUALLY used — either
+ *   whatever `opts.model` the caller passed, or, when that was left
+ *   unspecified, this function's own default ("llama3.1:8b") — so a
+ *   caller that wants to record which model really answered a request
+ *   doesn't need to duplicate that default itself.
+ *
+ *   If this rejects instead, the thrown error carries `err.model` (the
+ *   same resolved model name, for the same reason, on every rejection
+ *   path — including the initial connection failing before any
+ *   response was ever read) alongside its usual `message`. In
+ *   streaming mode specifically (see the `signal` doc above) it also
+ *   carries two more extra properties: `err.partialText` and
+ *   `err.partialThinking`, whatever text/thinking had already
+ *   accumulated before the failure (both `''` if nothing had streamed
+ *   yet). Non-streaming mode has no partialText/partialThinking
+ *   equivalent — a non-streaming call either returns the whole answer
+ *   at once or never returns any of it.
  */
 async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, repeatPenalty, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
@@ -194,14 +215,21 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
       signal,
     });
   } catch (err) {
-    if (err.name === 'AbortError') throw err;
-    throw new Error(
+    if (err.name === 'AbortError') {
+      err.model = model;
+      throw err;
+    }
+    const wrapped = new Error(
       `Could not reach Ollama at ${OLLAMA_BASE_URL}. Is "ollama serve" running? (${err.message})`
     );
+    wrapped.model = model;
+    throw wrapped;
   }
 
   if (!res.ok) {
-    throw new Error(`Ollama /api/chat failed: ${res.status} ${await res.text()}`);
+    const err = new Error(`Ollama /api/chat failed: ${res.status} ${await res.text()}`);
+    err.model = model;
+    throw err;
   }
 
   if (!streaming) {
@@ -212,6 +240,7 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
       doneReason: data.done_reason,
       promptTokens: data.prompt_eval_count,
       answerTokens: data.eval_count,
+      model,
     };
   }
 
@@ -239,39 +268,58 @@ async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTok
   let promptTokens;
   let answerTokens;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    let newlineIdx;
-    while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, newlineIdx).trim();
-      buffer = buffer.slice(newlineIdx + 1);
-      if (!line) continue;
-      const obj = JSON.parse(line);
-      const thinkingPiece = obj.message && obj.message.thinking;
-      if (thinkingPiece) {
-        fullThinking += thinkingPiece;
-        if (onThinking) onThinking(thinkingPiece);
-      }
-      const piece = obj.message && obj.message.content;
-      if (piece) {
-        full += piece;
-        onToken(piece);
-      }
-      // prompt_eval_count/eval_count only appear on this final line,
-      // same as done_reason above — every earlier fragment has
-      // done: false and neither field at all.
-      if (obj.done) {
-        doneReason = obj.done_reason;
-        promptTokens = obj.prompt_eval_count;
-        answerTokens = obj.eval_count;
+      let newlineIdx;
+      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIdx).trim();
+        buffer = buffer.slice(newlineIdx + 1);
+        if (!line) continue;
+        const obj = JSON.parse(line);
+        const thinkingPiece = obj.message && obj.message.thinking;
+        if (thinkingPiece) {
+          fullThinking += thinkingPiece;
+          if (onThinking) onThinking(thinkingPiece);
+        }
+        const piece = obj.message && obj.message.content;
+        if (piece) {
+          full += piece;
+          onToken(piece);
+        }
+        // prompt_eval_count/eval_count only appear on this final line,
+        // same as done_reason above — every earlier fragment has
+        // done: false and neither field at all.
+        if (obj.done) {
+          doneReason = obj.done_reason;
+          promptTokens = obj.prompt_eval_count;
+          answerTokens = obj.eval_count;
+        }
       }
     }
+  } catch (err) {
+    // Most commonly an AbortError from a Stop-button click mid-stream
+    // (see the `signal` doc above), but any other read/parse failure
+    // partway through lands here too. Without this, whatever text had
+    // already streamed — onToken() already delivered it to the caller
+    // fragment by fragment — would simply vanish the moment this
+    // function throws, since `full`/`fullThinking` are local variables
+    // only ever returned on the normal, non-throwing path below. A
+    // caller that wants to record (e.g. log) a partial answer instead
+    // of losing it entirely can read it off the thrown error via these
+    // two properties; `err` itself is rethrown completely unchanged
+    // otherwise (same type, same message) so existing catch logic
+    // elsewhere is unaffected.
+    err.partialText = full;
+    err.partialThinking = fullThinking;
+    err.model = model;
+    throw err;
   }
 
-  return { text: full, thinking: fullThinking, doneReason, promptTokens, answerTokens };
+  return { text: full, thinking: fullThinking, doneReason, promptTokens, answerTokens, model };
 }
 
 /**

@@ -12,14 +12,13 @@
     {
       "id": "test-rubric",
       "label": "Test Rubric",
-      "description": "Place to test rubric wording.",
-      "compareInsrtuction": [],
       "attributes": [
         {
           "name": "Haz11 - Asset Inventory and Exposure - Exposure Quantification",
-          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to each hazard?"
+          "proposal": "Does the plan quantify, either in absolute numbers or population percentages, the people at risk due to high heat?"
         }
-      ]
+      ],
+      "description": "Place to test rubric wording."
     },
     {
       "id": "inland-flooding",

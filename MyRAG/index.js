@@ -12,6 +12,7 @@ const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } 
 const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
 const { parseComparisonAnswer } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
+const { logQueryActivity, logAction } = require('./src/activityLog');
 
 const app = express();
 app.use(express.json());
@@ -180,9 +181,11 @@ app.post('/ideal-proposals', (req, res) => {
 
     data.topics.push(topic);
     saveTopics(data);
+    logAction({ req, type: 'rubricTopicCreate', success: true, details: { topicId: id, label: topic.label, attributeCount: topic.attributes.length } });
     res.status(201).json({ topic });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'rubricTopicCreate', success: false, error: err.message, details: { topicId: id } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -222,9 +225,11 @@ app.put('/ideal-proposals/:topicId', (req, res) => {
 
     data.topics[index] = topic;
     saveTopics(data);
+    logAction({ req, type: 'rubricTopicUpdate', success: true, details: { topicId, label: topic.label, attributeCount: topic.attributes.length } });
     res.json({ topic });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'rubricTopicUpdate', success: false, error: err.message, details: { topicId } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -247,9 +252,11 @@ app.delete('/ideal-proposals/:topicId', (req, res) => {
 
     const [removed] = data.topics.splice(index, 1);
     saveTopics(data);
+    logAction({ req, type: 'rubricTopicDelete', success: true, details: { topicId, label: removed.label } });
     res.json({ removed: { id: removed.id, label: removed.label } });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'rubricTopicDelete', success: false, error: err.message, details: { topicId } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -452,9 +459,11 @@ app.delete('/workspaces/:workspaceId/documents/:sourceFile', (req, res) => {
 
   try {
     const result = deleteDocument(workspaceId, sourceFile);
+    logAction({ req, type: 'documentDelete', workspaceId, success: true, details: { sourceFile, ...result } });
     res.json({ workspaceId, sourceFile, ...result });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'documentDelete', workspaceId, success: false, error: err.message, details: { sourceFile } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -489,9 +498,11 @@ app.delete('/workspaces/:workspaceId', (req, res) => {
 
   try {
     const result = deleteWorkspace(workspaceId);
+    logAction({ req, type: 'workspaceDelete', workspaceId, success: true });
     res.json({ workspaceId, ...result });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'workspaceDelete', workspaceId, success: false, error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -556,9 +567,11 @@ app.post('/workspaces/:workspaceId/rebuild-index', async (req, res) => {
       overlapWords,
       onProgress: send,
     });
+    logAction({ req, type: 'indexRebuild', workspaceId, success: true, details: { filesProcessed: result.filesProcessed, totalChunks: result.totalChunks } });
     send({ type: 'done', ...result });
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'indexRebuild', workspaceId, success: false, error: err.message });
     send({ type: 'error', error: err.message });
   }
   res.end();
@@ -675,9 +688,11 @@ app.post('/embed', async (req, res) => {
 
   try {
     const result = await embedDocumentIntoWorkspace(workspaceId, filePath, { maxWords, overlapWords, embedModel });
+    logAction({ req, type: 'documentEmbed', workspaceId, success: true, details: { sourceFile: result.sourceFile, chunksEmbedded: result.chunksEmbedded } });
     res.json(result);
   } catch (err) {
     console.error(err);
+    logAction({ req, type: 'documentEmbed', workspaceId, success: false, error: err.message, details: { filePath } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -789,6 +804,7 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
       overlapWords = parsePositiveIntField(req.body.overlapWords, 'overlapWords');
     } catch (err) {
       fs.unlink(req.file.path, () => {}); // best-effort; nothing more useful to do if this fails
+      logAction({ req, type: 'documentUpload', workspaceId, success: false, error: err.message, details: { sourceFile: path.basename(req.file.originalname) } });
       return res.status(400).json({ error: err.message });
     }
 
@@ -805,9 +821,11 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
         overlapWords,
         isUpload: true,
       });
+      logAction({ req, type: 'documentUpload', workspaceId, success: true, details: { sourceFile: result.sourceFile, chunksEmbedded: result.chunksEmbedded } });
       send({ type: 'done', ...result, originalName: req.file.originalname });
     } catch (err) {
       console.error(err);
+      logAction({ req, type: 'documentUpload', workspaceId, success: false, error: err.message, details: { sourceFile: path.basename(req.file.originalname) } });
       send({ type: 'error', error: err.message });
     } finally {
       res.end();
@@ -949,16 +967,31 @@ app.post('/query', async (req, res) => {
   // the loop below still runs exactly once, unchanged from before.
   const batches = topic ? batchAttributes(topic.attributes, attributesPerCall) : [null];
 
-  try {
-    let combinedAnswer = '';
-    let allSources = [];
-    let allRecords = [];
-    const thinkingParts = [];
-    const retrievalQueries = [];
-    let totalPromptTokens = 0;
-    let totalAnswerTokens = 0;
-    let lastDoneReason;
+  // Hoisted above the try block (rather than declared as the try
+  // block's first lines, which is how this used to read) so the catch
+  // block below can still log whatever partial answer/sources had
+  // already been accumulated when something failed — see
+  // logQueryActivity()'s own doc comment in src/activityLog.js for why
+  // even a failed request is worth recording with whatever's
+  // available, not skipped entirely.
+  let combinedAnswer = '';
+  let allSources = [];
+  let allRecords = [];
+  const thinkingParts = [];
+  const retrievalQueries = [];
+  let totalPromptTokens = 0;
+  let totalAnswerTokens = 0;
+  let lastDoneReason;
+  // The chat model that ACTUALLY answered — resolved by chat() itself
+  // (its own default when `chatModel` above was left unspecified), not
+  // just echoing back whatever `chatModel` was passed in. Captured from
+  // chat()'s return value below on success, or from a thrown error's
+  // own `.model` (see ollamaClient.js) if a chat call was reached but
+  // failed. Stays undefined if no chat call was ever reached at all
+  // (e.g. "no-documents").
+  let resolvedChatModel;
 
+  try {
     for (const attributesSubset of batches) {
       // See composeComparisonQuestion()'s big comment in
       // src/idealProposals.js: when a topic is selected, ITS text
@@ -991,8 +1024,10 @@ app.post('/query', async (req, res) => {
         // Every batch would hit this same empty workspace, so there's
         // no point continuing the loop — short-circuit the whole
         // request exactly like the single-pass version did.
+        const noDocsAnswer = `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`;
+        logQueryActivity({ req, workspaceId, question, topic, status: 'no-documents', answer: noDocsAnswer });
         return res.json({
-          answer: `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`,
+          answer: noDocsAnswer,
           sources: [],
         });
       }
@@ -1004,13 +1039,14 @@ app.post('/query', async (req, res) => {
       // interpreted, since only the caller knows whether it itself set
       // maxTokens (in which case "length" was requested) or not (in
       // which case "length" means Ollama's own context window ran out).
-      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, repeatPenalty, think });
+      const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, repeatPenalty, think });
 
       combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
       allSources = allSources.concat(sourcesSummary(matches));
       totalPromptTokens += promptTokens || 0;
       totalAnswerTokens += answerTokens || 0;
       lastDoneReason = doneReason;
+      resolvedChatModel = usedModel;
       if (thinking) thinkingParts.push(thinking);
 
       // Only a topic-driven comparison batch has attributes to parse
@@ -1026,6 +1062,17 @@ app.post('/query', async (req, res) => {
         allRecords = allRecords.concat(parseComparisonAnswer(answer, attributesSubset, matches));
       }
     }
+
+    logQueryActivity({
+      req,
+      workspaceId,
+      question,
+      topic,
+      status: 'completed',
+      answer: combinedAnswer,
+      sourceChunkIds: [...new Set(allSources.map((s) => s.id))],
+      chatModel: resolvedChatModel,
+    });
 
     // `thinking` is only included when non-empty — a model that
     // doesn't support it (or was asked not to via `think: false`)
@@ -1049,6 +1096,17 @@ app.post('/query', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    logQueryActivity({
+      req,
+      workspaceId,
+      question,
+      topic,
+      status: 'error',
+      error: err.message,
+      answer: combinedAnswer,
+      sourceChunkIds: [...new Set(allSources.map((s) => s.id))],
+      chatModel: resolvedChatModel || err.model,
+    });
     res.status(500).json({ error: err.message });
   }
 });
@@ -1198,8 +1256,16 @@ app.post('/query/stream', async (req, res) => {
     // just for this route's first batch.
     firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK);
   } catch (err) {
-    if (clientGone) return; // stopped before retrieval even finished — no one to report back to
+    if (clientGone) {
+      // Stopped before retrieval even finished — no one to report back
+      // to, but still worth a log entry: the request was genuinely
+      // attempted, and "aborted" is a more accurate record of what
+      // happened than silently dropping it.
+      logQueryActivity({ req, workspaceId, question, topic, status: 'aborted' });
+      return;
+    }
     console.error(err);
+    logQueryActivity({ req, workspaceId, question, topic, status: 'error', error: err.message });
     return res.status(500).json({ error: err.message });
   }
 
@@ -1208,9 +1274,11 @@ app.post('/query/stream', async (req, res) => {
   const send = (event) => res.write(JSON.stringify(event) + '\n');
 
   if (firstMatches.length === 0) {
+    const noDocsAnswer = `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`;
+    logQueryActivity({ req, workspaceId, question, topic, status: 'no-documents', answer: noDocsAnswer });
     send({
       type: 'done',
-      answer: `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`,
+      answer: noDocsAnswer,
       sources: [],
       totalBatches: 1,
     });
@@ -1219,9 +1287,19 @@ app.post('/query/stream', async (req, res) => {
 
   let combinedAnswer = '';
   let allRecords = [];
+  // Pooled across every batch — same purpose as /query's `allSources`,
+  // but this route never otherwise keeps a combined sources array (each
+  // batch's sources are only ever sent as their own "sources"/
+  // "batch-done" stream events), so this exists purely to feed
+  // logQueryActivity()'s sourceChunkIds below.
+  let allSourceIds = [];
   let totalPromptTokens = 0;
   let totalAnswerTokens = 0;
   let lastDoneReason;
+  // Same purpose as /query's resolvedChatModel above — the chat model
+  // that ACTUALLY answered, resolved by chat() itself rather than just
+  // echoing back the requested `chatModel`.
+  let resolvedChatModel;
 
   try {
     for (let i = 0; i < batches.length; i++) {
@@ -1255,6 +1333,7 @@ app.post('/query/stream', async (req, res) => {
       // in src/idealProposals.js for the retrieval-vs-chat-prompt split
       // this is meant to make visible.
       send({ type: 'sources', batchIndex: i, totalBatches, sources: sourcesSummary(matches), retrievalQuery });
+      allSourceIds = allSourceIds.concat(matches.map((m) => m.id));
 
       if (matches.length === 0) {
         // Shouldn't normally happen once batch 0 already found
@@ -1265,7 +1344,7 @@ app.post('/query/stream', async (req, res) => {
       }
 
       const messages = buildRagMessages(effectiveQuestion, matches, topic ? 'proposal' : undefined);
-      const { text: answer, thinking, doneReason, promptTokens, answerTokens } = await chat(messages, {
+      const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, {
         model: chatModel,
         temperature,
         maxTokens,
@@ -1281,6 +1360,7 @@ app.post('/query/stream', async (req, res) => {
       totalPromptTokens += promptTokens || 0;
       totalAnswerTokens += answerTokens || 0;
       lastDoneReason = doneReason;
+      resolvedChatModel = usedModel;
 
       // `matches` here plays the same role as in /query above — lets
       // parseComparisonAnswer() verify any quote against this batch's
@@ -1317,13 +1397,73 @@ app.post('/query/stream', async (req, res) => {
         records: allRecords,
         totalBatches,
       });
+      logQueryActivity({
+        req,
+        workspaceId,
+        question,
+        topic,
+        status: 'completed',
+        answer: combinedAnswer,
+        sourceChunkIds: [...new Set(allSourceIds)],
+        chatModel: resolvedChatModel,
+      });
+    } else {
+      // The loop above exited via `if (clientGone) break;` — the
+      // client disconnected between batches, with nothing having
+      // thrown. Distinct from the catch block below, which handles an
+      // abort landing mid-await (embed()/chat() rejecting with an
+      // AbortError) — this is the same outcome reached a different
+      // way, so it's logged identically.
+      logQueryActivity({
+        req,
+        workspaceId,
+        question,
+        topic,
+        status: 'aborted',
+        answer: combinedAnswer,
+        sourceChunkIds: [...new Set(allSourceIds)],
+        chatModel: resolvedChatModel,
+      });
     }
   } catch (err) {
+    // A failure here most commonly means chat() rejected mid-stream —
+    // ollamaClient.js's chat() attaches whatever text had already
+    // streamed as err.partialText in that case (see its own doc
+    // comment), which combinedAnswer would NOT otherwise reflect: that
+    // only gets updated once chat() returns normally, which it never
+    // does on a thrown error. Folding it in here means the log still
+    // captures a genuine partial answer instead of nothing, for
+    // exactly the case this matters most — an aborted stream.
+    const loggedAnswer = err.partialText
+      ? (combinedAnswer ? combinedAnswer + '\n\n' : '') + err.partialText
+      : combinedAnswer;
+
     if (clientGone) {
       console.log(`[query/stream] [${workspaceId}] stopped by client before finishing`);
+      logQueryActivity({
+        req,
+        workspaceId,
+        question,
+        topic,
+        status: 'aborted',
+        answer: loggedAnswer,
+        sourceChunkIds: [...new Set(allSourceIds)],
+        chatModel: resolvedChatModel || err.model,
+      });
     } else {
       console.error(err);
       send({ type: 'error', error: err.message });
+      logQueryActivity({
+        req,
+        workspaceId,
+        question,
+        topic,
+        status: 'error',
+        error: err.message,
+        answer: loggedAnswer,
+        sourceChunkIds: [...new Set(allSourceIds)],
+        chatModel: resolvedChatModel || err.model,
+      });
     }
   } finally {
     if (!clientGone) res.end();
