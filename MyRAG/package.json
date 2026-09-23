@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "mammoth": "^1.12.2",
     "multer": "^2.3.0",

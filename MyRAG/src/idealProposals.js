@@ -66,6 +66,36 @@ function loadTopics() {
 }
 
 /**
+ * Writes `data` to idealProposals.json, replacing its entire contents —
+ * the save-side counterpart to loadTopics(), following the same "just
+ * a file" philosophy documented in this module's own header comment:
+ * no locking, no partial/merge writes, no in-memory cache to keep in
+ * sync. Every route in index.js that creates, overwrites, or deletes a
+ * topic (see the Rubric Control feature in README.md) follows the same
+ * read-modify-write pattern: loadTopics() to get the current contents,
+ * change just the `topics` array in memory, then saveTopics() the
+ * whole thing back — so defaultCompareInstruction and any other
+ * top-level field a person hand-edited into the file are preserved
+ * automatically as long as callers always start from a fresh
+ * loadTopics() rather than constructing `data` from scratch.
+ *
+ * Minimal shape validation only (a top-level "topics" array) — same
+ * bar loadTopics() itself enforces, not full per-topic schema
+ * checking, since the route handlers above this already validate the
+ * specific fields they accept from a request body before ever
+ * reaching here.
+ *
+ * @param {{defaultCompareInstruction?: string|string[], topics: Array<Object>}} data
+ * @throws {Error} if `data` doesn't have a top-level "topics" array.
+ */
+function saveTopics(data) {
+  if (!data || !Array.isArray(data.topics)) {
+    throw new Error('Cannot save idealProposals.json: data must have a top-level "topics" array.');
+  }
+  fs.writeFileSync(IDEAL_PROPOSALS_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
+/**
  * Lean summary of every topic, for populating the Ask form's dropdown:
  * id (the value actually submitted back in a query) plus label and
  * description (display only). Deliberately excludes attributes and
@@ -74,10 +104,20 @@ function loadTopics() {
  * stays server-side and is folded in only when a query names that
  * topic's id, the same "client sends a name/id, server resolves the
  * behavior" pattern chatModel and embedModel already use.
- * @returns {Array<{id: string, label: string, description: string|undefined}>}
+ * `attributeCount` is included too (added for the Rubric Control UI's
+ * topic list — see index.html/script.js — so it can show how many
+ * attributes each topic has without a second request per topic); it's
+ * a harmless addition for the Ask form's dropdown, which simply never
+ * reads that field.
+ * @returns {Array<{id: string, label: string, description: string|undefined, attributeCount: number}>}
  */
 function listTopicSummaries() {
-  return loadTopics().topics.map(({ id, label, description }) => ({ id, label, description }));
+  return loadTopics().topics.map(({ id, label, description, attributes }) => ({
+    id,
+    label,
+    description,
+    attributeCount: Array.isArray(attributes) ? attributes.length : 0,
+  }));
 }
 
 /**
@@ -379,6 +419,7 @@ function batchAttributes(attributes, attributesPerCall) {
 
 module.exports = {
   loadTopics,
+  saveTopics,
   listTopicSummaries,
   getTopic,
   composeComparisonQuestion,

@@ -935,8 +935,545 @@ function initSectionToggle(details, storageKey) {
   };
 }
 
-let documentsDetails, answerDetails, attributeResultsDetails, importDetails;
+let documentsDetails, answerDetails, attributeResultsDetails, importDetails, rubricDetails;
 let answerToggle;
+
+// ---- Tabs (hamburger menu) ----
+//
+// The page's sections are grouped into three always-present panel
+// divs in index.html (#tabPanel-documents, #tabPanel-rubric,
+// #tabPanel-query) — "Document Management," "Rubric Control," and
+// "Query and Response" respectively. Switching tabs only ever toggles
+// each panel's own display:block/none; nothing inside a panel is
+// re-rendered, rebuilt, or removed from the DOM when it's hidden, so
+// in-progress state in a tab you switch away from (a half-typed
+// question, an open Advanced settings section, a query still
+// streaming in) is still exactly as you left it when you switch back.
+// This is also why none of the existing element ids or event-handling
+// code elsewhere in this file needed to change for tabs to exist —
+// every element a handler looks up is still on the page, just
+// sometimes inside a panel with display:none.
+const TAB_IDS = ['documents', 'rubric', 'query'];
+const TAB_LABELS = {
+  documents: 'Document Management',
+  rubric: 'Rubric Control',
+  query: 'Query and Response',
+};
+// Which tab was open persists across a reload, same
+// localStorage-per-browser convention initSectionToggle() above uses
+// for collapsible sections — a low-risk, easily-reversible nicety
+// (falls back to the first tab if storage is unavailable or empty).
+const TAB_STORAGE_KEY = 'local-rag:activeTab';
+
+let tabMenuBtn, tabMenuList, tabMenuActiveLabel;
+
+/**
+ * Shows the given tab's panel and hides the other two, updates the
+ * hamburger menu's active-item highlighting and its button label (the
+ * approved "active-tab indicator"), and remembers the choice for next
+ * visit.
+ * @param {string} tabId - one of TAB_IDS; falls back to the first tab
+ *   if not recognized (e.g. a stale/corrupt localStorage value).
+ */
+function setActiveTab(tabId) {
+  if (!TAB_IDS.includes(tabId)) tabId = TAB_IDS[0];
+
+  for (const id of TAB_IDS) {
+    const panel = document.getElementById(`tabPanel-${id}`);
+    if (panel) panel.style.display = id === tabId ? '' : 'none';
+  }
+  for (const item of tabMenuList.querySelectorAll('.tab-menu-item')) {
+    item.classList.toggle('active', item.dataset.tab === tabId);
+  }
+  tabMenuActiveLabel.textContent = TAB_LABELS[tabId];
+
+  try {
+    localStorage.setItem(TAB_STORAGE_KEY, tabId);
+  } catch (err) {
+    // Non-fatal — the switch itself still worked, it just won't be
+    // remembered next visit.
+  }
+}
+
+function initTabs() {
+  tabMenuBtn = document.getElementById('tabMenuBtn');
+  tabMenuList = document.getElementById('tabMenuList');
+  tabMenuActiveLabel = document.getElementById('tabMenuActiveLabel');
+
+  tabMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't let this click immediately re-close the menu via the document listener below
+    const open = tabMenuList.classList.toggle('open');
+    tabMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  tabMenuList.addEventListener('click', (e) => {
+    const item = e.target.closest('.tab-menu-item');
+    if (!item) return;
+    setActiveTab(item.dataset.tab);
+    tabMenuList.classList.remove('open');
+    tabMenuBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  // Clicking anywhere else on the page closes the menu if it's open —
+  // standard dropdown behavior. Harmless when the menu's already
+  // closed (classList.remove on an already-absent class is a no-op).
+  document.addEventListener('click', () => {
+    tabMenuList.classList.remove('open');
+    tabMenuBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  let initialTab = TAB_IDS[0];
+  try {
+    const stored = localStorage.getItem(TAB_STORAGE_KEY);
+    if (stored && TAB_IDS.includes(stored)) initialTab = stored;
+  } catch (err) {
+    // Storage unavailable — fall back to the first tab.
+  }
+  setActiveTab(initialTab);
+}
+
+// ---- Rubric Control ----
+//
+// UI for managing idealProposals.json's topics — the "ideal proposal"
+// comparison data the Query and Response tab's compare-mode dropdown
+// offers (see refreshIdealTopics() above and src/idealProposals.js).
+// Previously this file could only be edited by hand or via the
+// standalone excel_to_json.py script; this section is the in-app
+// replacement for both, talking to the CRUD routes added alongside it
+// in index.js (GET/POST/PUT/DELETE /ideal-proposals[...]) and the
+// native xlsx-import routes backed by src/xlsxImport.js.
+//
+// A topic's id is fixed once created (no rename support, by design —
+// see the routes' own doc comments in index.js) — rubricEditingTopicId
+// below tracks whether the form is currently creating a brand new
+// topic (null) or overwriting an existing one (that topic's id, with
+// the id field itself locked). Saving an edit always fully replaces
+// the topic's label/description/attributes, never merges.
+
+let rubricTopicsBody, rubricTopicsEmpty, rubricTopicsError;
+let rubricForm, rubricFormHeading, rubricFormHint;
+let rubricTopicId, rubricTopicIdHint, rubricTopicLabel, rubricTopicDescription, rubricCompareInstruction;
+let rubricAttributesBody, rubricAddAttributeBtn;
+let rubricXlsxFile, rubricXlsxFieldsRow, rubricXlsxSheet, rubricXlsxNameColumns, rubricXlsxProposalColumn, rubricXlsxImportBtn, rubricXlsxStatus, rubricXlsxError;
+let rubricSaveBtn, rubricCancelEditBtn, rubricFormStatus, rubricFormError;
+
+let rubricEditingTopicId = null;
+// The File object from the last workbook picked for import — kept
+// around so "Load attributes from workbook" (which may be clicked
+// after changing the sheet/column dropdowns a few times) can resend
+// the same file to /ideal-proposals/import-xlsx without asking the
+// person to re-pick it; a browser File object can be attached to more
+// than one FormData/fetch call without issue.
+let rubricXlsxSelectedFile = null;
+
+/**
+ * (Re)loads the Rubric Control tab's topic list from GET
+ * /ideal-proposals. Called on init, and again after any create/edit/
+ * delete so the table always reflects what's actually saved.
+ */
+async function refreshRubricTopics() {
+  rubricTopicsError.style.display = 'none';
+  try {
+    const res = await fetch('/ideal-proposals');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load topics');
+
+    const topics = data.topics || [];
+    rubricTopicsBody.innerHTML = '';
+    rubricTopicsEmpty.textContent = topics.length
+      ? ''
+      : 'No topics yet — add one below, or import attributes from an Excel workbook.';
+
+    for (const topic of topics) {
+      const attrWord = topic.attributeCount === 1 ? 'attribute' : 'attributes';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(topic.label)}<div class="hint">${escapeHtml(topic.id)}</div></td>
+        <td>${escapeHtml(topic.description || '')}</td>
+        <td>${topic.attributeCount} ${attrWord}</td>
+        <td class="rubric-topic-actions">
+          <button type="button" class="btn-secondary rubric-edit-btn" data-id="${escapeHtml(topic.id)}">Edit</button>
+          <button type="button" class="btn-remove rubric-delete-btn" data-id="${escapeHtml(topic.id)}">Delete</button>
+        </td>
+      `;
+      rubricTopicsBody.appendChild(tr);
+    }
+  } catch (err) {
+    rubricTopicsError.textContent = err.message;
+    rubricTopicsError.style.display = 'block';
+  }
+}
+
+/**
+ * Appends one editable attribute row (name + proposal + remove
+ * button). Both fields are <textarea>s rather than single-line
+ * <input>s — a name built from several joined spreadsheet columns
+ * (see excel_to_json.py's JOIN_SEPARATOR) and especially a proposal's
+ * ideal-condition text routinely run well past what a single-line
+ * input can show at once, forcing horizontal scrolling inside a tiny
+ * box to read or edit the whole thing. A <textarea> wraps instead,
+ * showing several lines up front, and can still be dragged taller via
+ * its own resize handle (see the CSS) for anything longer than that.
+ * `rows` just sets the starting height — normal textarea behavior,
+ * not a length limit; nothing about how the value is read (still a
+ * single string, still trimmed) or saved changes because of this.
+ */
+function addRubricAttributeRow(name = '', proposal = '') {
+  const tr = document.createElement('tr');
+
+  const nameTd = document.createElement('td');
+  const nameInput = document.createElement('textarea');
+  nameInput.rows = 2;
+  nameInput.className = 'rubric-attr-name';
+  nameInput.placeholder = 'Attribute name';
+  nameInput.value = name;
+  nameTd.appendChild(nameInput);
+
+  const proposalTd = document.createElement('td');
+  const proposalInput = document.createElement('textarea');
+  proposalInput.rows = 4;
+  proposalInput.className = 'rubric-attr-proposal';
+  proposalInput.placeholder = 'Ideal proposal text';
+  proposalInput.value = proposal;
+  proposalTd.appendChild(proposalInput);
+
+  const removeTd = document.createElement('td');
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn-remove';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => tr.remove());
+  removeTd.appendChild(removeBtn);
+
+  tr.appendChild(nameTd);
+  tr.appendChild(proposalTd);
+  tr.appendChild(removeTd);
+  rubricAttributesBody.appendChild(tr);
+}
+
+function clearRubricAttributeRows() {
+  rubricAttributesBody.innerHTML = '';
+}
+
+/**
+ * Reads the attribute editor's rows back into
+ * `[{name, proposal}, ...]`. A row left completely blank (added via
+ * "Add attribute" and never filled in) is silently dropped; a row
+ * with only one of the two fields filled in is kept as-is so the
+ * server's own validation catches and reports it clearly, rather than
+ * this function guessing whether that was a mistake worth silently
+ * discarding.
+ */
+function readRubricAttributeRows() {
+  return [...rubricAttributesBody.querySelectorAll('tr')]
+    .map((tr) => ({
+      name: tr.querySelector('.rubric-attr-name').value.trim(),
+      proposal: tr.querySelector('.rubric-attr-proposal').value.trim(),
+    }))
+    .filter((a) => a.name || a.proposal);
+}
+
+/** Clears the xlsx-import sub-form back to its initial, nothing-picked-yet state. */
+function resetRubricXlsxImport() {
+  rubricXlsxSelectedFile = null;
+  rubricXlsxFile.value = '';
+  rubricXlsxFieldsRow.style.display = 'none';
+  rubricXlsxImportBtn.style.display = 'none';
+  rubricXlsxSheet.innerHTML = '';
+  rubricXlsxNameColumns.innerHTML = '';
+  rubricXlsxProposalColumn.innerHTML = '';
+  rubricXlsxStatus.textContent = '';
+  rubricXlsxError.style.display = 'none';
+}
+
+/**
+ * Resets the whole Rubric Control form to "creating a brand new
+ * topic" — called on init, after a successful save, and when Cancel
+ * edit is clicked.
+ */
+function resetRubricForm() {
+  rubricEditingTopicId = null;
+  rubricForm.reset();
+  rubricTopicId.disabled = false;
+  rubricTopicIdHint.textContent =
+    'Letters, numbers, hyphens, and underscores only. This cannot be changed once the topic is created.';
+  rubricFormHeading.textContent = 'Add a new topic';
+  rubricFormHint.textContent =
+    'Fill in a topic id, label, and at least one attribute, or import attributes from an Excel workbook below.';
+  rubricSaveBtn.textContent = 'Save topic';
+  rubricCancelEditBtn.style.display = 'none';
+  clearRubricAttributeRows();
+  addRubricAttributeRow();
+  resetRubricXlsxImport();
+  rubricFormError.style.display = 'none';
+  rubricFormStatus.textContent = '';
+}
+
+/**
+ * Loads one existing topic's full detail (GET /ideal-proposals/:id —
+ * not the resolved-fallback getTopic() shape; see that route's own
+ * doc comment in index.js) into the form for editing. The id field is
+ * locked, since overwriting is the only supported edit — there's no
+ * rename.
+ */
+async function loadRubricTopicForEdit(topicId) {
+  rubricFormError.style.display = 'none';
+  rubricFormStatus.textContent = 'Loading…';
+  try {
+    const res = await fetch(`/ideal-proposals/${encodeURIComponent(topicId)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load topic');
+    const topic = data.topic;
+
+    rubricEditingTopicId = topic.id;
+    rubricTopicId.value = topic.id;
+    rubricTopicId.disabled = true;
+    rubricTopicIdHint.textContent = "Fixed — a topic's id cannot be changed once created.";
+    rubricTopicLabel.value = topic.label || '';
+    rubricTopicDescription.value = topic.description || '';
+    // compareInstruction may be a plain string or an array of
+    // paragraphs (see resolveInstructionText() in idealProposals.js);
+    // the edit form only ever writes it back as a single string, same
+    // as the routes' own body shape expects.
+    rubricCompareInstruction.value = Array.isArray(topic.compareInstruction)
+      ? topic.compareInstruction.join('\n\n')
+      : (topic.compareInstruction || '');
+
+    rubricFormHeading.textContent = `Editing "${topic.label}"`;
+    rubricFormHint.textContent = "Saving replaces this topic's label, description, and attributes entirely.";
+    rubricSaveBtn.textContent = 'Save changes';
+    rubricCancelEditBtn.style.display = '';
+
+    clearRubricAttributeRows();
+    const attrs = topic.attributes || [];
+    if (attrs.length) {
+      for (const a of attrs) addRubricAttributeRow(a.name, a.proposal);
+    } else {
+      addRubricAttributeRow();
+    }
+    resetRubricXlsxImport();
+    rubricFormStatus.textContent = '';
+
+    rubricForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    rubricFormError.textContent = err.message;
+    rubricFormError.style.display = 'block';
+    rubricFormStatus.textContent = '';
+  }
+}
+
+/**
+ * Reads the chosen workbook's sheets/columns (POST
+ * /ideal-proposals/xlsx-inspect) and populates the sheet/name-columns/
+ * proposal-column dropdowns, so picking what to import is a matter of
+ * choosing from real options rather than typing exact names from
+ * memory the way excel_to_json.py's CLI required.
+ */
+async function inspectRubricXlsxFile(file) {
+  rubricXlsxError.style.display = 'none';
+  rubricXlsxStatus.textContent = 'Reading workbook…';
+  rubricXlsxFieldsRow.style.display = 'none';
+  rubricXlsxImportBtn.style.display = 'none';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/ideal-proposals/xlsx-inspect', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to read workbook');
+
+    const sheets = data.sheets || [];
+    if (!sheets.length) throw new Error('This workbook has no sheets.');
+
+    rubricXlsxSheet.innerHTML = '';
+    for (const sheet of sheets) {
+      const opt = document.createElement('option');
+      opt.value = sheet.name;
+      opt.textContent = sheet.name;
+      rubricXlsxSheet.appendChild(opt);
+    }
+
+    const populateColumnChoices = () => {
+      const sheet = sheets.find((s) => s.name === rubricXlsxSheet.value);
+      const columns = sheet ? sheet.columns : [];
+
+      rubricXlsxNameColumns.innerHTML = '';
+      rubricXlsxProposalColumn.innerHTML = '';
+      for (const col of columns) {
+        const nameOpt = document.createElement('option');
+        nameOpt.value = col;
+        nameOpt.textContent = col;
+        rubricXlsxNameColumns.appendChild(nameOpt);
+
+        const proposalOpt = document.createElement('option');
+        proposalOpt.value = col;
+        proposalOpt.textContent = col;
+        rubricXlsxProposalColumn.appendChild(proposalOpt);
+      }
+    };
+    rubricXlsxSheet.onchange = populateColumnChoices;
+    populateColumnChoices();
+
+    rubricXlsxFieldsRow.style.display = '';
+    rubricXlsxImportBtn.style.display = '';
+    rubricXlsxStatus.textContent = `Found ${sheets.length} sheet(s) — pick a sheet and columns, then load attributes.`;
+  } catch (err) {
+    rubricXlsxError.textContent = err.message;
+    rubricXlsxError.style.display = 'block';
+    rubricXlsxStatus.textContent = '';
+  }
+}
+
+/**
+ * Runs the actual conversion (POST /ideal-proposals/import-xlsx) for
+ * whichever sheet/columns are currently selected, and loads the
+ * result into the attribute editor, REPLACING whatever rows were
+ * there — matches the "xlsx import always fully replaces, never
+ * merges" decision, applied here at load-into-editor time as well as
+ * at save time, so what's shown in the editor is always exactly what
+ * Save would write.
+ */
+async function importRubricXlsxAttributes() {
+  rubricXlsxError.style.display = 'none';
+  if (!rubricXlsxSelectedFile) {
+    rubricXlsxError.textContent = 'Choose a workbook first.';
+    rubricXlsxError.style.display = 'block';
+    return;
+  }
+
+  const sheet = rubricXlsxSheet.value;
+  const nameColumns = [...rubricXlsxNameColumns.selectedOptions].map((o) => o.value);
+  const proposalColumn = rubricXlsxProposalColumn.value;
+
+  if (!sheet || !nameColumns.length || !proposalColumn) {
+    rubricXlsxError.textContent = 'Pick a sheet, at least one name column, and a proposal column.';
+    rubricXlsxError.style.display = 'block';
+    return;
+  }
+
+  rubricXlsxImportBtn.disabled = true;
+  rubricXlsxStatus.textContent = 'Loading attributes…';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', rubricXlsxSelectedFile);
+    formData.append('sheet', sheet);
+    formData.append('nameColumns', nameColumns.join(','));
+    formData.append('proposalColumn', proposalColumn);
+    const res = await fetch('/ideal-proposals/import-xlsx', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to import workbook');
+
+    const attributes = data.attributes || [];
+    clearRubricAttributeRows();
+    if (attributes.length) {
+      for (const a of attributes) addRubricAttributeRow(a.name, a.proposal);
+    } else {
+      addRubricAttributeRow();
+    }
+
+    rubricXlsxStatus.textContent =
+      `Loaded ${attributes.length} attribute(s) into the editor below` +
+      (data.skippedRows ? ` (skipped ${data.skippedRows} row(s) with an empty proposal or name column(s))` : '') +
+      ' — review, then Save.';
+  } catch (err) {
+    rubricXlsxError.textContent = err.message;
+    rubricXlsxError.style.display = 'block';
+    rubricXlsxStatus.textContent = '';
+  } finally {
+    rubricXlsxImportBtn.disabled = false;
+  }
+}
+
+/**
+ * Creates a new topic (POST /ideal-proposals) or overwrites the one
+ * currently being edited (PUT /ideal-proposals/:id), then refreshes
+ * both the Rubric Control table AND the Query and Response tab's
+ * compare-mode dropdown — the latter is what keeps a just-added or
+ * just-edited topic usable immediately, with no page reload.
+ */
+async function submitRubricForm(e) {
+  e.preventDefault();
+  rubricFormError.style.display = 'none';
+
+  const id = rubricTopicId.value.trim();
+  const label = rubricTopicLabel.value.trim();
+  const description = rubricTopicDescription.value.trim();
+  const compareInstruction = rubricCompareInstruction.value.trim();
+  const attributes = readRubricAttributeRows();
+
+  if (!rubricEditingTopicId && !id) {
+    rubricFormError.textContent = 'Topic id is required.';
+    rubricFormError.style.display = 'block';
+    return;
+  }
+  if (!label) {
+    rubricFormError.textContent = 'Label is required.';
+    rubricFormError.style.display = 'block';
+    return;
+  }
+  if (!attributes.length) {
+    rubricFormError.textContent = 'At least one attribute (name + proposal) is required.';
+    rubricFormError.style.display = 'block';
+    return;
+  }
+
+  // Saving while rubricEditingTopicId is set always goes to PUT
+  // /ideal-proposals/:topicId, which fully replaces that topic's
+  // label, description, and attributes — never a merge (see that
+  // route's own doc comment in index.js). That's the one case a Save
+  // here can actually destroy existing data, most easily overlooked
+  // right after an xlsx import replaced every attribute row at once —
+  // so confirm before it happens rather than after. Creating a brand
+  // new topic (rubricEditingTopicId null) never reaches this branch:
+  // POST /ideal-proposals already rejects a duplicate id outright
+  // rather than silently overwriting, so there's nothing to confirm
+  // there.
+  if (rubricEditingTopicId) {
+    const attrWord = attributes.length === 1 ? 'attribute' : 'attributes';
+    const confirmed = confirm(
+      `Save changes to "${label}"?\n\n` +
+      `This overwrites the existing topic (id: "${rubricEditingTopicId}") — its label, description, and attributes will be replaced with what's shown in the form now (${attributes.length} ${attrWord}). This cannot be undone.`
+    );
+    if (!confirmed) return;
+  }
+
+  rubricSaveBtn.disabled = true;
+  rubricFormStatus.textContent = 'Saving…';
+
+  try {
+    const body = { label, description, attributes, compareInstruction };
+    const res = rubricEditingTopicId
+      ? await fetch(`/ideal-proposals/${encodeURIComponent(rubricEditingTopicId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      : await fetch('/ideal-proposals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, ...body }),
+        });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save topic');
+
+    // resetRubricForm() clears rubricFormStatus as part of putting the
+    // form back into "add a new topic" state — so the success message
+    // has to be set AFTER it runs, not before, or it would be wiped
+    // out before anyone sees it.
+    const savedLabel = data.topic.label;
+    resetRubricForm();
+    rubricFormStatus.textContent = `Saved "${savedLabel}".`;
+    refreshRubricTopics();
+    refreshIdealTopics();
+  } catch (err) {
+    rubricFormError.textContent = err.message;
+    rubricFormError.style.display = 'block';
+    rubricFormStatus.textContent = '';
+  } finally {
+    rubricSaveBtn.disabled = false;
+  }
+}
 
 /**
  * Same NDJSON-over-fetch pattern as embedWithProgress() above,
@@ -1116,6 +1653,37 @@ function init() {
   answerDetails = document.getElementById('answerDetails');
   attributeResultsDetails = document.getElementById('attributeResultsDetails');
   importDetails = document.getElementById('importDetails');
+  rubricDetails = document.getElementById('rubricDetails');
+
+  rubricTopicsBody = document.getElementById('rubricTopicsBody');
+  rubricTopicsEmpty = document.getElementById('rubricTopicsEmpty');
+  rubricTopicsError = document.getElementById('rubricTopicsError');
+
+  rubricForm = document.getElementById('rubricForm');
+  rubricFormHeading = document.getElementById('rubricFormHeading');
+  rubricFormHint = document.getElementById('rubricFormHint');
+  rubricTopicId = document.getElementById('rubricTopicId');
+  rubricTopicIdHint = document.getElementById('rubricTopicIdHint');
+  rubricTopicLabel = document.getElementById('rubricTopicLabel');
+  rubricTopicDescription = document.getElementById('rubricTopicDescription');
+  rubricCompareInstruction = document.getElementById('rubricCompareInstruction');
+
+  rubricAttributesBody = document.getElementById('rubricAttributesBody');
+  rubricAddAttributeBtn = document.getElementById('rubricAddAttributeBtn');
+
+  rubricXlsxFile = document.getElementById('rubricXlsxFile');
+  rubricXlsxFieldsRow = document.getElementById('rubricXlsxFieldsRow');
+  rubricXlsxSheet = document.getElementById('rubricXlsxSheet');
+  rubricXlsxNameColumns = document.getElementById('rubricXlsxNameColumns');
+  rubricXlsxProposalColumn = document.getElementById('rubricXlsxProposalColumn');
+  rubricXlsxImportBtn = document.getElementById('rubricXlsxImportBtn');
+  rubricXlsxStatus = document.getElementById('rubricXlsxStatus');
+  rubricXlsxError = document.getElementById('rubricXlsxError');
+
+  rubricSaveBtn = document.getElementById('rubricSaveBtn');
+  rubricCancelEditBtn = document.getElementById('rubricCancelEditBtn');
+  rubricFormStatus = document.getElementById('rubricFormStatus');
+  rubricFormError = document.getElementById('rubricFormError');
 
   // ---- Collapsible section toggles ----
   // Documents-in-this-area and the per-attribute results table just
@@ -1126,6 +1694,10 @@ function init() {
   answerToggle = initSectionToggle(answerDetails, 'local-rag:answerOpen');
   initSectionToggle(attributeResultsDetails, 'local-rag:attributeResultsOpen');
   initSectionToggle(importDetails, 'local-rag:importOpen');
+  initSectionToggle(rubricDetails, 'local-rag:rubricOpen');
+
+  // ---- Tabs ----
+  initTabs();
 
   // ---- Event listeners ----
 
@@ -1371,6 +1943,60 @@ function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
   });
+
+  // ---- Rubric Control ----
+
+  rubricAddAttributeBtn.addEventListener('click', () => addRubricAttributeRow());
+
+  rubricForm.addEventListener('submit', submitRubricForm);
+
+  rubricCancelEditBtn.addEventListener('click', () => resetRubricForm());
+
+  // One delegated listener handles every row's Edit/Delete buttons,
+  // same pattern documentsBody's Remove buttons use above — no need
+  // to re-attach a handler after each refreshRubricTopics() rebuild.
+  rubricTopicsBody.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.rubric-edit-btn');
+    if (editBtn) {
+      loadRubricTopicForEdit(editBtn.dataset.id);
+      return;
+    }
+
+    const deleteBtn = e.target.closest('.rubric-delete-btn');
+    if (deleteBtn) {
+      const topicId = deleteBtn.dataset.id;
+      if (!confirm(`Permanently delete the topic "${topicId}"? This cannot be undone.`)) return;
+
+      deleteBtn.disabled = true;
+      rubricTopicsError.style.display = 'none';
+      try {
+        const res = await fetch(`/ideal-proposals/${encodeURIComponent(topicId)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to delete topic');
+
+        // If the topic just deleted was mid-edit in the form, drop
+        // back to "add a new topic" rather than leaving a dangling
+        // edit-in-progress for something that no longer exists.
+        if (rubricEditingTopicId === topicId) resetRubricForm();
+
+        refreshRubricTopics();
+        refreshIdealTopics();
+      } catch (err) {
+        rubricTopicsError.textContent = err.message;
+        rubricTopicsError.style.display = 'block';
+        deleteBtn.disabled = false;
+      }
+    }
+  });
+
+  rubricXlsxFile.addEventListener('change', () => {
+    const file = rubricXlsxFile.files && rubricXlsxFile.files[0];
+    if (!file) return;
+    rubricXlsxSelectedFile = file;
+    inspectRubricXlsxFile(file);
+  });
+
+  rubricXlsxImportBtn.addEventListener('click', () => importRubricXlsxAttributes());
 
   // Same shared delegate on both the main sources table and the
   // per-attribute results table's Sources column — see
@@ -1732,4 +2358,6 @@ function init() {
   refreshWorkspaces();
   refreshModels();
   refreshIdealTopics();
+  resetRubricForm();
+  refreshRubricTopics();
 }

@@ -17,6 +17,71 @@ body {
   color: #18181b;
   background: #fff;
 }
+/* App header + hamburger tab menu. The header lays the title/subtitle
+   out next to the menu button; the menu itself is a small dropdown
+   list of tab names, toggled open/closed by tabMenuBtn and positioned
+   absolutely so it floats over the page rather than pushing content
+   down (same absolute-positioning approach as details.tip's popover
+   below). See initTabs() in script.js for the open/close and
+   tab-switching logic. */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.tab-menu { position: relative; flex-shrink: 0; }
+.tab-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  color: #18181b;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.tab-menu-btn:hover { background: var(--bg-soft); }
+.tab-menu-icon { font-size: 1.1rem; line-height: 1; }
+.tab-menu-active-label { white-space: nowrap; }
+.tab-menu-list {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  margin-top: 0.35rem;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.tab-menu-list.open { display: block; }
+.tab-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  align-self: stretch;
+  background: transparent;
+  color: #18181b;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tab-menu-item:hover { background: var(--bg-soft); }
+.tab-menu-item.active {
+  background: #18181b;
+  color: #fff;
+  font-weight: 600;
+}
+
 h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
 h2 { font-size: 1rem; margin: 0 0 0.75rem; }
 p.sub { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
@@ -377,3 +442,21 @@ tr.batch-summary-row td {
   white-space: pre-wrap;
 }
 .modal-body.muted { color: var(--muted); }
+
+/* Rubric Control's attribute-row editor — each row is a <tr> with two
+   <textarea>s (name, proposal) and a remove button, rendered by
+   addRubricAttributeRow() in script.js. Textareas already get
+   width:100% and resize:vertical from the plain "textarea" rule
+   above; this just tunes their starting height per field instead of
+   both sharing that rule's generic min-height — a name is usually one
+   short line (occasionally two, when built from several joined
+   spreadsheet columns), while a proposal's ideal-condition text is
+   routinely several sentences and benefits from more visible room by
+   default. Both can still be dragged taller for anything longer than
+   that. */
+#rubricAttributesBody textarea { min-height: 2.4rem; line-height: 1.35; }
+#rubricAttributesBody .rubric-attr-proposal { min-height: 5.5rem; }
+#rubricAttributesBody td { vertical-align: top; }
+#rubricTopicsBody td.rubric-topic-actions { white-space: nowrap; }
+#rubricTopicsBody .btn-secondary,
+#rubricTopicsBody .btn-remove { margin-right: 0.35rem; }

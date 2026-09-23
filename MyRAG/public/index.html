@@ -8,9 +8,31 @@
 </head>
 <body onload="init()">
 
-<h1 id="appNameHeading">local-rag</h1>
-<p class="sub">Everything below works within a single storage area — pick or create one first.</p>
-<p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
+<div class="app-header">
+  <div>
+    <h1 id="appNameHeading">local-rag</h1>
+    <p class="sub">Everything below works within a single storage area — pick or create one first.</p>
+    <p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
+  </div>
+
+  <!-- Hamburger menu: switches which tab-panel below is visible. See
+       initTabs() in script.js — panels are shown/hidden with plain
+       display:block/none, never re-rendered or removed from the DOM,
+       so switching tabs never loses in-progress state (a half-typed
+       question, an open Advanced settings panel, etc.) in whichever
+       tab you switch away from. -->
+  <div class="tab-menu">
+    <button type="button" id="tabMenuBtn" class="tab-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Open section menu">
+      <span class="tab-menu-icon">&#9776;</span>
+      <span id="tabMenuActiveLabel" class="tab-menu-active-label"></span>
+    </button>
+    <div id="tabMenuList" class="tab-menu-list" role="menu">
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="documents">Document Management</button>
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="rubric">Rubric Control</button>
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="query">Query and Response</button>
+    </div>
+  </div>
+</div>
 
 <section class="card">
   <h2>Document storage area</h2>
@@ -33,6 +55,8 @@
     </span>
   </details>
 </section>
+
+<div id="tabPanel-documents" class="tab-panel">
 
 <section class="card" id="documentsWrap" style="display:none;">
   <details class="section-toggle" id="documentsDetails" open>
@@ -163,6 +187,128 @@
     </div>
   </details>
 </section>
+
+</div><!-- /tabPanel-documents -->
+
+<div id="tabPanel-rubric" class="tab-panel">
+
+<section class="card">
+  <details class="section-toggle" id="rubricDetails" open>
+    <summary><h2>Rubric control</h2></summary>
+    <div class="section-toggle-body">
+      <p class="hint">
+        Manage the "ideal proposal" topics used by the compare-mode
+        dropdown on the Query and Response tab. Each topic is a set of
+        attributes — a name paired with the ideal condition for that
+        attribute — that a document can be compared against.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>Topic</th><th>Description</th><th>Attributes</th><th></th></tr>
+        </thead>
+        <tbody id="rubricTopicsBody"></tbody>
+      </table>
+      <p class="hint" id="rubricTopicsEmpty"></p>
+      <p class="error" id="rubricTopicsError"></p>
+
+      <div class="workspace-actions">
+        <h3 id="rubricFormHeading">Add a new topic</h3>
+        <p class="hint" id="rubricFormHint">
+          Fill in a topic id, label, and at least one attribute, or
+          import attributes from an Excel workbook below.
+        </p>
+
+        <form id="rubricForm">
+          <div class="row">
+            <div>
+              <label for="rubricTopicId">Topic id</label>
+              <input type="text" id="rubricTopicId" placeholder="e.g. offshore-wind" autocomplete="off" />
+              <p class="hint" id="rubricTopicIdHint">
+                Letters, numbers, hyphens, and underscores only. This
+                cannot be changed once the topic is created.
+              </p>
+            </div>
+            <div>
+              <label for="rubricTopicLabel">Label</label>
+              <input type="text" id="rubricTopicLabel" placeholder="e.g. Offshore Wind" autocomplete="off" />
+            </div>
+          </div>
+          <div>
+            <label for="rubricTopicDescription">Description (optional)</label>
+            <input type="text" id="rubricTopicDescription" placeholder="Shown next to the label in the compare-mode dropdown" autocomplete="off" />
+          </div>
+
+          <details class="advanced">
+            <summary>Advanced: comparison instruction override</summary>
+            <label for="rubricCompareInstruction">Comparison instruction (optional)</label>
+            <textarea id="rubricCompareInstruction" placeholder="Leave blank to use the default comparison instruction for every topic"></textarea>
+            <p class="hint">
+              Only needed if this topic should be compared differently
+              from every other topic. Leave blank to use
+              idealProposals.json's shared default instruction.
+            </p>
+          </details>
+
+          <div class="workspace-actions">
+            <h3>Attributes</h3>
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Ideal proposal</th><th></th></tr>
+              </thead>
+              <tbody id="rubricAttributesBody"></tbody>
+            </table>
+            <button type="button" id="rubricAddAttributeBtn" class="btn-secondary">Add attribute</button>
+          </div>
+
+          <details class="advanced">
+            <summary>Import attributes from an Excel workbook</summary>
+            <p class="hint">
+              Replaces the attribute rows above with rows read from one
+              sheet of an .xlsx workbook — review them below before
+              saving. Matches the same column-combining behavior the
+              old excel_to_json.py script used: pick more than one name
+              column and their values are joined with " - ".
+            </p>
+            <div>
+              <label for="rubricXlsxFile">Workbook (.xlsx)</label>
+              <input type="file" id="rubricXlsxFile" accept=".xlsx" />
+            </div>
+            <div class="row" id="rubricXlsxFieldsRow" style="display:none;">
+              <div>
+                <label for="rubricXlsxSheet">Sheet</label>
+                <select id="rubricXlsxSheet"></select>
+              </div>
+              <div>
+                <label for="rubricXlsxNameColumns">Name column(s)</label>
+                <select id="rubricXlsxNameColumns" multiple size="4"></select>
+                <p class="hint">Ctrl/Cmd-click to select more than one.</p>
+              </div>
+              <div>
+                <label for="rubricXlsxProposalColumn">Proposal column</label>
+                <select id="rubricXlsxProposalColumn"></select>
+              </div>
+            </div>
+            <button type="button" id="rubricXlsxImportBtn" class="btn-secondary" style="display:none;">Load attributes from workbook</button>
+            <p class="status" id="rubricXlsxStatus"></p>
+            <p class="error" id="rubricXlsxError"></p>
+          </details>
+
+          <div class="button-row">
+            <button type="submit" id="rubricSaveBtn">Save topic</button>
+            <button type="button" id="rubricCancelEditBtn" class="btn-secondary" style="display:none;">Cancel edit</button>
+          </div>
+          <p class="status" id="rubricFormStatus"></p>
+          <p class="error" id="rubricFormError"></p>
+        </form>
+      </div>
+    </div>
+  </details>
+</section>
+
+</div><!-- /tabPanel-rubric -->
+
+<div id="tabPanel-query" class="tab-panel">
 
 <section class="card">
   <h2>2. Ask a question</h2>
@@ -424,6 +570,8 @@
     </table>
   </div>
 </section>
+
+</div><!-- /tabPanel-query -->
 
 <div class="modal-backdrop" id="chunkModalBackdrop">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chunkModalTitle">

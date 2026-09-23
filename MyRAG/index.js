@@ -9,8 +9,9 @@ const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = requi
 const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
+const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
 const { parseComparisonAnswer } = require('./src/responseParser');
+const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 
 const app = express();
 app.use(express.json());
@@ -81,6 +82,254 @@ app.get('/ideal-proposals', (req, res) => {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Same allowlist-pattern approach isValidWorkspaceId() uses in
+// workspace.js — a topic id never touches the filesystem directly (it
+// only ever lives inside idealProposals.json), but keeping it to the
+// same simple, URL-safe character set means it can always be used as
+// a route param (see :topicId below) and never needs any special
+// escaping/decoding beyond the usual encodeURIComponent().
+const TOPIC_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function isValidTopicId(id) {
+  return typeof id === 'string' && TOPIC_ID_PATTERN.test(id);
+}
+
+/**
+ * Shared validation for one attribute row ({name, proposal}) submitted
+ * from the Rubric Control UI or produced by the xlsx importer. Both
+ * fields are required, non-empty strings — an attribute with no
+ * proposal text is meaningless (there's nothing to compare a document
+ * against), and one with no name can't be told apart from any other
+ * in the results table or CSV.
+ * @param {*} attributes
+ * @returns {string|null} an error message, or null if every attribute is valid
+ */
+function attributesError(attributes) {
+  if (!Array.isArray(attributes)) return '"attributes" must be an array';
+  for (let i = 0; i < attributes.length; i++) {
+    const a = attributes[i];
+    if (!a || typeof a !== 'object') return `attributes[${i}] must be an object`;
+    if (typeof a.name !== 'string' || !a.name.trim()) return `attributes[${i}].name is required`;
+    if (typeof a.proposal !== 'string' || !a.proposal.trim()) return `attributes[${i}].proposal is required`;
+  }
+  return null;
+}
+
+/**
+ * GET /ideal-proposals/:topicId
+ *
+ * Full detail for one topic, for the Rubric Control UI's edit form —
+ * deliberately NOT getTopic() from idealProposals.js, which resolves
+ * compareInstruction through its file-level-default/hardcoded-fallback
+ * chain for use in an actual comparison prompt. An edit form needs the
+ * topic's own raw stored fields instead (compareInstruction present
+ * only if this topic actually set one), so saving it back doesn't bake
+ * a resolved fallback string into a topic that never had its own
+ * override.
+ */
+app.get('/ideal-proposals/:topicId', (req, res) => {
+  const { topicId } = req.params;
+  if (!isValidTopicId(topicId)) return res.status(400).json({ error: 'Invalid topic id' });
+
+  try {
+    const data = loadTopics();
+    const topic = data.topics.find((t) => t.id === topicId);
+    if (!topic) return res.status(404).json({ error: `No topic with id "${topicId}"` });
+    res.json({ topic });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /ideal-proposals
+ * Body: { id, label, attributes: [{name, proposal}, ...], description?, compareInstruction? }
+ *
+ * Creates a brand new topic in idealProposals.json. `id` is fixed at
+ * creation — there is deliberately no rename support (see PUT below,
+ * which can overwrite everything about a topic except its id) —
+ * matching what was decided for the Rubric Control feature: a topic's
+ * id is its permanent identity, so anything that already refers to a
+ * topic by id (a saved query, a script) keeps working even after its
+ * label/description/attributes are edited.
+ */
+app.post('/ideal-proposals', (req, res) => {
+  const { id, label, description, attributes, compareInstruction } = req.body || {};
+
+  if (!isValidTopicId(id)) {
+    return res.status(400).json({ error: 'id is required and may only contain letters, numbers, hyphens, and underscores (max 64 characters)' });
+  }
+  if (typeof label !== 'string' || !label.trim()) {
+    return res.status(400).json({ error: 'label is required' });
+  }
+  const attrErr = attributesError(attributes || []);
+  if (attrErr) return res.status(400).json({ error: attrErr });
+
+  try {
+    const data = loadTopics();
+    if (data.topics.some((t) => t.id === id)) {
+      return res.status(409).json({ error: `A topic with id "${id}" already exists` });
+    }
+
+    const topic = { id, label: label.trim(), attributes: attributes || [] };
+    if (description && description.trim()) topic.description = description.trim();
+    if (compareInstruction && compareInstruction.trim()) topic.compareInstruction = compareInstruction.trim();
+
+    data.topics.push(topic);
+    saveTopics(data);
+    res.status(201).json({ topic });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /ideal-proposals/:topicId
+ * Body: { label, attributes: [{name, proposal}, ...], description?, compareInstruction? }
+ *
+ * Overwrites an existing topic's label/description/attributes/
+ * compareInstruction in place — :topicId itself is immutable (no
+ * rename support; see POST above). This always fully replaces the
+ * topic's attributes array rather than merging with what was there
+ * before, matching the explicit decision for both manual edits and
+ * xlsx-import saves: an xlsx import represents the complete current
+ * state of that rubric, so a save from it should leave the topic with
+ * exactly those attributes, not the union of old and new.
+ */
+app.put('/ideal-proposals/:topicId', (req, res) => {
+  const { topicId } = req.params;
+  if (!isValidTopicId(topicId)) return res.status(400).json({ error: 'Invalid topic id' });
+
+  const { label, description, attributes, compareInstruction } = req.body || {};
+  if (typeof label !== 'string' || !label.trim()) {
+    return res.status(400).json({ error: 'label is required' });
+  }
+  const attrErr = attributesError(attributes || []);
+  if (attrErr) return res.status(400).json({ error: attrErr });
+
+  try {
+    const data = loadTopics();
+    const index = data.topics.findIndex((t) => t.id === topicId);
+    if (index === -1) return res.status(404).json({ error: `No topic with id "${topicId}"` });
+
+    const topic = { id: topicId, label: label.trim(), attributes: attributes || [] };
+    if (description && description.trim()) topic.description = description.trim();
+    if (compareInstruction && compareInstruction.trim()) topic.compareInstruction = compareInstruction.trim();
+
+    data.topics[index] = topic;
+    saveTopics(data);
+    res.json({ topic });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /ideal-proposals/:topicId
+ *
+ * Removes a topic from idealProposals.json entirely. No confirmation
+ * step server-side, same convention as DELETE /workspaces/:workspaceId
+ * — the browser UI asks before ever sending this request.
+ */
+app.delete('/ideal-proposals/:topicId', (req, res) => {
+  const { topicId } = req.params;
+  if (!isValidTopicId(topicId)) return res.status(400).json({ error: 'Invalid topic id' });
+
+  try {
+    const data = loadTopics();
+    const index = data.topics.findIndex((t) => t.id === topicId);
+    if (index === -1) return res.status(404).json({ error: `No topic with id "${topicId}"` });
+
+    const [removed] = data.topics.splice(index, 1);
+    saveTopics(data);
+    res.json({ removed: { id: removed.id, label: removed.label } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Transient, in-memory upload for the two xlsx-import routes below —
+// deliberately NOT the disk-backed `upload` multer instance further
+// down this file (used for actual document uploads). A rubric
+// workbook isn't workspace-scoped and there's no ongoing reason to
+// keep the raw spreadsheet around after it's been read once; holding
+// it only in memory for the life of one request avoids ever writing it
+// to disk at all.
+const uploadXlsx = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB — a rubric workbook is a small, mostly-text file; generous but not unbounded.
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext !== '.xlsx') {
+      return cb(new Error(`Unsupported file type "${ext}". Only .xlsx is supported.`));
+    }
+    cb(null, true);
+  },
+});
+
+/**
+ * POST /ideal-proposals/xlsx-inspect
+ * multipart/form-data: "file" (.xlsx)
+ *
+ * Lists a workbook's sheets and each sheet's header-row column names,
+ * so the Rubric Control UI can offer real dropdowns for "which sheet"
+ * and "which columns" instead of requiring someone to already know the
+ * exact sheet/column names by heart the way excel_to_json.py's CLI
+ * did. Read-only — nothing is written anywhere by this route.
+ */
+app.post('/ideal-proposals/xlsx-inspect', (req, res) => {
+  uploadXlsx.single('file')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded (expected form field "file")' });
+
+    try {
+      const sheets = await inspectWorkbook(req.file.buffer);
+      res.json({ sheets });
+    } catch (err) {
+      console.error(err);
+      res.status(400).json({ error: `Could not read workbook: ${err.message}` });
+    }
+  });
+});
+
+/**
+ * POST /ideal-proposals/import-xlsx
+ * multipart/form-data: "file" (.xlsx), plus text fields "sheet",
+ * "nameColumns" (comma-separated, no spaces around the commas — same
+ * format excel_to_json.py's CLI took), and "proposalColumn".
+ *
+ * Converts one sheet into an attribute list and returns it as a
+ * PREVIEW — this route never touches idealProposals.json itself. The
+ * Rubric Control UI loads the returned attributes into its editor so
+ * they can be reviewed (and hand-adjusted, if needed) before an
+ * explicit Save, which goes through POST or PUT /ideal-proposals
+ * above and always fully replaces whatever attribute list was there.
+ */
+app.post('/ideal-proposals/import-xlsx', (req, res) => {
+  uploadXlsx.single('file')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded (expected form field "file")' });
+
+    const { sheet, nameColumns, proposalColumn } = req.body;
+    if (!sheet) return res.status(400).json({ error: 'sheet is required' });
+    if (!nameColumns || !nameColumns.trim()) return res.status(400).json({ error: 'nameColumns is required' });
+    if (!proposalColumn) return res.status(400).json({ error: 'proposalColumn is required' });
+
+    try {
+      const columns = nameColumns.split(',').map((c) => c.trim()).filter(Boolean);
+      const result = await convertSheetToAttributes(req.file.buffer, sheet, columns, proposalColumn);
+      res.json(result);
+    } catch (err) {
+      console.error(err);
+      res.status(400).json({ error: err.message });
+    }
+  });
 });
 
 /**
