@@ -182,6 +182,129 @@ npm start
 Defaults to port 3500. Set `PORT=<something else>` in your environment
 first if 3500 is already in use on your machine.
 
+## Access control
+
+By default the server has NO access control at all — anyone who can
+reach it can use it. To require a username/password, set one of these
+in the environment before starting it:
+
+```
+AUTH_USER=leigh
+AUTH_PASSWORD=some-strong-password
+```
+
+or, for more than one login:
+
+```
+AUTH_USERS=alice:some-strong-password,bob:another-strong-password
+```
+
+(`AUTH_USERS` takes priority if both are set.) With either set, every
+request — including the UI's own page and static files, not just the
+API routes — requires that username/password, presented via standard
+HTTP Basic Auth: the browser itself pops up a native login prompt the
+first time, and then remembers it for the rest of that browser session.
+A PowerShell caller can pass the same credential with
+`Invoke-RestMethod -Credential (Get-Credential)` or a manually-built
+`Authorization: Basic ...` header.
+
+**Setting these via a `.env` file.** Rather than setting environment
+variables by hand every time (`$env:AUTH_USERS=...` in PowerShell,
+which only lasts that one shell session), you can instead create a
+plain text file named `.env` in this project's root directory (right
+next to `index.js` and `package.json` — NOT inside `src/`) containing:
+
+```
+AUTH_USERS=alice:some-strong-password,bob:another-strong-password
+```
+
+`index.js` loads this file automatically on startup, via the small
+`dotenv` package — no flag or extra step needed, just `npm start` as
+usual. A real environment variable set directly in the shell (or, on
+the AWS instance, however that environment is configured there) still
+takes priority over whatever `.env` says, so `.env` is purely a
+convenience for not having to retype the same values every launch, not
+a second, conflicting source of truth. `.env` is listed in
+`.gitignore` so a real password in it is never accidentally committed
+if this project is ever put under version control.
+
+If neither environment variable is set, the server prints a warning to
+its own console on startup and then runs unprotected — this is
+deliberate (see the doc comment at the top of `src/basicAuth.js`), so
+that everyday local testing keeps working with zero setup, but it does
+mean you have to remember to actually set one of these before running
+this anywhere reachable beyond a network you trust — nothing in the app
+itself will stop you from forgetting.
+
+Worth understanding before relying on this: HTTP Basic Auth only
+base64-*encodes* the credential in transit, it does not encrypt it —
+trivially reversible by anyone who can observe the traffic. That's a
+non-issue on localhost or a trusted LAN, but if this server is ever
+reachable from a network you don't fully trust (the open internet
+included), pair it with HTTPS so the credential is actually protected
+in transit, not just gated at the door. This app doesn't set up HTTPS
+itself; see the note below for why that's a slightly awkward problem on
+an AWS instance with no domain name and a public IP that changes every
+launch, and a couple of ways around it.
+
+<details>
+<summary>Getting HTTPS without a domain name or a static IP (click to expand)</summary>
+
+The usual path to a real (browser-trusted) TLS certificate — Let's
+Encrypt via `certbot` — needs a stable hostname to issue the
+certificate for and to prove you control, which normally means owning
+a domain name pointed at a fixed IP address. Neither of those exists
+today for an AWS instance launched without an Elastic IP or a
+registered domain. A few ways around that, roughly lightest-to-most-
+involved:
+
+- **A wildcard "IP-as-a-hostname" service (e.g. sslip.io or nip.io) +
+  an AWS Elastic IP.** These free services resolve a hostname like
+  `203-0-113-42.sslip.io` directly to the IP address embedded in the
+  name — no registration, no account, no cost — which is enough of a
+  "domain" for Let's Encrypt's normal HTTP-01 challenge to work
+  against. It only works if the IP stays put across restarts though,
+  which the default AWS public IP doesn't — allocating an Elastic IP
+  and associating it with the instance fixes that (free while it's
+  attached to a running instance; a small hourly charge only if you
+  allocate one and leave it unattached). Together: a stable IP + a free
+  hostname pointing at it + ordinary certbot.
+- **Tailscale Funnel.** Tailscale (free for personal/small-team use)
+  gives each machine you install it on a stable hostname
+  (`something.your-tailnet.ts.net`) that stays the same no matter how
+  often the underlying AWS public IP changes, and can automatically
+  provision and renew a real Let's Encrypt certificate for that
+  hostname on your behalf. Its "Funnel" feature then exposes that over
+  the open internet with HTTPS already handled — no domain purchase, no
+  Elastic IP, no certbot setup on your end at all. Worth a look
+  independent of the HTTPS question too: Tailscale can instead keep
+  this server reachable ONLY to devices on your private Tailscale
+  network, which is a stronger posture than "password-protected but
+  open to the whole internet."
+- **A self-signed certificate.** Zero cost, zero domain, zero external
+  service — Node's own `https` module can serve with a certificate you
+  generate yourself in a couple of commands. This genuinely encrypts
+  the connection (defeating passive network sniffing of the Basic Auth
+  credential, the specific risk above), but browsers will show a "not
+  secure" / certificate-warning page on every first visit, since a
+  self-signed certificate isn't vouched for by anyone the browser
+  already trusts — you'd click through that warning (or add the
+  certificate as a manual exception) rather than getting the ordinary
+  padlock. A reasonable stopgap, not a long-term answer.
+- **Buy a cheap domain + Elastic IP + certbot.** The standard, most
+  "boring and robust" route, and worth it once this is more than a
+  small/occasional-use setup — a domain is typically well under
+  $15/year, and once it's pointed at an Elastic IP, `certbot` handles
+  obtaining and auto-renewing the certificate with very little ongoing
+  work.
+
+None of these are implemented in this app currently — they're
+infrastructure/deployment choices made around it (DNS, the EC2
+instance's networking, a reverse proxy or Node's own `https` module in
+front of what's here today), not changes to `index.js` itself.
+
+</details>
+
 ## Using the browser UI
 
 Once the server's running, open `http://localhost:3500/` in a browser
@@ -811,10 +934,17 @@ month's file while the server runs to watch requests come in live.
 
 A few deliberate limits worth knowing:
 
-- **"Who" means an IP address, nothing more.** On this app's normal
-  setup — no reverse proxy in front of it — that's the real, direct
-  address of whoever connected, but it identifies a *machine*, not a
-  *person*: several people sharing one computer, or a NAT'd network
+- **"Who" is a real username when Basic Auth is on, an IP address when
+  it isn't.** With `AUTH_USER`/`AUTH_PASSWORD`/`AUTH_USERS` configured
+  (see "Access control" above), every logged line in both files also
+  carries a `user` field — the actual authenticated username, a real
+  identity rather than just "which machine." `ip` is still logged
+  alongside it either way. If access control isn't configured at all,
+  there's no login to attribute anything to, so `user` is simply
+  omitted and `ip` remains the only "who" available — which, on this
+  app's normal setup (no reverse proxy in front of it), is the real,
+  direct address of whoever connected, but identifies a *machine*, not
+  a *person*: several people sharing one computer, or a NAT'd network
   where everyone looks like one router address, both collapse to the
   same logged IP. If this server is ever put behind a reverse proxy,
   Express's `trust proxy` setting would need to be configured for the

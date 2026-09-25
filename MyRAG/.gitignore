@@ -1,0 +1,9 @@
+# Real credentials — never committed, even if this project is later
+# put under version control. See the "Access control" section in
+# README.md for what goes in here (AUTH_USER/AUTH_PASSWORD/AUTH_USERS).
+.env
+
+# Everything else here is generated/local, not source:
+node_modules/
+workspaces/
+logs/

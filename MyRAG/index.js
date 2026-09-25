@@ -1,6 +1,26 @@
+const path = require('path');
+
+// Loads a .env file (if one exists) into process.env — this has to run
+// BEFORE any of this app's own modules are required below, since a few
+// of them (src/basicAuth.js's AUTH_USER/AUTH_PASSWORD/AUTH_USERS,
+// src/ollamaClient.js's OLLAMA_BASE_URL) read process.env once, at
+// require-time, not on every request; requiring them first would mean
+// they'd only ever see whatever was ALREADY in the environment before
+// this line ran. Pointed explicitly at a .env file next to this script
+// (`__dirname`), not dotenv's own default of "whatever the current
+// working directory happens to be when `node`/`npm start` was
+// launched from" — that default would silently stop finding the file
+// the moment this app is ever started from a different working
+// directory (a systemd service, a scheduled task, a different shell),
+// which is exactly the kind of "works on my machine" footgun worth
+// avoiding here. A variable already set in the real environment is
+// left alone — dotenv doesn't override those with the .env file's
+// value — so an explicit `$env:AUTH_USERS=...` before launching still
+// takes priority over whatever .env says, same as most tools behave.
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const fs = require('fs');
 const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
@@ -13,8 +33,19 @@ const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQ
 const { parseComparisonAnswer } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
+const { basicAuth } = require('./src/basicAuth');
 
 const app = express();
+
+// Mounted first, ahead of everything else — including express.static
+// below — so nothing in the app (the UI's own HTML/JS/CSS included) is
+// reachable without a valid credential once one is configured. See
+// src/basicAuth.js for the full design: this is a no-op (nothing is
+// gated) unless AUTH_USER/AUTH_PASSWORD or AUTH_USERS is set in the
+// environment, so local, everyday testing keeps working with zero
+// config exactly as before.
+app.use(basicAuth);
+
 app.use(express.json());
 
 // Serves public/index.html (and anything else dropped in public/) as

@@ -47,9 +47,11 @@
  * corrupt each other's lines. The worst a crash mid-write can do is
  * leave one incomplete trailing line; every earlier line is untouched.
  *
- * Deliberately narrow field sets in both files: who (IP address), when,
- * which storage area, what happened, whether it succeeded, and — for
- * the query log specifically — which chunk IDs were retrieved. Neither
+ * Deliberately narrow field sets in both files: who (the logged-in
+ * username, when Basic Auth is configured — see src/basicAuth.js — plus
+ * the IP address either way), when, which storage area, what happened,
+ * whether it succeeded, and — for the query log specifically — which
+ * chunk IDs were retrieved. Neither
  * file includes retrieved chunks' own text, before/after snapshots of
  * anything that changed, or any other server-internal detail (retrieval
  * query text, token counts, per-batch breakdowns, etc.) that the rest
@@ -140,16 +142,20 @@ function appendActionLog(entry) {
  * against a real workspace, so there's nothing worth recording yet.
  *
  * @param {object} params
- * @param {import('express').Request} params.req - used only for
- *   req.ip. On this app's normal setup (no reverse proxy in front of
- *   it) that's the real, direct peer address; if this server is ever
+ * @param {import('express').Request} params.req - used for req.ip and
+ *   req.authUser. req.ip identifies a *machine*, not a *person* —
+ *   multiple people sharing one computer, or a NAT'd network where
+ *   everyone looks like one router address, both collapse to the same
+ *   logged IP; on this app's normal setup (no reverse proxy in front of
+ *   it) it's the real, direct peer address, but if this server is ever
  *   put behind a proxy, Express's own `trust proxy` setting would need
  *   to be configured for req.ip to keep meaning the original caller
- *   rather than the proxy itself — not a concern today, but worth
- *   remembering if the deployment changes. It's also only ever as
- *   meaningful as "which machine," not "which person" — multiple
- *   people sharing one machine, or a NAT'd network where everyone
- *   looks like one router address, both collapse to the same IP here.
+ *   rather than the proxy itself. req.authUser is set by
+ *   src/basicAuth.js's middleware once a request has actually
+ *   authenticated — a real logged-in identity, not just "which
+ *   machine" — and is undefined whenever Basic Auth isn't configured at
+ *   all (see this module's doc comment: the `user` field is then simply
+ *   omitted from the logged line, and `ip` is all "who" this log has).
  * @param {string} params.workspaceId
  * @param {string} [params.question] - the raw text typed into the
  *   question box, if any. For a plain query this is the whole
@@ -204,6 +210,7 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
 
   appendActivityLog({
     type,
+    ...(req.authUser ? { user: req.authUser } : {}),
     ip: req.ip,
     workspaceId,
     ...(topic ? { topicId: topic.id, topicLabel: topic.label } : {}),
@@ -217,6 +224,7 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
 
   appendActionLog({
     type,
+    ...(req.authUser ? { user: req.authUser } : {}),
     ip: req.ip,
     workspaceId,
     ...(topic ? { topicId: topic.id } : {}),
@@ -240,9 +248,9 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
  * failure must not take down the real request it's describing.
  *
  * @param {object} params
- * @param {import('express').Request} params.req - used only for req.ip;
- *   see the matching param on logQueryActivity() above for the same
- *   caveats (machine, not person; req.ip assumes no reverse proxy).
+ * @param {import('express').Request} params.req - used for req.ip and
+ *   req.authUser; see the matching param on logQueryActivity() above
+ *   for what each one means and when `user` ends up omitted.
  * @param {string} params.type - a short camelCase action name, e.g.
  *   "documentUpload", "documentEmbed", "documentDelete",
  *   "workspaceDelete", "indexRebuild", "rubricTopicCreate",
@@ -266,6 +274,7 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
 function logAction({ req, type, workspaceId, success, error, details }) {
   appendActionLog({
     type,
+    ...(req.authUser ? { user: req.authUser } : {}),
     ip: req.ip,
     ...(workspaceId ? { workspaceId } : {}),
     success,
