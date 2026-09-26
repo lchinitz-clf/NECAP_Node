@@ -785,17 +785,55 @@ function renderAttributeResults(batches, numCtx, threshold) {
  * Excel opens the file with correct characters instead of guessing
  * the encoding wrong.
  */
+/**
+ * Escapes one CSV field: quoted (with internal quotes doubled) if it
+ * contains a comma, quote, or newline, left bare otherwise. Shared by
+ * every CSV export in this file — see buildAttributeResultsCsv() below
+ * and buildRubricAttributesCsv() further down — so the escaping rule
+ * only lives in one place.
+ */
+function csvEscape(value) {
+  const str = value == null ? '' : String(value);
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 function buildAttributeResultsCsv(batches) {
-  const csvEscape = (value) => {
-    const str = value == null ? '' : String(value);
-    return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-  };
   const rows = [['Attribute name', 'Proposal', 'LLM result', 'LLM analysis', 'Source document(s)']];
   for (const batch of batches) {
     const sourceRefs = (batch.sources || []).map((s) => `${s.sourceFile} #${s.chunkIndex}`).join('; ');
     for (const r of batch.records || []) {
       rows.push([r.name, r.proposal, r.resultText, r.category, sourceRefs]);
     }
+  }
+  return '﻿' + rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+}
+
+/**
+ * Turns a topic's raw attributes (as stored in idealProposals.json —
+ * {name, proposal, included} entries) into CSV text: three columns,
+ * "Name", "Ideal proposal", and "Include", matching the attribute
+ * editor table's own headers. Every attribute is exported regardless
+ * of its included/excluded state — this is a full dump of the topic's
+ * attribute rows, not a preview of what an actual comparison run would
+ * analyze, so the "Include" column is what tells a reader which rows
+ * are currently excluded rather than the export silently dropping
+ * them. `included` is written out as the literal strings "TRUE"/
+ * "FALSE" (via isAttributeIncluded()'s same missing-means-true
+ * default, so a pre-existing attribute with no `included` field at
+ * all still exports as "TRUE") rather than a raw boolean, since CSV
+ * has no native boolean type and this keeps the column unambiguous
+ * however the file is later opened or re-imported. Deliberately does
+ * NOT try to split a combined name back out into separate columns by
+ * its " - " join separator (see JOIN_SEPARATOR in src/xlsxImport.js)
+ * — that combining only ever happens on the way IN, from an xlsx
+ * import; the export's job is just to hand back exactly what's
+ * stored, with the same CSV escaping and leading BOM as
+ * buildAttributeResultsCsv() above.
+ */
+function buildRubricAttributesCsv(attributes) {
+  const rows = [['Name', 'Ideal proposal', 'Include']];
+  for (const a of attributes || []) {
+    rows.push([a.name, a.proposal, a.included !== false ? 'TRUE' : 'FALSE']);
   }
   return '﻿' + rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
 }
@@ -1053,9 +1091,9 @@ function initTabs() {
 let rubricTopicsBody, rubricTopicsEmpty, rubricTopicsError;
 let rubricForm, rubricFormHeading, rubricFormHint;
 let rubricTopicId, rubricTopicIdHint, rubricTopicLabel, rubricTopicDescription, rubricCompareInstruction;
-let rubricAttributesBody, rubricAddAttributeBtn;
+let rubricAttributesBody, rubricAddAttributeBtn, rubricIncludeAllBtn, rubricExcludeAllBtn;
 let rubricXlsxFile, rubricXlsxFieldsRow, rubricXlsxSheet, rubricXlsxNameColumns, rubricXlsxProposalColumn, rubricXlsxImportBtn, rubricXlsxStatus, rubricXlsxError;
-let rubricSaveBtn, rubricCancelEditBtn, rubricFormStatus, rubricFormError;
+let rubricSaveBtn, rubricCancelEditBtn, rubricExportCsvBtn, rubricFormStatus, rubricFormError;
 
 let rubricEditingTopicId = null;
 // The File object from the last workbook picked for import — kept
@@ -1105,20 +1143,27 @@ async function refreshRubricTopics() {
 }
 
 /**
- * Appends one editable attribute row (name + proposal + remove
- * button). Both fields are <textarea>s rather than single-line
- * <input>s — a name built from several joined spreadsheet columns
- * (see excel_to_json.py's JOIN_SEPARATOR) and especially a proposal's
- * ideal-condition text routinely run well past what a single-line
- * input can show at once, forcing horizontal scrolling inside a tiny
- * box to read or edit the whole thing. A <textarea> wraps instead,
- * showing several lines up front, and can still be dragged taller via
- * its own resize handle (see the CSS) for anything longer than that.
- * `rows` just sets the starting height — normal textarea behavior,
- * not a length limit; nothing about how the value is read (still a
- * single string, still trimmed) or saved changes because of this.
+ * Appends one editable attribute row (name + proposal + include
+ * checkbox + remove button). Both text fields are <textarea>s rather
+ * than single-line <input>s — a name built from several joined
+ * spreadsheet columns (see excel_to_json.py's JOIN_SEPARATOR) and
+ * especially a proposal's ideal-condition text routinely run well past
+ * what a single-line input can show at once, forcing horizontal
+ * scrolling inside a tiny box to read or edit the whole thing. A
+ * <textarea> wraps instead, showing several lines up front, and can
+ * still be dragged taller via its own resize handle (see the CSS) for
+ * anything longer than that. `rows` just sets the starting height —
+ * normal textarea behavior, not a length limit; nothing about how the
+ * value is read (still a single string, still trimmed) or saved
+ * changes because of this.
+ *
+ * `included` defaults to true, matching isAttributeIncluded()'s
+ * "missing means true" default in src/idealProposals.js — so both a
+ * brand-new row (added via "Add attribute") and a row loaded from an
+ * older saved attribute with no `included` field at all start out
+ * checked.
  */
-function addRubricAttributeRow(name = '', proposal = '') {
+function addRubricAttributeRow(name = '', proposal = '', included = true) {
   const tr = document.createElement('tr');
 
   const nameTd = document.createElement('td');
@@ -1137,6 +1182,14 @@ function addRubricAttributeRow(name = '', proposal = '') {
   proposalInput.value = proposal;
   proposalTd.appendChild(proposalInput);
 
+  const includedTd = document.createElement('td');
+  includedTd.className = 'rubric-attr-included-cell';
+  const includedInput = document.createElement('input');
+  includedInput.type = 'checkbox';
+  includedInput.className = 'rubric-attr-included';
+  includedInput.checked = included !== false;
+  includedTd.appendChild(includedInput);
+
   const removeTd = document.createElement('td');
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
@@ -1147,6 +1200,7 @@ function addRubricAttributeRow(name = '', proposal = '') {
 
   tr.appendChild(nameTd);
   tr.appendChild(proposalTd);
+  tr.appendChild(includedTd);
   tr.appendChild(removeTd);
   rubricAttributesBody.appendChild(tr);
 }
@@ -1157,20 +1211,34 @@ function clearRubricAttributeRows() {
 
 /**
  * Reads the attribute editor's rows back into
- * `[{name, proposal}, ...]`. A row left completely blank (added via
- * "Add attribute" and never filled in) is silently dropped; a row
- * with only one of the two fields filled in is kept as-is so the
- * server's own validation catches and reports it clearly, rather than
- * this function guessing whether that was a mistake worth silently
- * discarding.
+ * `[{name, proposal, included}, ...]`. A row left completely blank
+ * (added via "Add attribute" and never filled in) is silently dropped;
+ * a row with only one of the two text fields filled in is kept as-is
+ * so the server's own validation catches and reports it clearly,
+ * rather than this function guessing whether that was a mistake worth
+ * silently discarding. `included` always comes back as an explicit
+ * boolean (the checkbox's own checked state), never omitted — the
+ * server-side normalizeAttributesForSave() in index.js does the same
+ * for any caller that skips this form entirely (e.g. a future API
+ * client), but going through this function is how the editor itself
+ * always saves an explicit value rather than leaning on the
+ * missing-means-true fallback.
  */
 function readRubricAttributeRows() {
   return [...rubricAttributesBody.querySelectorAll('tr')]
     .map((tr) => ({
       name: tr.querySelector('.rubric-attr-name').value.trim(),
       proposal: tr.querySelector('.rubric-attr-proposal').value.trim(),
+      included: tr.querySelector('.rubric-attr-included').checked,
     }))
     .filter((a) => a.name || a.proposal);
+}
+
+/** Sets every attribute row's Include checkbox to `included`. */
+function setAllRubricAttributesIncluded(included) {
+  for (const cb of rubricAttributesBody.querySelectorAll('.rubric-attr-included')) {
+    cb.checked = included;
+  }
 }
 
 /** Clears the xlsx-import sub-form back to its initial, nothing-picked-yet state. */
@@ -1202,6 +1270,7 @@ function resetRubricForm() {
     'Fill in a topic id, label, and at least one attribute, or import attributes from an Excel workbook below.';
   rubricSaveBtn.textContent = 'Save topic';
   rubricCancelEditBtn.style.display = 'none';
+  rubricExportCsvBtn.style.display = 'none';
   clearRubricAttributeRows();
   addRubricAttributeRow();
   resetRubricXlsxImport();
@@ -1243,11 +1312,12 @@ async function loadRubricTopicForEdit(topicId) {
     rubricFormHint.textContent = "Saving replaces this topic's label, description, and attributes entirely.";
     rubricSaveBtn.textContent = 'Save changes';
     rubricCancelEditBtn.style.display = '';
+    rubricExportCsvBtn.style.display = '';
 
     clearRubricAttributeRows();
     const attrs = topic.attributes || [];
     if (attrs.length) {
-      for (const a of attrs) addRubricAttributeRow(a.name, a.proposal);
+      for (const a of attrs) addRubricAttributeRow(a.name, a.proposal, a.included !== false);
     } else {
       addRubricAttributeRow();
     }
@@ -1259,6 +1329,48 @@ async function loadRubricTopicForEdit(topicId) {
     rubricFormError.textContent = err.message;
     rubricFormError.style.display = 'block';
     rubricFormStatus.textContent = '';
+  }
+}
+
+/**
+ * Exports the topic currently loaded for editing (rubricEditingTopicId)
+ * as a "Name,Ideal proposal,Include" CSV, every attribute included
+ * regardless of its own included/excluded state — see
+ * buildRubricAttributesCsv() above for the exact shape.
+ *
+ * Deliberately re-fetches the topic from the server (GET
+ * /ideal-proposals/:id) rather than reading whatever is currently
+ * sitting in the attribute-rows editor: the form can hold unsaved
+ * edits (a row added, a name/proposal tweaked, an xlsx import staged)
+ * that haven't gone through Save yet, and this export is meant to
+ * reflect exactly what's in idealProposals.json right now, not a
+ * preview of in-progress changes — an explicit design decision, not an
+ * oversight, so someone exporting mid-edit gets the last SAVED version
+ * rather than being surprised by half-finished edits leaking into a
+ * file they might hand to someone else.
+ */
+async function exportRubricCsv() {
+  if (!rubricEditingTopicId) return; // button is hidden in this state anyway; guard defensively
+  rubricFormError.style.display = 'none';
+  try {
+    const res = await fetch(`/ideal-proposals/${encodeURIComponent(rubricEditingTopicId)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load topic for export');
+    const topic = data.topic;
+
+    const csv = buildRubricAttributesCsv(topic.attributes || []);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${topic.id}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    rubricFormError.textContent = err.message;
+    rubricFormError.style.display = 'block';
   }
 }
 
@@ -1670,6 +1782,8 @@ function init() {
 
   rubricAttributesBody = document.getElementById('rubricAttributesBody');
   rubricAddAttributeBtn = document.getElementById('rubricAddAttributeBtn');
+  rubricIncludeAllBtn = document.getElementById('rubricIncludeAllBtn');
+  rubricExcludeAllBtn = document.getElementById('rubricExcludeAllBtn');
 
   rubricXlsxFile = document.getElementById('rubricXlsxFile');
   rubricXlsxFieldsRow = document.getElementById('rubricXlsxFieldsRow');
@@ -1682,6 +1796,7 @@ function init() {
 
   rubricSaveBtn = document.getElementById('rubricSaveBtn');
   rubricCancelEditBtn = document.getElementById('rubricCancelEditBtn');
+  rubricExportCsvBtn = document.getElementById('rubricExportCsvBtn');
   rubricFormStatus = document.getElementById('rubricFormStatus');
   rubricFormError = document.getElementById('rubricFormError');
 
@@ -1947,10 +2062,13 @@ function init() {
   // ---- Rubric Control ----
 
   rubricAddAttributeBtn.addEventListener('click', () => addRubricAttributeRow());
+  rubricIncludeAllBtn.addEventListener('click', () => setAllRubricAttributesIncluded(true));
+  rubricExcludeAllBtn.addEventListener('click', () => setAllRubricAttributesIncluded(false));
 
   rubricForm.addEventListener('submit', submitRubricForm);
 
   rubricCancelEditBtn.addEventListener('click', () => resetRubricForm());
+  rubricExportCsvBtn.addEventListener('click', () => exportRubricCsv());
 
   // One delegated listener handles every row's Edit/Delete buttons,
   // same pattern documentsBody's Remove buttons use above — no need

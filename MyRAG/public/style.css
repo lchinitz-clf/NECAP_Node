@@ -456,6 +456,9 @@ tr.batch-summary-row td {
    that. */
 #rubricAttributesBody textarea { min-height: 2.4rem; line-height: 1.35; }
 #rubricAttributesBody .rubric-attr-proposal { min-height: 5.5rem; }
+.rubric-attr-included-cell { text-align: center; }
+.rubric-attr-included-cell .rubric-attr-included { width: 1.1rem; height: 1.1rem; cursor: pointer; }
+#rubricDetails .workspace-actions .button-row { margin-bottom: 0.6rem; }
 #rubricAttributesBody td { vertical-align: top; }
 #rubricTopicsBody td.rubric-topic-actions { white-space: nowrap; }
 #rubricTopicsBody .btn-secondary,

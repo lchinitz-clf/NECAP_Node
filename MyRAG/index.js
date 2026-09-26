@@ -29,7 +29,7 @@ const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = requi
 const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes } = require('./src/idealProposals');
+const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes } = require('./src/idealProposals');
 const { parseComparisonAnswer } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
@@ -129,12 +129,17 @@ function isValidTopicId(id) {
 }
 
 /**
- * Shared validation for one attribute row ({name, proposal}) submitted
- * from the Rubric Control UI or produced by the xlsx importer. Both
- * fields are required, non-empty strings — an attribute with no
- * proposal text is meaningless (there's nothing to compare a document
- * against), and one with no name can't be told apart from any other
- * in the results table or CSV.
+ * Shared validation for one attribute row ({name, proposal, included?})
+ * submitted from the Rubric Control UI or produced by the xlsx
+ * importer. `name` and `proposal` are required, non-empty strings — an
+ * attribute with no proposal text is meaningless (there's nothing to
+ * compare a document against), and one with no name can't be told
+ * apart from any other in the results table or CSV. `included`, when
+ * present at all, must be an actual boolean — it's optional precisely
+ * so older callers (and the xlsx importer) that don't know about this
+ * field yet can keep omitting it; see isAttributeIncluded() in
+ * src/idealProposals.js for the "missing means true" default this
+ * enables.
  * @param {*} attributes
  * @returns {string|null} an error message, or null if every attribute is valid
  */
@@ -145,8 +150,25 @@ function attributesError(attributes) {
     if (!a || typeof a !== 'object') return `attributes[${i}] must be an object`;
     if (typeof a.name !== 'string' || !a.name.trim()) return `attributes[${i}].name is required`;
     if (typeof a.proposal !== 'string' || !a.proposal.trim()) return `attributes[${i}].proposal is required`;
+    if ('included' in a && typeof a.included !== 'boolean') return `attributes[${i}].included must be a boolean`;
   }
   return null;
+}
+
+/**
+ * Normalizes a validated attributes array before it's persisted to
+ * idealProposals.json: every attribute saved through the app from here
+ * on carries an explicit `included` boolean (defaulting a missing
+ * value to `true`), rather than relying on isAttributeIncluded()'s
+ * "missing means true" fallback forever. Pre-existing entries in the
+ * file that this route never touches keep relying on that fallback
+ * until they're next saved — this only normalizes what's actually
+ * being written right now.
+ * @param {Array<{name: string, proposal: string, included?: boolean}>} attributes
+ * @returns {Array<{name: string, proposal: string, included: boolean}>}
+ */
+function normalizeAttributesForSave(attributes) {
+  return (attributes || []).map((a) => ({ ...a, included: a.included !== false }));
 }
 
 /**
@@ -206,7 +228,7 @@ app.post('/ideal-proposals', (req, res) => {
       return res.status(409).json({ error: `A topic with id "${id}" already exists` });
     }
 
-    const topic = { id, label: label.trim(), attributes: attributes || [] };
+    const topic = { id, label: label.trim(), attributes: normalizeAttributesForSave(attributes) };
     if (description && description.trim()) topic.description = description.trim();
     if (compareInstruction && compareInstruction.trim()) topic.compareInstruction = compareInstruction.trim();
 
@@ -250,7 +272,7 @@ app.put('/ideal-proposals/:topicId', (req, res) => {
     const index = data.topics.findIndex((t) => t.id === topicId);
     if (index === -1) return res.status(404).json({ error: `No topic with id "${topicId}"` });
 
-    const topic = { id: topicId, label: label.trim(), attributes: attributes || [] };
+    const topic = { id: topicId, label: label.trim(), attributes: normalizeAttributesForSave(attributes) };
     if (description && description.trim()) topic.description = description.trim();
     if (compareInstruction && compareInstruction.trim()) topic.compareInstruction = compareInstruction.trim();
 
@@ -996,7 +1018,7 @@ app.post('/query', async (req, res) => {
   // in every attribute at once. A plain (non-comparison) question is
   // always exactly one "batch" with no attribute subset — `null` — so
   // the loop below still runs exactly once, unchanged from before.
-  const batches = topic ? batchAttributes(topic.attributes, attributesPerCall) : [null];
+  const batches = topic ? batchAttributes(getIncludedAttributes(topic), attributesPerCall) : [null];
 
   // Hoisted above the try block (rather than declared as the try
   // block's first lines, which is how this used to read) so the catch
@@ -1231,7 +1253,7 @@ app.post('/query/stream', async (req, res) => {
   // See the long comment on batchAttributes() in src/idealProposals.js
   // and on /query above — same batching, just streamed per batch here
   // instead of collected silently into one response.
-  const batches = topic ? batchAttributes(topic.attributes, attributesPerCall) : [null];
+  const batches = topic ? batchAttributes(getIncludedAttributes(topic), attributesPerCall) : [null];
   const totalBatches = batches.length;
 
   // Cancellation: if the browser's Stop button aborts its own fetch to
@@ -1501,7 +1523,7 @@ app.post('/query/stream', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3500;
 app.listen(PORT, () => {
   console.log(`local-rag server listening on http://localhost:${PORT}`);
 });

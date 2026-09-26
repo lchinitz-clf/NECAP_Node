@@ -417,6 +417,41 @@ function batchAttributes(attributes, attributesPerCall) {
   return batches;
 }
 
+/**
+ * Whether a single attribute should be included in an actual
+ * rubric-analysis run. Defaults to true when `included` is missing
+ * entirely (or is anything other than the literal boolean `false`) —
+ * this is what keeps every pre-existing entry in idealProposals.json
+ * written before this field existed behaving exactly as it always has,
+ * with no one-time migration required. Only an explicit `included:
+ * false` excludes an attribute.
+ * @param {{included?: boolean}} attribute
+ * @returns {boolean}
+ */
+function isAttributeIncluded(attribute) {
+  return !attribute || attribute.included !== false;
+}
+
+/**
+ * Filters a topic's attributes down to just the ones that should
+ * actually be analyzed, per isAttributeIncluded() above. Used once,
+ * upstream of batchAttributes(), by the /query and /query/stream
+ * routes in index.js — everything downstream of that filtering point
+ * (batchAttributes, composeComparisonQuestion, composeRetrievalQuery,
+ * parseComparisonAnswer) never needs to know this field exists at all.
+ * Other callers (the Rubric Control editor's load/edit/export routes)
+ * intentionally do NOT use this — they work with the topic's full,
+ * unfiltered attribute list, since excluded attributes should still be
+ * visible and editable, just skipped when actually running an
+ * analysis.
+ * @param {{attributes?: Array<{included?: boolean}>}} topic
+ * @returns {Array<Object>}
+ */
+function getIncludedAttributes(topic) {
+  const attributes = (topic && topic.attributes) || [];
+  return attributes.filter(isAttributeIncluded);
+}
+
 module.exports = {
   loadTopics,
   saveTopics,
@@ -425,6 +460,8 @@ module.exports = {
   composeComparisonQuestion,
   composeRetrievalQuery,
   batchAttributes,
+  isAttributeIncluded,
+  getIncludedAttributes,
   resolveInstructionText,
   HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
 };

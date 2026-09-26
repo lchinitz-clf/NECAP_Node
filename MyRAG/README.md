@@ -573,8 +573,8 @@ reload the page once first.
       "label": "Offshore Wind",
       "description": "Ideal conditions for an offshore wind development proposal.",
       "attributes": [
-        { "name": "Turbine setback distance", "proposal": "..." },
-        { "name": "Environmental review process", "proposal": "..." }
+        { "name": "Turbine setback distance", "proposal": "...", "included": true },
+        { "name": "Environmental review process", "proposal": "...", "included": false }
       ]
     }
   ]
@@ -605,13 +605,44 @@ reload the page once first.
   topic's own `compareInstruction`, else the file's
   `defaultCompareInstruction`, else one final hardcoded string in the
   code itself for the edge case where the file defines neither.
-- `attributes` — the actual substance: an array of `{name, proposal}`
-  pairs, one per ideal condition to check the reviewed document
-  against. `proposal` is deliberately a different field name from the
-  topic-level `description` above — the two mean genuinely different
-  things (one's a note to yourself, the other is the specific content
-  that gets sent to the model) and reusing one word for both invited
-  exactly the kind of mix-up worth avoiding in a hand-edited file.
+- `attributes` — the actual substance: an array of `{name, proposal,
+  included}` entries, one per ideal condition to check the reviewed
+  document against. `proposal` is deliberately a different field name
+  from the topic-level `description` above — the two mean genuinely
+  different things (one's a note to yourself, the other is the
+  specific content that gets sent to the model) and reusing one word
+  for both invited exactly the kind of mix-up worth avoiding in a
+  hand-edited file.
+- `included` *(optional, per attribute)* — whether this attribute
+  should be part of an actual comparison run. Omit it (or set it to
+  `true`) for the normal case; set it to `false` to keep an attribute
+  visible and editable in the Rubric Control UI and in
+  `idealProposals.json` without having it analyzed — useful for
+  temporarily sidelining an attribute you're still drafting, or one
+  that doesn't apply to the current batch of documents, without
+  deleting and later re-typing it. A missing `included` field is
+  treated as `true` (see `isAttributeIncluded()` in
+  `src/idealProposals.js`), so every attribute written before this
+  field existed keeps behaving exactly as it always has; saving a
+  topic through the Rubric Control UI or the `POST`/`PUT`
+  `/ideal-proposals` routes always writes an explicit `true`/`false`
+  going forward. In the Rubric Control editor, each attribute row has
+  its own "Include" checkbox, and "Include all"/"Exclude all" buttons
+  above the table set every row at once — none of this takes effect
+  until you actually save the topic. Excluded attributes are filtered
+  out once, before batching (see `getIncludedAttributes()` in
+  `src/idealProposals.js`), so they're skipped entirely by both
+  `/query` and `/query/stream` — no retrieval call, no chat call, and
+  no row in the per-attribute *results* table for that attribute. The
+  topic list's "N attributes" count still reflects *every* attribute
+  on the topic, included or not — only an actual comparison run skips
+  excluded ones. The rubric attribute CSV export (the "Export CSV"
+  button in the topic editor, distinct from the per-attribute results
+  export) also always includes every attribute regardless of its
+  included/excluded state, now as three columns — "Name", "Ideal
+  proposal", and "Include" (`TRUE`/`FALSE`) — so the exported file
+  shows which rows are currently excluded rather than silently
+  dropping them.
 
 ### How it works: approach 1 — fold into the question (implemented)
 

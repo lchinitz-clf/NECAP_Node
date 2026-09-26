@@ -252,9 +252,13 @@
 
           <div class="workspace-actions">
             <h3>Attributes</h3>
+            <div class="button-row">
+              <button type="button" id="rubricIncludeAllBtn" class="btn-secondary">Include all</button>
+              <button type="button" id="rubricExcludeAllBtn" class="btn-secondary">Exclude all</button>
+            </div>
             <table>
               <thead>
-                <tr><th>Name</th><th>Ideal proposal</th><th></th></tr>
+                <tr><th>Name</th><th>Ideal proposal</th><th>Include</th><th></th></tr>
               </thead>
               <tbody id="rubricAttributesBody"></tbody>
             </table>
@@ -297,6 +301,7 @@
           <div class="button-row">
             <button type="submit" id="rubricSaveBtn">Save topic</button>
             <button type="button" id="rubricCancelEditBtn" class="btn-secondary" style="display:none;">Cancel edit</button>
+            <button type="button" id="rubricExportCsvBtn" class="btn-secondary" style="display:none;">Export CSV</button>
           </div>
           <p class="status" id="rubricFormStatus"></p>
           <p class="error" id="rubricFormError"></p>
