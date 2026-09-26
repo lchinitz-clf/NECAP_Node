@@ -27,30 +27,38 @@
  * misattribute.
  *
  * A second, separate best-effort layer sits on top of the above: when
- * compareInstruction asks for a quote + citation on each line
+ * compareInstruction asks for a quote + citation
  * (`Quote: "..." [file, chunk N]`, or a model's own inline variant —
- * see extractQuoteAndCitation() below), that segment is pulled out of
- * an already-isolated attribute's text and resolveCitation() looks up
- * the REAL [file, chunk] it came from by searching for the quote's
- * actual text among this batch's retrieved chunks — never by trusting
- * whatever citation the model itself wrote next to it. Two real
- * failure modes made that trust unworkable: a small model inventing a
- * non-integer "chunk 6b" that doesn't exist, and a model citing this
- * app's own "PROPOSAL START"/"PROPOSAL END" prompt markers as though
- * they were a file name (both observed in practice — see
- * extractQuoteAndCitation()'s and resolveCitation()'s doc comments).
+ * see extractQuotesAndCitations() below), each one found in an
+ * already-isolated attribute's text is pulled out and resolveCitation()
+ * looks up the REAL [file, chunk] it came from by searching for the
+ * quote's actual text among this batch's retrieved chunks — never by
+ * trusting whatever citation the model itself wrote next to it. Two
+ * real failure modes made that trust unworkable: a small model
+ * inventing a non-integer "chunk 6b" that doesn't exist, and a model
+ * citing this app's own "PROPOSAL START"/"PROPOSAL END" prompt markers
+ * as though they were a file name (both observed in practice — see
+ * extractQuotesAndCitations()'s and resolveCitation()'s doc comments).
  * Searching by the quote's own content sidesteps both: whatever the
  * model calls its source, the displayed citation can only ever be a
- * chunk that genuinely contains the quoted words, or "not found" if
- * it doesn't appear anywhere. The same quote+citation search also
- * doubles as a boundary marker: everything after it is discarded,
- * which fixes a related bug where a batch's last attribute picked up
- * unrelated rambling the model tacked on after finishing its real
- * answer (nothing else bounds the end of the last attribute's
- * segment — see splitByAttributeNames() below). Same philosophy as
- * the rest of this file throughout: never silently trust unreliable
- * model output when it can instead be checked, corrected from data,
- * or clearly marked as unverified.
+ * chunk that genuinely contains the quoted words, or "not found" if it
+ * doesn't appear anywhere.
+ *
+ * An attribute's answer isn't limited to a single quote — a "give a
+ * detailed answer, then a verdict" instruction (see
+ * HARDCODED_FALLBACK_COMPARE_INSTRUCTION in idealProposals.js)
+ * routinely produces several supporting quotes for one attribute, and
+ * every one of them is found, independently verified, and spliced back
+ * into the displayed text in order (see spliceVerifiedQuotes() below),
+ * not just the first. Text after the LAST quote+citation found is
+ * still discarded, though, which fixes a related bug where a batch's
+ * last attribute picked up unrelated rambling the model tacked on
+ * after finishing its real answer (nothing else bounds the end of the
+ * last attribute's segment — see splitByAttributeNames() below); that
+ * landmark just moves to the last citation now instead of the only
+ * one. Same philosophy as the rest of this file throughout: never
+ * silently trust unreliable model output when it can instead be
+ * checked, corrected from data, or clearly marked as unverified.
  */
 
 // Checked longest/most-specific phrase first so e.g. "not addressed"
@@ -279,14 +287,23 @@ function extractCategoryAndResult(segment, attributeName) {
 }
 
 /**
- * Pulls a quote + citation off of one attribute's already-isolated
- * text (the output of extractCategoryAndResult() above) — the citation
- * compareInstruction asks for, requested precisely so it can be
- * mechanically checked against the actual chunk it claims to come
- * from (see resolveCitation() below) rather than just trusted
- * outright.
+ * Finds EVERY quote + citation attempt in one attribute's already-
+ * isolated text (the output of extractCategoryAndResult() above), in
+ * the order they appear — the citations compareInstruction asks for,
+ * requested precisely so each one can be mechanically checked against
+ * the actual chunk it claims to come from (see resolveCitation()
+ * below) rather than just trusted outright.
  *
- * Recognizes three shapes, tried in this order:
+ * This used to stop at the first match, back when compareInstruction
+ * asked for one terse "<category> — <reason>. Quote: ..." line per
+ * attribute and nothing more. The current "give a detailed answer,
+ * then a verdict" instruction (see HARDCODED_FALLBACK_COMPARE_INSTRUCTION
+ * in idealProposals.js) routinely produces several sentences of
+ * supporting detail per attribute, each with its own quote — so this
+ * now keeps scanning forward and returns all of them, not just the
+ * first.
+ *
+ * Recognizes three shapes per match, same as always:
  *   1. An explicit "Quote: "..." [file, chunk N]" label — the format
  *      compareInstruction actually asks for.
  *   2. No label at all: some models (observed in practice with a 3B
@@ -310,124 +327,199 @@ function extractCategoryAndResult(segment, attributeName) {
  *      quote in. Recognized as its own pattern (not folded into
  *      pattern 1, which requires the literal word "Quote") so this
  *      shows up as a clean, citation-free reason instead of leaving a
- *      dangling "none [...]" fragment — with a fabricated-looking
- *      citation attached to a nonexistent quote — sitting in
- *      resultText. Like pattern 2, the bracket must immediately
- *      follow (only light punctuation/whitespace in between), so an
- *      incidental "none" elsewhere in ordinary prose isn't mistaken
- *      for this placeholder.
+ *      dangling "none [...]" fragment sitting in resultText. Like
+ *      pattern 2, the bracket must immediately follow (only light
+ *      punctuation/whitespace in between), so an incidental "none"
+ *      elsewhere in ordinary prose isn't mistaken for this
+ *      placeholder.
  *
- * Neither pattern is anchored to the end of `text`. That's
- * deliberate and fixes a real failure mode: a batched answer's LAST
- * attribute has nothing bounding the end of its segment (see
- * splitByAttributeNames() above), so if the model tacks on unrelated
- * rambling after finishing this attribute's real answer — in
- * practice, a model has been seen appending stray commentary about a
- * DIFFERENT attribute right after finishing this one — that trailing
- * text used to get silently absorbed into this attribute's
- * resultText. Finding the quote+citation as a landmark ANYWHERE in
- * the text and discarding everything after it fixes that: once the
- * attribute's real answer is complete (marked by its citation), any
- * further text is dropped as bleed rather than displayed as if it
- * belonged to this attribute.
+ * All three patterns are searched across the whole text (not just once
+ * each), and where two patterns would match overlapping spans at the
+ * same position — e.g. a labeled "Quote: "abc" [file, chunk 1]" also
+ * satisfies the label-free inline shape starting a few characters
+ * later, right at the quote mark — whichever one starts EARLIEST wins
+ * and the later, overlapping one is skipped, same tie-break this
+ * function always used, just applied at every position instead of
+ * only the first.
  *
- * The claimed file name and chunk token are captured as-is and are
- * NOT trusted as the real citation — see resolveCitation() below,
- * which looks up the true source by searching for the quote's actual
- * text among this batch's retrieved chunks instead. That's because
- * models have been observed citing things that were never real
- * sources at all: a non-integer "chunk 6b" (chunk indices are always
- * plain integers — see embedPipeline.js), or even the prompt's own
- * "PROPOSAL START"/"PROPOSAL END" section markers as though they were
- * a file name. Trusting the model's claimed citation would surface
- * either of those errors straight to the screen looking exactly as
- * authoritative as a real one; searching for the quote's own text
- * instead sidesteps the model's naming mistakes entirely and can only
- * ever point at a chunk that genuinely contains the words quoted.
+ * The claimed file name and chunk token on each match are captured
+ * as-is and are NOT trusted as the real citation — see
+ * resolveCitation() below, which looks up the true source by searching
+ * for the quote's actual text among this batch's retrieved chunks
+ * instead. That's because models have been observed citing things that
+ * were never real sources at all: a non-integer "chunk 6b" (chunk
+ * indices are always plain integers — see embedPipeline.js), or even
+ * the prompt's own "PROPOSAL START"/"PROPOSAL END" section markers as
+ * though they were a file name. Trusting the model's claimed citation
+ * would surface either of those errors straight to the screen looking
+ * exactly as authoritative as a real one; searching for the quote's
+ * own text instead sidesteps the model's naming mistakes entirely and
+ * can only ever point at a chunk that genuinely contains the words
+ * quoted.
  *
  * @param {string} text
- * @returns {{resultText: string, quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null}}
+ * @returns {Array<{start: number, end: number, quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null}>}
+ *   In text order. `quote` is '' for a "none"-shaped match — see
+ *   spliceVerifiedQuotes() below for how callers should treat that
+ *   (render nothing for it, but don't lose the surrounding prose).
  *   `claimedChunkIndex` is the raw captured token as a trimmed string
  *   (e.g. "6", or the bogus "6b" or "PROPOSAL START"), kept only as a
  *   tiebreaker in resolveCitation() below — never displayed directly.
  */
-function extractQuoteAndCitation(text) {
+function extractQuotesAndCitations(text) {
   // "Quote" is followed by an optional colon, not a required one — a
   // model has been observed writing "Quote none" with no punctuation
   // at all (still unambiguous: only "Quote"/"Quote:" ever precedes the
   // quoted-text-or-none shape this looks for), and requiring the colon
   // would make that whole segment fall through unrecognized instead.
-  const labeledRe = /[\s.;:—–-]*Quote\s*:?\s*(?:["“]([^"”]*)["”]|(none|n\/a|no quote))\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])?/i;
-  const inlineRe = /["“]([^"”]+)["”]\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/i;
-  const bareNoneRe = /(?:none|n\/a|no quote)\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/i;
+  // All three carry the "g" flag now (they didn't need one when only
+  // the first match anywhere ever mattered) so exec() can be called
+  // repeatedly to walk every match in the text.
+  const labeledRe = /[\s.;:—–-]*Quote\s*:?\s*(?:["“]([^"”]*)["”]|(none|n\/a|no quote))\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])?/gi;
+  const inlineRe = /["“]([^"”]+)["”]\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/gi;
+  const bareNoneRe = /(?:none|n\/a|no quote)\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/gi;
 
-  const labeledMatch = labeledRe.exec(text);
-  const inlineMatch = inlineRe.exec(text);
-  const bareNoneMatch = bareNoneRe.exec(text);
-
-  // All three patterns are searched for unconditionally, and whichever
-  // one starts EARLIEST in the text wins — not by fixed priority.
-  // That matters once a model rambles past its real answer: relaxing
-  // the colon above means a stray, out-of-place "Quote none" further
-  // down a rambling response (see this module's doc comment for the
-  // real example that surfaced this) can now match the labeled
-  // pattern too, and if labeled always won outright, that LATER stray
-  // match would be picked over the real, earlier inline citation right
-  // after the actual answer — silently letting everything in between
-  // (the ramble this whole function exists to cut off) leak back into
-  // resultText. Taking whichever match has the smaller index keeps
-  // this landmark-based cut at the first quote-shaped thing in the
-  // text, which is always the real answer when the model followed
-  // instructions at all, regardless of which of the three shapes it
-  // used.
-  let chosen = null;
-  for (const candidate of [
-    labeledMatch && { m: labeledMatch, kind: 'labeled' },
-    inlineMatch && { m: inlineMatch, kind: 'inline' },
-    bareNoneMatch && { m: bareNoneMatch, kind: 'bareNone' },
+  const raw = [];
+  for (const { re, kind } of [
+    { re: labeledRe, kind: 'labeled' },
+    { re: inlineRe, kind: 'inline' },
+    { re: bareNoneRe, kind: 'bareNone' },
   ]) {
-    if (!candidate) continue;
-    if (!chosen || candidate.m.index < chosen.m.index) chosen = candidate;
+    let m;
+    while ((m = re.exec(text))) {
+      raw.push({ m, kind, start: m.index, end: m.index + m[0].length });
+      // Defensive only — none of these patterns can match an empty
+      // string, so lastIndex always advances on its own, but a stuck
+      // lastIndex would otherwise infinite-loop here.
+      if (m[0].length === 0) re.lastIndex += 1;
+    }
+  }
+  raw.sort((a, b) => a.start - b.start);
+
+  const results = [];
+  let cursor = 0;
+  for (const cand of raw) {
+    if (cand.start < cursor) continue; // overlaps a match already kept at an earlier position — skip
+    const { m, kind } = cand;
+    let quote, claimedSourceFile, claimedChunkIndex;
+    if (kind === 'labeled') {
+      quote = (m[1] || '').trim();
+      claimedSourceFile = m[3] ? m[3].trim() : null;
+      claimedChunkIndex = m[4] !== undefined ? m[4].trim() : null;
+    } else if (kind === 'inline') {
+      quote = (m[1] || '').trim();
+      claimedSourceFile = m[2] ? m[2].trim() : null;
+      claimedChunkIndex = m[3] !== undefined ? m[3].trim() : null;
+    } else {
+      // bareNone: never has a quote to capture — "none" itself isn't
+      // the quote text, it's the model saying there ISN'T one — so
+      // quote stays '' just like the labeled "Quote: none" case does.
+      quote = '';
+      claimedSourceFile = m[1] ? m[1].trim() : null;
+      claimedChunkIndex = m[2] !== undefined ? m[2].trim() : null;
+    }
+    results.push({ start: cand.start, end: cand.end, quote, claimedSourceFile, claimedChunkIndex });
+    cursor = cand.end;
+  }
+  return results;
+}
+
+/**
+ * Renders one match from extractQuotesAndCitations() into display
+ * text — the verified real citation (never the model's claimed one;
+ * see resolveCitation()'s doc comment for why) plus a ✓/⚠ marker.
+ * Returns '' for a "none"-shaped match (nothing to show), which
+ * spliceVerifiedQuotes() below relies on to know when to skip one.
+ * @param {{quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null}} match
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [matches]
+ * @returns {string}
+ */
+function renderQuoteMatch(match, matches) {
+  if (!match.quote) return '';
+  const resolved = resolveCitation(match.quote, matches, match.claimedSourceFile, match.claimedChunkIndex);
+  const citation = resolved && resolved.verified ? ` [${resolved.sourceFile}, chunk ${resolved.chunkIndex}]` : '';
+  const verifyNote = resolved && resolved.verified ? ' ✓ quote verified'
+    : resolved && resolved.verified === false ? ' ⚠ quote NOT found verbatim in any retrieved chunk'
+    : '';
+  return `"${match.quote}"${citation}${verifyNote}`;
+}
+
+/**
+ * Splices every quote+citation match found in `text` (via
+ * extractQuotesAndCitations() above) back into the display text, each
+ * one replaced by its VERIFIED form (renderQuoteMatch()) rather than
+ * left exactly as the model wrote it, with the prose around and
+ * between them preserved so a multi-quote answer still reads as one
+ * continuous piece of reasoning instead of a disconnected list of
+ * citations. A "none"-shaped match contributes nothing of its own, but
+ * the prose on either side of it is stitched together as if it had
+ * never matched at all — a model saying "no quote for this part" for
+ * one sentence shouldn't sever the sentences around it.
+ *
+ * Text after the LAST match is always dropped, same as the original
+ * single-quote version — see extractQuotesAndCitations()'s doc comment
+ * for why (a batch's last attribute has nothing else bounding the end
+ * of its segment, so a model that rambles on after its real, cited
+ * answer needs a landmark to cut at; the LAST citation is that
+ * landmark now, same as the only citation used to be). If no match had
+ * an actual quote at all (every one found was a "none"), the cutoff
+ * falls back to right before the FIRST match — the same thing a lone
+ * "none" always produced.
+ *
+ * When no quote-shaped match is found anywhere, `text` is returned
+ * completely unchanged (no citation machinery was ever invoked, so
+ * nothing here should second-guess the plain prose).
+ *
+ * @param {string} text
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [chunkMatches] -
+ *   this batch's own retrieved chunks, passed straight through to
+ *   resolveCitation() for each quote found.
+ * @returns {string}
+ */
+function spliceVerifiedQuotes(text, chunkMatches) {
+  const found = extractQuotesAndCitations(text);
+  if (found.length === 0) return text;
+
+  let out = '';
+  let pending = '';
+  let cursor = 0;
+  let renderedAny = false;
+
+  for (const m of found) {
+    pending += text.slice(cursor, m.start);
+    const rendered = renderQuoteMatch(m, chunkMatches);
+    if (rendered) {
+      // For a SECOND-or-later quote, `pending` typically starts right
+      // after the previous quote's "]" citation bracket, where the
+      // model's own sentence-ending punctuation lands (". Additionally,
+      // ..."). Stripped here rather than left in, since this function
+      // supplies its own ". " separator between quotes right below —
+      // without stripping, the two collide into a double "..  Foo"
+      // artifact. The very first quote's leading text never has this
+      // problem (nothing before it ends mid-citation), so this only
+      // needs to apply once `out` is already non-empty.
+      const between = (out ? pending.replace(/^[\s.,;:\-–—]+/, '') : pending).trim();
+      out += out
+        ? (between ? `. ${between} — ${rendered}` : ` — ${rendered}`)
+        : (between ? `${between} — ${rendered}` : rendered);
+      pending = '';
+      renderedAny = true;
+    }
+    // A "none" match's own span is simply dropped (never added to
+    // `pending`); whatever text came before it keeps accumulating in
+    // `pending` for whichever real quote comes next.
+    cursor = m.end;
   }
 
-  if (!chosen) {
-    return { resultText: text, quote: '', claimedSourceFile: null, claimedChunkIndex: null };
+  if (!renderedAny) {
+    // Every match found was a "none" placeholder — nothing to show but
+    // citation attempts for quotes that don't exist, all discarded;
+    // keep only what came before the first one, same as a lone "none"
+    // always produced.
+    return text.slice(0, found[0].start).trim();
   }
 
-  const { m, kind } = chosen;
-  // No `|| text.trim()` fallback here: an empty prefix is a normal,
-  // expected result (the quote itself doubling as the whole reason,
-  // with nothing said before it) — not a failure to recover from.
-  // Falling back to the full original text on an empty prefix used to
-  // silently re-attach the quote/citation (and anything the model
-  // rambled on AFTER them) right back onto resultText, undoing the
-  // whole point of finding this landmark in the first place.
-  const resultText = text.slice(0, m.index).trim();
-  if (kind === 'labeled') {
-    return {
-      resultText,
-      quote: (m[1] || '').trim(),
-      claimedSourceFile: m[3] ? m[3].trim() : null,
-      claimedChunkIndex: m[4] !== undefined ? m[4].trim() : null,
-    };
-  }
-  if (kind === 'inline') {
-    return {
-      resultText,
-      quote: (m[1] || '').trim(),
-      claimedSourceFile: m[2] ? m[2].trim() : null,
-      claimedChunkIndex: m[3] !== undefined ? m[3].trim() : null,
-    };
-  }
-  // bareNone: never has a quote to capture — "none" itself isn't the
-  // quote text, it's the model saying there ISN'T one — so quote stays
-  // '' just like the labeled "Quote: none" case does.
-  return {
-    resultText,
-    quote: '',
-    claimedSourceFile: m[1] ? m[1].trim() : null,
-    claimedChunkIndex: m[2] !== undefined ? m[2].trim() : null,
-  };
+  return out;
 }
 
 // Matches an ellipsis a model used to shorten a quote — "...", a
@@ -500,7 +592,7 @@ function chunkContainsOrderedPieces(haystack, pieces) {
  * Determines the REAL citation for an extracted quote by searching
  * for its actual text among this batch's retrieved chunks, rather
  * than trusting whatever file/chunk the model claimed — see
- * extractQuoteAndCitation() above for the failure modes (hallucinated
+ * extractQuotesAndCitations() above for the failure modes (hallucinated
  * "chunk 6b", or a prompt marker like "PROPOSAL START" cited as if it
  * were a file name) that made trusting the model's own citation
  * unreliable enough to abandon entirely. A quote's real source is
@@ -543,7 +635,28 @@ function chunkContainsOrderedPieces(haystack, pieces) {
 function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
 
-  const normalize = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Besides collapsing whitespace runs, this also reassembles a common
+  // PDF-extraction artifact: a word that was hyphenated across a line
+  // break in the original document ("Sea-\nlevel rise") frequently comes
+  // out of extraction as "Sea- level rise" — the hyphen followed by a
+  // stray space instead of running straight into the next word. A model
+  // quoting the same passage typically writes it the normal way,
+  // "Sea-level rise" (no space), since that's how the word actually
+  // reads. Those are the same words to a human, but this function used
+  // to only collapse whitespace, so that single space was enough to fail
+  // an otherwise-exact substring match for the model's ENTIRE quote (a
+  // real observed case, confirmed against real chunk text with this
+  // exact artifact). The replace below removes the space in "sea- level"
+  // (-> "sea-level") whenever a hyphen/dash sits directly between two
+  // word characters with whitespace after it — never touching a dash
+  // used as ordinary punctuation (" - ", "word — word"), which always
+  // has a space BEFORE the dash too and so doesn't match `\w[-‐-
+  // ―]\s`.
+  const normalize = (s) => String(s || '')
+    .toLowerCase()
+    .replace(/(\w)[-‐-―]\s+(\w)/g, '$1-$2')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   const rawPieces = splitQuoteOnEllipsis(quote);
   if (rawPieces.length === 0) return null; // e.g. the "quote" was just an ellipsis with nothing else
@@ -583,14 +696,16 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
  * silent gap. An empty `category` is what marks a row as this
  * fallback rather than a normal one-attribute answer.
  *
- * When a quote + citation was requested and successfully parsed (see
- * extractQuoteAndCitation() above), it's folded back into `resultText`
- * as a trailing `— "quote" [file, chunk N]` segment, suffixed with a
- * checkmark or warning depending on verifyQuote()'s outcome against
- * `matches` (✓ quote verified / ⚠ quote NOT found verbatim in cited
- * block) — so the on-screen table and the CSV export both surface the
- * verification result without either one needing its own new column
- * or field; `resultText` stays a single plain string throughout.
+ * When one or more quote + citations were requested and successfully
+ * parsed (see extractQuotesAndCitations() and spliceVerifiedQuotes()
+ * above), each is folded back into `resultText` in place as a
+ * `"quote" [file, chunk N]` segment, suffixed with a checkmark or
+ * warning depending on resolveCitation()'s outcome against `matches`
+ * (✓ quote verified / ⚠ quote NOT found verbatim in any retrieved
+ * chunk) — so the on-screen table and the CSV export both surface the
+ * verification result for every quote without either one needing its
+ * own new column or field; `resultText` stays a single plain string
+ * throughout.
  *
  * @param {string} answerText - the chat model's raw answer for this batch
  * @param {Array<{name: string, proposal: string}>} attributes - the
@@ -635,25 +750,17 @@ function parseComparisonAnswer(answerText, attributes, matches) {
       resultText = text.trim();
     }
 
-    const parsedQuote = extractQuoteAndCitation(resultText);
-    let finalResultText = parsedQuote.resultText;
-    if (parsedQuote.quote) {
-      // The displayed citation is always the REAL one resolveCitation()
-      // found by searching for the quote's actual text — never
-      // whatever file/chunk the model itself claimed (see
-      // extractQuoteAndCitation()'s doc comment for why that claim
-      // isn't trusted). When the quote can't be found anywhere in this
-      // batch's retrieved chunks at all, no citation is shown, since
-      // fabricating one from the model's own unreliable claim would be
-      // worse than showing none.
-      const resolved = resolveCitation(parsedQuote.quote, matches, parsedQuote.claimedSourceFile, parsedQuote.claimedChunkIndex);
-      const citation = resolved && resolved.verified ? ` [${resolved.sourceFile}, chunk ${resolved.chunkIndex}]` : '';
-      const verifyNote = resolved && resolved.verified ? ' ✓ quote verified'
-        : resolved && resolved.verified === false ? ' ⚠ quote NOT found verbatim in any retrieved chunk'
-        : '';
-      const prefix = parsedQuote.resultText ? `${parsedQuote.resultText} — ` : '';
-      finalResultText = `${prefix}"${parsedQuote.quote}"${citation}${verifyNote}`;
-    }
+    // Finds every quote+citation in this attribute's text (not just
+    // the first — see spliceVerifiedQuotes()'s doc comment), verifies
+    // each one against this batch's actual retrieved chunks, and
+    // splices the verified forms back into place. The displayed
+    // citation for each quote is always the REAL one resolveCitation()
+    // found by searching for the quote's actual text — never whatever
+    // file/chunk the model itself claimed. When a quote can't be found
+    // anywhere in this batch's retrieved chunks at all, no citation is
+    // shown for it, since fabricating one from the model's own
+    // unreliable claim would be worse than showing none.
+    const finalResultText = spliceVerifiedQuotes(resultText, matches);
 
     return {
       name: attr.name,
@@ -664,4 +771,10 @@ function parseComparisonAnswer(answerText, attributes, matches) {
   });
 }
 
-module.exports = { parseComparisonAnswer, extractQuoteAndCitation, resolveCitation, splitQuoteOnEllipsis };
+module.exports = {
+  parseComparisonAnswer,
+  extractQuotesAndCitations,
+  spliceVerifiedQuotes,
+  resolveCitation,
+  splitQuoteOnEllipsis,
+};
