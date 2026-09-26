@@ -14,11 +14,13 @@
       "label": "Test Rubric",
       "attributes": [
         {
-          "name": "Haz11 - Asset Inventory and Exposure - Exposure Quantification",
-          "proposal": "Does the plan quantify, either in absolute numbers or population percentages, the people at risk due to high heat?"
+          "name": "TestQuestion",
+          "proposal": "Does the plan evaluate compound or cascading hazards, such as flooding combined with power outages, heat combined with poor air quality, or coastal flooding combined with storm surge?",
+          "included": true
         }
       ],
-      "description": "Place to test rubric wording."
+      "description": "Place to test rubric wording.",
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
     },
     {
       "id": "inland-flooding",
@@ -957,222 +959,275 @@
     {
       "id": "city-level-hazard",
       "label": "City Level Hazard Mitigation",
-      "description": "City level hazard mitigation plans.",
-      "compareInsrtuction": [],
       "attributes": [
         {
           "name": "Haz1 - Hazard Identification - Comprehensive Hazard Coverage",
-          "proposal": "Has the plan identified all major natural hazards relevant to the municipality’s geography and climate conditions?"
+          "proposal": "What are the major natural hazards relevant to the municipality’s geography and climate conditions.  Provide a list of all identified hazards.",
+          "included": true
         },
         {
           "name": "Haz2 - Hazard Identification - Locally Significant Hazards",
-          "proposal": "Are locally significant hazards included even if they are not among the most severe statewide hazards?"
+          "proposal": "Are locally significant hazards included even if they are not among the most severe statewide hazards?",
+          "included": false
         },
         {
           "name": "Haz3 - Hazard Identification - Future Climate Conditions",
-          "proposal": "Does the plan consider both current and future climate-driven changes in hazard frequency, intensity, duration, or geographic extent?"
+          "proposal": "Does the plan consider both current and future climate-driven changes in hazard frequency, intensity, duration, or geographic extent?",
+          "included": true
         },
         {
           "name": "Haz4 - Hazard Identification - Compound and Cascading Hazards",
-          "proposal": "Does the plan evaluate compound or cascading hazards, such as flooding combined with power outages, heat combined with poor air quality, or coastal flooding combined with storm surge?"
+          "proposal": "Does the plan evaluate compound or cascading hazards, such as flooding combined with power outages, heat combined with poor air quality, or coastal flooding combined with storm surge?",
+          "included": true
         },
         {
           "name": "Haz5 - Hazard Identification - Hazard Inclusion and Exclusion Rationale",
-          "proposal": "Does the plan explain why certain hazards were included or excluded from analysis?"
+          "proposal": "Does the plan explain why certain hazards were included or excluded from analysis?",
+          "included": false
         },
         {
           "name": "Haz6 - Asset Inventory and Exposure - Critical Asset Inventory",
-          "proposal": "Has the plan identified and mapped critical facilities, infrastructure, natural resources, and community assets?"
+          "proposal": "Has the plan identified and created a map containing the location of important critical facilities, infrastructure, natural resources, and community assets?",
+          "included": true
         },
         {
           "name": "Haz7 - Asset Inventory and Exposure - Essential Community Facilities",
-          "proposal": "Does the asset inventory include affordable housing, public housing, schools, childcare facilities, healthcare facilities, emergency response facilities, transportation infrastructure, water and wastewater infrastructure, energy infrastructure, and community cooling or warming centers?"
+          "proposal": "Does the asset inventory include affordable housing, public housing, schools, childcare facilities, healthcare facilities, emergency response facilities, transportation infrastructure, water and wastewater infrastructure, energy infrastructure, and community cooling or warming centers?",
+          "included": true
         },
         {
           "name": "Haz8 - Asset Inventory and Exposure - Assets Serving Priority Populations",
-          "proposal": "Does the plan identify assets that serve Environmental Justice communities and low-income, older adult, disabled, immigrant, or linguistically isolated populations?"
+          "proposal": "Does the plan identify assets that serve Environmental Justice communities and low-income, older adult, disabled, immigrant, or linguistically isolated populations?",
+          "included": true
         },
         {
           "name": "Haz9 - Asset Inventory and Exposure - Natural and Nature-Based Assets",
-          "proposal": "Are natural and nature-based assets included, such as wetlands, floodplains, urban forests, coastal buffers, and open space?"
+          "proposal": "Are natural and nature-based assets included, such as wetlands, floodplains, urban forests, coastal buffers, and open space?",
+          "included": true
         },
         {
           "name": "Haz10 - Asset Inventory and Exposure - Criticality Assessment",
-          "proposal": "Does the plan identify which assets are most critical to life safety, public health, and community functioning during and after disasters?"
+          "proposal": "Does the plan identify which assets are most critical to life safety, public health, and community functioning during and after disasters?",
+          "included": true
         },
         {
           "name": "Haz11 - Asset Inventory and Exposure - Exposure Quantification",
-          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to each hazard?"
+          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres likely to be affected by extreme heat?",
+          "included": true
         },
         {
           "name": "Haz12 - Data Quality and Data Sources - Source Documentation",
-          "proposal": "Are the data sources used clearly documented and cited?"
+          "proposal": "Are the data sources used clearly documented and cited?",
+          "included": false
         },
         {
           "name": "Haz13 - Data Quality and Data Sources - Data Currency",
-          "proposal": "Were the most recent datasets available at the time of plan development used?"
+          "proposal": "Were the most recent datasets available at the time of plan development used?",
+          "included": false
         },
         {
           "name": "Haz14 - Data Quality and Data Sources - Best Available Local and State Data",
-          "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?"
+          "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?",
+          "included": false
         },
         {
           "name": "Haz15 - Data Quality and Data Sources - Flood Risk Data",
-          "proposal": "For flooding analyses, does the plan incorporate the best available flood data, including state flood-risk tools, watershed studies, or local modeling where available?"
+          "proposal": "For flooding analyses, does the plan incorporate the best available flood data, including state flood-risk tools, watershed studies, or local modeling where available?",
+          "included": false
         },
         {
           "name": "Haz16 - Data Quality and Data Sources - Data Limitations and Uncertainty",
-          "proposal": "Does the plan explain limitations and uncertainties associated with the data sources used?"
+          "proposal": "Does the plan explain limitations and uncertainties associated with the data sources used?",
+          "included": false
         },
         {
           "name": "Haz17 - Data Quality and Data Sources - Demographic Data Currency",
-          "proposal": "Are demographic and socioeconomic datasets sufficiently current to reflect recent community conditions?"
+          "proposal": "Are demographic and socioeconomic datasets sufficiently current to reflect recent community conditions?",
+          "included": false
         },
         {
           "name": "Haz18 - Data Quality and Data Sources - Historical and Projected Evidence",
-          "proposal": "Are historical disaster records used alongside future climate projections?"
+          "proposal": "Are historical disaster records used alongside future climate projections?",
+          "included": false
         },
         {
           "name": "Haz19 - Hazard Measurement and Modeling - Risk Measurement Method",
-          "proposal": "Does the plan clearly explain how hazard risk was measured?"
+          "proposal": "Does the plan clearly explain how hazard risk was measured?",
+          "included": false
         },
         {
           "name": "Haz20 - Hazard Measurement and Modeling - Model Assumptions",
-          "proposal": "Are assumptions used in risk calculations transparently documented?"
+          "proposal": "Are assumptions used in risk calculations transparently documented?",
+          "included": false
         },
         {
           "name": "Haz21 - Hazard Measurement and Modeling - Risk Rating Method",
-          "proposal": "Does the plan explain how hazard probability, severity, exposure, and vulnerability were combined to generate risk ratings?"
+          "proposal": "Does the plan explain how hazard probability, severity, exposure, and vulnerability were combined to generate risk ratings?",
+          "included": false
         },
         {
           "name": "Haz22 - Hazard Measurement and Modeling - Future Climate Projections",
-          "proposal": "Does the plan use future climate projections when assessing long-term risk?"
+          "proposal": "Does the plan use future climate projections when assessing long-term risk?",
+          "included": false
         },
         {
           "name": "Haz23 - Hazard Measurement and Modeling - Planning Horizons",
-          "proposal": "Are planning horizons clearly specified, such as current conditions, 2050, 2070, or 2100?"
+          "proposal": "Are planning horizons clearly specified, such as current conditions, 2050, 2070, or 2100?",
+          "included": false
         },
         {
           "name": "Haz24 - Hazard Measurement and Modeling - Technical Appropriateness",
-          "proposal": "Are the methods used to model hazards technically appropriate and supported by scientific evidence?"
+          "proposal": "Are the methods used to model hazards technically appropriate and supported by scientific evidence?",
+          "included": false
         },
         {
           "name": "Haz25 - Hazard Measurement and Modeling - Risk Concept Clarity",
-          "proposal": "Does the plan distinguish among hazard exposure, vulnerability, and risk?"
+          "proposal": "Does the plan distinguish among hazard exposure, vulnerability, and risk?",
+          "included": false
         },
         {
           "name": "Haz26 - Hazard Measurement and Modeling - Projection Uncertainty",
-          "proposal": "Are uncertainties in climate projections explicitly discussed?"
+          "proposal": "Are uncertainties in climate projections explicitly discussed?",
+          "included": false
         },
         {
           "name": "Haz27 - Vulnerability Assessment - Population Vulnerability by Hazard",
-          "proposal": "Does the plan evaluate which populations are most vulnerable to each hazard?"
+          "proposal": "Does the plan evaluate which populations are most vulnerable to each hazard?",
+          "included": false
         },
         {
           "name": "Haz28 - Vulnerability Assessment - Social Vulnerability Indicators",
-          "proposal": "Does the assessment incorporate social vulnerability indicators such as income, age, disability status, race and ethnicity, language isolation, housing tenure, and health status?"
+          "proposal": "Does the assessment incorporate social vulnerability indicators such as income, age, disability status, race and ethnicity, language isolation, housing tenure, and health status?",
+          "included": false
         },
         {
           "name": "Haz29 - Vulnerability Assessment - Cumulative Vulnerability",
-          "proposal": "Does the plan identify neighborhoods experiencing multiple overlapping vulnerabilities?"
+          "proposal": "Does the plan identify neighborhoods experiencing multiple overlapping vulnerabilities?",
+          "included": false
         },
         {
           "name": "Haz30 - Vulnerability Assessment - Spatial Analysis of Vulnerability",
-          "proposal": "Does the plan map social vulnerability alongside hazard exposure?"
+          "proposal": "Does the plan map social vulnerability alongside hazard exposure?",
+          "included": false
         },
         {
           "name": "Haz31 - Vulnerability Assessment - Displacement and Economic Risk",
-          "proposal": "Does the plan consider the risk of displacement, housing instability, or economic disruption resulting from climate hazards?"
+          "proposal": "Does the plan consider the risk of displacement, housing instability, or economic disruption resulting from climate hazards?",
+          "included": false
         },
         {
           "name": "Haz32 - Vulnerability Assessment - Public Health Impacts",
-          "proposal": "Does the plan assess public health impacts associated with identified hazards?"
+          "proposal": "Does the plan assess public health impacts associated with identified hazards?",
+          "included": false
         },
         {
           "name": "Haz33 - Risk Prioritization - Transparent Prioritization Process",
-          "proposal": "Does the plan provide a transparent process for prioritizing hazards?"
+          "proposal": "Does the plan provide a transparent process for prioritizing hazards?",
+          "included": false
         },
         {
           "name": "Haz34 - Risk Prioritization - Prioritization Criteria",
-          "proposal": "Are prioritization criteria clearly defined?"
+          "proposal": "Are prioritization criteria clearly defined?",
+          "included": false
         },
         {
           "name": "Haz35 - Risk Prioritization - Likelihood and Consequence",
-          "proposal": "Are both likelihood and consequence considered in prioritization?"
+          "proposal": "Are both likelihood and consequence considered in prioritization?",
+          "included": false
         },
         {
           "name": "Haz36 - Risk Prioritization - Equity in Prioritization",
-          "proposal": "Are impacts to vulnerable populations weighted or considered separately in prioritization methods?"
+          "proposal": "Are impacts to vulnerable populations weighted or considered separately in prioritization methods?",
+          "included": false
         },
         {
           "name": "Haz37 - Risk Prioritization - Highest-Risk People, Assets, and Systems",
-          "proposal": "Does the plan identify which assets, populations, and systems face the highest overall risk?"
+          "proposal": "Does the plan identify which assets, populations, and systems face the highest overall risk?",
+          "included": false
         },
         {
           "name": "Haz38 - Risk Prioritization - Future Conditions in Prioritization",
-          "proposal": "Are future climate conditions incorporated into prioritization decisions?"
+          "proposal": "Are future climate conditions incorporated into prioritization decisions?",
+          "included": false
         },
         {
           "name": "Haz39 - Review of Inputs and Assumptions - Input Data Quality Review",
-          "proposal": "Does the plan critically evaluate the quality and completeness of its input datasets?"
+          "proposal": "Does the plan critically evaluate the quality and completeness of its input datasets?",
+          "included": false
         },
         {
           "name": "Haz40 - Review of Inputs and Assumptions - Data Gaps",
-          "proposal": "Does the plan identify important data gaps?"
+          "proposal": "Does the plan identify important data gaps?",
+          "included": false
         },
         {
           "name": "Haz41 - Review of Inputs and Assumptions - Expert and Stakeholder Inputs",
-          "proposal": "Are expert judgments and stakeholder inputs documented?"
+          "proposal": "Are expert judgments and stakeholder inputs documented?",
+          "included": false
         },
         {
           "name": "Haz42 - Review of Inputs and Assumptions - Local Knowledge",
-          "proposal": "Does the plan explain how local knowledge influenced hazard identification and risk assessment?"
+          "proposal": "Does the plan explain how local knowledge influenced hazard identification and risk assessment?",
+          "included": false
         },
         {
           "name": "Haz43 - Review of Inputs and Assumptions - Municipal and Utility Consultation",
-          "proposal": "Were municipal departments, utility providers, public health agencies, and emergency managers consulted when identifying hazards and assets?"
+          "proposal": "Were municipal departments, utility providers, public health agencies, and emergency managers consulted when identifying hazards and assets?",
+          "included": false
         },
         {
           "name": "Haz44 - Review of Inputs and Assumptions - Data and Assessment Updates",
-          "proposal": "Does the plan include a process for updating datasets and revising risk assessments as better information becomes available?"
+          "proposal": "Does the plan include a process for updating datasets and revising risk assessments as better information becomes available?",
+          "included": false
         },
         {
           "name": "Haz45 - Overall Assessment - Missing Hazards",
-          "proposal": "Based on available evidence, are any significant hazards missing from the assessment?"
+          "proposal": "Based on available evidence, are any significant hazards missing from the assessment?",
+          "included": false
         },
         {
           "name": "Haz46 - Overall Assessment - Missing Critical Assets",
-          "proposal": "Based on available evidence, are any critical community assets missing from the assessment?"
+          "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
+          "included": false
         },
         {
           "name": "Haz47 - Overall Assessment - Opportunities to Improve Accuracy",
-          "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?"
+          "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?",
+          "included": false
         },
         {
           "name": "Haz48 - Overall Assessment - Decision-Usefulness",
-          "proposal": "Does the risk assessment appear sufficient to support prioritization of mitigation actions and funding decisions?"
+          "proposal": "Does the risk assessment appear sufficient to support prioritization of mitigation actions and funding decisions?",
+          "included": false
         },
         {
           "name": "Haz49 - Advocate Lens - Hazard and Social Vulnerability Overlap",
-          "proposal": "Does the plan identify where vulnerable populations and high-risk physical hazards overlap?"
+          "proposal": "Does the plan identify where vulnerable populations and high-risk physical hazards overlap?",
+          "included": false
         },
         {
           "name": "Haz50 - Advocate Lens - Equitable Investment Prioritization",
-          "proposal": "Does the plan prioritize mitigation investments in areas facing both high hazard exposure and high social vulnerability?"
+          "proposal": "Does the plan prioritize mitigation investments in areas facing both high hazard exposure and high social vulnerability?",
+          "included": false
         },
         {
           "name": "Haz51 - Advocate Lens - Historically Underserved Neighborhoods",
-          "proposal": "Does the plan evaluate whether historically underserved neighborhoods have received proportional attention in the risk assessment?"
+          "proposal": "Does the plan evaluate whether historically underserved neighborhoods have received proportional attention in the risk assessment?",
+          "included": false
         },
         {
           "name": "Haz52 - Advocate Lens - Community Assets and Social Infrastructure",
-          "proposal": "Does the plan recognize community assets and social networks as resilience resources, not just physical infrastructure?"
+          "proposal": "Does the plan recognize community assets and social networks as resilience resources, not just physical infrastructure?",
+          "included": false
         },
         {
           "name": "Haz53 - Advocate Lens - Community-Generated Data",
-          "proposal": "Does the plan incorporate local, community-generated, or resident-collected data where available?"
+          "proposal": "Does the plan incorporate local, community-generated, or resident-collected data where available?",
+          "included": false
         }
-      ]
+      ],
+      "description": "City level hazard mitigation plans.",
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
     }
   ]
 }

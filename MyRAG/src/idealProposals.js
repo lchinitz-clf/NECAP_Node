@@ -29,12 +29,18 @@ const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'idealProposals.json');
 // a minimal or very old file). The normal, hand-editable default lives
 // in the JSON file, not here: see getTopic()'s fallback chain below.
 const HARDCODED_FALLBACK_COMPARE_INSTRUCTION =
-  'Compare the proposal (between the PROPOSAL START and PROPOSAL END markers ' +
-  'you were given separately) against the rubric (between the RUBRIC START and ' +
-  'RUBRIC END markers above). For each attribute, note whether the ' +
-  'proposal matches, falls short of, or exceeds the rubric, and flag ' +
-  'anything the rubric calls for that the proposal does not appear to ' +
-  'address at all.';
+	  "Answer the question or address the criterion below thoroughly and directly, using only the " +
+	  "material provided. Include every specific figure, number, example, or detail you find, even if " +
+	  "you can only address part of what's asked. Do not skip straight to a judgment - give the full, " +
+	  "direct answer first.\n\n" +
+	  "After your direct answer, give a verdict: Matches if the material fully answers or satisfies " +
+	  "what's asked, Falls short if it partially addresses it or gives less than what's asked, Exceeds " +
+	  "if it goes beyond what's asked, or Not addressed if the material says nothing relevant to this " +
+	  "at all.\n\n" +
+	  "If more than one attribute is listed above, address them one at a time, in order: give each " +
+	  "attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's " +
+	  "name, and do not blend separate attributes' information together into a single combined answer " +
+	  "or verdict.";
 
 /**
  * Reads and parses idealProposals.json fresh from disk.
