@@ -34,6 +34,7 @@ const { parseComparisonAnswer } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
 const { basicAuth } = require('./src/basicAuth');
+const { sendRubricCompletionEmail } = require('./src/emailNotify');
 
 const app = express();
 
@@ -1228,7 +1229,7 @@ app.post('/query', async (req, res) => {
  * "batch-done" immediately before "done".
  */
 app.post('/query/stream', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall, notifyEmail, notifyEmailTo } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -1353,6 +1354,15 @@ app.post('/query/stream', async (req, res) => {
   // that ACTUALLY answered, resolved by chat() itself rather than just
   // echoing back the requested `chatModel`.
   let resolvedChatModel;
+  // Only populated (and only matters) when this is a rubric comparison
+  // AND notifyEmail was requested — see the completion email send
+  // below. Mirrors, batch for batch, the exact same shape the browser
+  // builds client-side into `latestBatches` from these same "batch-done"
+  // events (see script.js) — buildAttributeResultsHtml() in
+  // public/reportHtml.js expects that shape regardless of which side
+  // builds it, so the emailed report and the "Export HTML" download
+  // are always identical for the same run.
+  const batchesForReport = topic && notifyEmail ? [] : null;
 
   try {
     for (let i = 0; i < batches.length; i++) {
@@ -1422,6 +1432,17 @@ app.post('/query/stream', async (req, res) => {
         ? parseComparisonAnswer(answer, attributesSubset, matches)
         : [];
       allRecords = allRecords.concat(records);
+      if (batchesForReport) {
+        batchesForReport.push({
+          batchIndex: i,
+          totalBatches,
+          sources: sourcesSummary(matches),
+          records,
+          promptTokens,
+          answerTokens,
+          doneReason,
+        });
+      }
 
       // `thinking` here mirrors /query's response: only included when
       // non-empty, for a caller that reconnected mid-stream or
@@ -1460,6 +1481,23 @@ app.post('/query/stream', async (req, res) => {
         sourceChunkIds: [...new Set(allSourceIds)],
         chatModel: resolvedChatModel,
       });
+      // Deliberately NOT awaited: the browser is waiting on this
+      // response to close so it can update the UI, and sending an
+      // email (an outbound SMTP round trip) has no reason to hold that
+      // up. sendRubricCompletionEmail() never throws (see its own doc
+      // comment in src/emailNotify.js) — the .catch() here is only a
+      // last-resort safety net, not something expected to ever fire.
+      if (batchesForReport) {
+        sendRubricCompletionEmail({
+          req,
+          workspaceId,
+          topicLabel: topic.label,
+          notifyEmailTo,
+          batches: batchesForReport,
+          chatModel: resolvedChatModel,
+          numCtx,
+        }).catch((err) => console.error('[query/stream] unexpected error sending completion email:', err));
+      }
     } else {
       // The loop above exited via `if (clientGone) break;` — the
       // client disconnected between batches, with nothing having

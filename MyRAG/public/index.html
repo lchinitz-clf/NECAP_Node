@@ -4,6 +4,13 @@
 <meta charset="utf-8" />
 <title>local-rag</title>
 <link rel="stylesheet" href="style.css" />
+<!-- reportHtml.js and validation.js must load before script.js: both
+     define plain globals (buildAttributeResultsHtml(), etc. /
+     isValidEmailAddress()) that script.js calls directly — see each
+     file's own doc comment for why they're also require()'d from
+     src/emailNotify.js server-side, unlike everything else here. -->
+<script src="reportHtml.js"></script>
+<script src="validation.js"></script>
 <script src="script.js"></script>
 </head>
 <body onload="init()">
@@ -361,6 +368,54 @@
     </div>
 
     <div>
+      <label for="notifyEmail" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+        <input type="checkbox" id="notifyEmail" style="width:auto;" />
+        Email me when this finishes
+      </label>
+      <!-- type="text", not type="email": a type="email" input runs the
+           browser's OWN native format check before the form's "submit"
+           event even fires, which would silently swallow the submit
+           entirely for a malformed (non-empty) address — our own inline
+           error message below (driven by isValidEmailAddress() in
+           validation.js, the single shared check this app uses
+           everywhere) would never even get a chance to show, and
+           whatever error was already on screen from a previous attempt
+           would just sit there unexplained. autocomplete="email" alone
+           is enough to get browser autofill suggestions without that
+           side effect. -->
+      <input
+        type="text"
+        id="notifyEmailTo"
+        placeholder="you@example.com"
+        autocomplete="email"
+        style="margin-top:0.4rem;"
+      />
+      <p class="error" id="notifyEmailToError" style="display:none;"></p>
+      <p class="hint" id="notifyEmailHint">
+        Only meaningful for a comparison against an ideal-proposal
+        topic above — sends a summary plus the same HTML report the
+        "Export HTML" button below produces, to whatever address is
+        typed above. Nothing is sent, and nothing is remembered, if
+        the box is left blank or isn't a valid address — there's no
+        server-side default recipient. Requires this tab to stay open
+        for the whole run, same as today: closing it still stops the
+        analysis (same as the Stop button), so nothing gets sent for a
+        run that never finished.
+      </p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          The server also needs GMAIL_USER and GMAIL_APP_PASSWORD set in
+          its .env before it can send anything at all, regardless of
+          what address you type here — see README.md. Checking this
+          box with a valid address when that isn't configured is
+          harmless: nothing sends, and a note is logged on the server
+          instead.
+        </span>
+      </details>
+    </div>
+
+    <div>
       <label for="chatModel">Chat model</label>
       <select id="chatModel"></select>
       <p class="hint" id="chatModelHint"></p>
@@ -447,19 +502,24 @@
         </div>
         <div>
           <label for="numCtx">Request size</label>
-          <input type="number" id="numCtx" placeholder="model default" min="512" step="512" value="8192" />
+          <input type="number" id="numCtx" value="8192" placeholder="model default" min="512" step="512" />
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>
               How much room the AI model has for your question, the
               searched blocks, and its answer, all combined. Leave
-              blank to use the model's own default — commonly 4096.
-              Raising this lets you search more blocks or get longer
-              answers without running out of room, but uses more
-              memory; how much depends on the model. If a question
-              fails outright with an error mentioning "context size,"
-              this is usually too low for how much you're asking it
-              to work with.
+              blank to use the model's own default — commonly 4096,
+              which in practice has been too small once "Blocks to
+              search" and a rubric's own instructions are added on top,
+              especially for a reasoning model that also needs room for
+              its own thinking trace. Defaults to 8192 here for that
+              reason. Raising this further lets you search more blocks
+              or get longer answers without running out of room, but
+              uses more memory; how much depends on the model. If a
+              question fails outright with an error mentioning "context
+              size," or a model's answer trails off or degenerates
+              partway through, this is usually too low for how much
+              you're asking it to work with.
             </span>
           </details>
         </div>
@@ -481,7 +541,7 @@
         </div>
         <div>
           <label for="attributesPerCall">Attributes per call</label>
-          <input type="number" id="attributesPerCall" placeholder="all" min="1" step="1" value="1"/>
+          <input type="number" id="attributesPerCall" value="1" placeholder="all" min="1" step="1" />
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>
@@ -497,7 +557,13 @@
               calls (and somewhat longer overall) but retrieve more
               relevant material per attribute and are also parsed more
               reliably into the per-attribute results table and CSV
-              below.
+              below. Defaults to "1" — a real side-by-side comparison
+              found that batching more than one attribute together
+              both retrieved less-focused material for each one and
+              made the model blend separate attributes' answers
+              together, so one-at-a-time is the recommended starting
+              point; raise it only if you specifically want to trade
+              some of that focus for fewer, larger calls.
             </span>
           </details>
         </div>
@@ -536,6 +602,7 @@
         <div class="section-toggle-body">
           <div class="button-row" style="margin: 0 0 0.5rem;">
             <button type="button" id="downloadCsvBtn" class="btn-secondary">Download CSV</button>
+            <button type="button" id="downloadHtmlBtn" class="btn-secondary">Export HTML</button>
           </div>
           <p class="hint">
             Best-effort parsing of the answer above into one row per

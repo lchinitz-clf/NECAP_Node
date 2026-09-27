@@ -134,6 +134,12 @@ async function refreshIdealTopics() {
       const opt = document.createElement('option');
       opt.value = topic.id;
       opt.textContent = topic.description ? `${topic.label} — ${topic.description}` : topic.label;
+      // The plain label, undecorated by the description appended above —
+      // kept as its own attribute so a caller that just wants "Offshore
+      // Wind" for a report header (see buildAttributeResultsHtml() and
+      // the downloadHtmlBtn handler) doesn't have to re-parse it back out
+      // of the combined display text.
+      opt.dataset.label = topic.label;
       idealTopicSelect.appendChild(opt);
     }
 
@@ -454,8 +460,8 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 
 let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
-let thinkCheckbox, reasoningWrap, reasoningEl;
-let attributeResultsWrap, attributeResultsBody, downloadCsvBtn;
+let thinkCheckbox, reasoningWrap, reasoningEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
+let attributeResultsWrap, attributeResultsBody, downloadCsvBtn, downloadHtmlBtn;
 
 // queryStartTime/queryTimerHandle track the elapsed-time display next
 // to Ask/Stop. performance.now() rather than Date.now() — monotonic,
@@ -701,33 +707,13 @@ function renderSourceChips(sources, threshold) {
     .join(' ');
 }
 
-/**
- * One line summarizing a single batch's own token usage (against the
- * Request size ceiling, when set) and, when this specific batch got
- * cut off before finishing, a warning flag — see renderTokenUsage()
- * above for why the aggregate line alone stopped being useful once a
- * comparison runs many batches, and the doc comment on latestBatches
- * for what each batch object carries.
- */
-function formatBatchSummary(batch, numCtx) {
-  const label = batch.totalBatches
-    ? `Batch ${batch.batchIndex + 1} of ${batch.totalBatches}`
-    : `Batch ${batch.batchIndex + 1}`;
-  let text = label;
-  if (batch.promptTokens !== undefined) {
-    const promptText = batch.promptTokens.toLocaleString();
-    const answerText = (batch.answerTokens || 0).toLocaleString();
-    text += numCtx !== undefined
-      ? ` — used ${promptText} of your ${numCtx.toLocaleString()}-token Request size, plus ${answerText} for the answer.`
-      : ` — used ${promptText} tokens for the question and retrieved blocks, plus ${answerText} for the answer.`;
-  } else {
-    text += '.';
-  }
-  if (batch.doneReason === 'length') {
-    text += ' ⚠ Cut off — hit the length limit for this batch.';
-  }
-  return text;
-}
+// formatBatchSummary() — one line summarizing a single batch's own
+// token usage and, when it got cut off, a warning flag — now lives in
+// reportHtml.js (loaded via <script> before this file in index.html,
+// same as escapeHtml()/buildAttributeResultsHtml() below), since the
+// completion-email attachment (src/emailNotify.js) needs the exact
+// same formatting server-side and that file has no DOM to depend on.
+// Still just a plain global here, same as before.
 
 // Renders every batch accumulated so far (each batch contributing its
 // own rows, plus — once there's more than one batch — a full-width
@@ -808,6 +794,16 @@ function buildAttributeResultsCsv(batches) {
   return '﻿' + rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
 }
 
+// REPORT_BADGE_CLASS, renderResultTextHtml(), and
+// buildAttributeResultsHtml() — the standalone HTML report builder for
+// the Export HTML button below and, server-side, the completion-email
+// attachment — now live in reportHtml.js (loaded via <script> before
+// this file in index.html), for the same reason formatBatchSummary()
+// moved there: src/emailNotify.js needs to build the identical report
+// from Node, which has no DOM. Still plain globals here, same as
+// before — see reportHtml.js's own module-level doc comment for how
+// that works without a bundler.
+
 /**
  * Turns a topic's raw attributes (as stored in idealProposals.json —
  * {name, proposal, included} entries) into CSV text: three columns,
@@ -838,11 +834,12 @@ function buildRubricAttributesCsv(attributes) {
   return '﻿' + rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+// escapeHtml() now lives in reportHtml.js (loaded via <script> before
+// this file in index.html) — used throughout this file exactly as
+// before, just no longer defined here. See that file's doc comment for
+// why it moved (a Node-safe implementation, not the DOM-based
+// `div.textContent`/`innerHTML` trick this used to use, so the exact
+// same function is usable from the server's completion-email code too).
 
 // ---- Chunk-text modal ----
 //
@@ -1628,12 +1625,27 @@ async function submitRubricForm(e) {
  *   When aborted, this function rejects with an AbortError (the
  *   fetch spec's own name for it) rather than the usual thrown
  *   Error; the caller below checks err.name to tell the two apart.
+ * @param {boolean} [notifyEmail] - the "Email me when this finishes"
+ *   checkbox. Only has any effect when idealTopicId is also set,
+ *   `notifyEmailTo` is a valid address (see below), and the run
+ *   completes normally (not aborted/errored) — see
+ *   sendRubricCompletionEmail() in src/emailNotify.js, called from
+ *   /query/stream right after its own "done" event. False/omitted
+ *   sends nothing, same as before this setting existed.
+ * @param {string} [notifyEmailTo] - the recipient typed into the box
+ *   next to that checkbox. The caller below already blocks submission
+ *   unless this is checkbox-off or a validated address (see
+ *   isValidEmailAddress() in public/validation.js), but the server
+ *   independently re-validates it too before ever sending anything —
+ *   see /query/stream in index.js — rather than trusting this fetch
+ *   body, since a hand-built request (README.md's "Testing with
+ *   PowerShell" section) skips this function, and this one, entirely.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // chatModel/temperature/maxTokens/numCtx/repeatPenalty/idealTopicId/attributesPerCall/think
+    // chatModel/temperature/maxTokens/numCtx/repeatPenalty/idealTopicId/attributesPerCall/think/notifyEmail/notifyEmailTo
     // undefined (nothing usable selected, or the field was cleared)
     // just omits that key from the JSON body entirely, and
     // /query/stream's own default takes over server-side — for
@@ -1642,8 +1654,9 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
     // default (usually 1.1)," for idealTopicId that's "answer
     // normally, no comparison," for attributesPerCall that's "ask
     // about every attribute in one call," for think that's "leave
-    // Ollama's own default alone" (see the think param doc above).
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think }),
+    // Ollama's own default alone" (see the think param doc above),
+    // for notifyEmail/notifyEmailTo that's "don't send anything."
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo }),
     signal,
   });
 
@@ -1748,12 +1761,16 @@ function init() {
   elapsedTimeEl = document.getElementById('elapsedTime');
   queryProgressWrap = document.getElementById('queryProgressWrap');
   thinkCheckbox = document.getElementById('thinkEnabled');
+  notifyEmailCheckbox = document.getElementById('notifyEmail');
+  notifyEmailToInput = document.getElementById('notifyEmailTo');
+  notifyEmailToError = document.getElementById('notifyEmailToError');
   reasoningWrap = document.getElementById('reasoningWrap');
   reasoningEl = document.getElementById('reasoningEl');
 
   attributeResultsWrap = document.getElementById('attributeResultsWrap');
   attributeResultsBody = document.getElementById('attributeResultsBody');
   downloadCsvBtn = document.getElementById('downloadCsvBtn');
+  downloadHtmlBtn = document.getElementById('downloadHtmlBtn');
 
   chunkModalBackdrop = document.getElementById('chunkModalBackdrop');
   chunkModalTitle = document.getElementById('chunkModalTitle');
@@ -2138,10 +2155,44 @@ function init() {
     URL.revokeObjectURL(url);
   });
 
+  downloadHtmlBtn.addEventListener('click', () => {
+    const hasRecords = latestBatches.some((b) => b.records && b.records.length);
+    if (!hasRecords) return; // shouldn't be clickable when there's nothing to export, but guard anyway
+
+    // Read the same form fields the submit handler does, at export time
+    // rather than from any state captured back when the query actually
+    // ran — this is just for the report's header, and re-reading live
+    // avoids needing to plumb a separate "what were the settings for
+    // this answer" object through every batch-done event.
+    const rawNumCtx = document.getElementById('numCtx').value;
+    const numCtx = rawNumCtx === '' || Number.isNaN(Number(rawNumCtx)) ? undefined : Number(rawNumCtx);
+    const selectedTopicOpt = idealTopicSelect.selectedOptions[0];
+    const meta = {
+      workspaceId: getWorkspaceId() || undefined,
+      topicLabel: idealTopicSelect.value ? (selectedTopicOpt?.dataset.label || selectedTopicOpt?.text) : null,
+      question: document.getElementById('question').value.trim() || undefined,
+      chatModel: chatModelSelect.value || undefined,
+      numCtx,
+    };
+
+    const html = buildAttributeResultsHtml(latestBatches, meta);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const workspaceId = getWorkspaceId() || 'results';
+    a.download = `${workspaceId}-comparison.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     errorEl.style.display = 'none';
+    notifyEmailToError.style.display = 'none';
     resultEl.style.display = 'none';
     sourcesBody.innerHTML = '';
     confidenceNote.textContent = '';
@@ -2218,6 +2269,13 @@ function init() {
     // about what this checkbox actually controls (not overriding vs.
     // overriding).
     const think = thinkCheckbox.checked ? undefined : false;
+    // Sent as-is (true or false) rather than the undefined-when-off
+    // convention think/maxTokens/etc. use above — the server only ever
+    // treats this as a plain boolean gate ("send an email once this
+    // finishes, yes or no"), with no separate "leave some other
+    // default alone" meaning for a missing value to preserve.
+    const notifyEmail = notifyEmailCheckbox.checked;
+    const notifyEmailTo = notifyEmailToInput.value.trim();
 
     // The question textarea is no longer `required` in the markup,
     // since a selected topic is enough on its own — see
@@ -2228,6 +2286,25 @@ function init() {
     if (!question && !idealTopicId) {
       errorEl.textContent = 'Enter a question, or select an ideal-proposal topic to compare against.';
       errorEl.style.display = 'block';
+      return;
+    }
+
+    // Checked here, before the run even starts, rather than only
+    // server-side — there's no server-configured fallback recipient
+    // (see src/emailNotify.js), so a blank or malformed address here
+    // would otherwise mean the whole analysis runs and finishes with
+    // nothing to show for the checkbox at all. Blocking submission up
+    // front means that's caught immediately instead of discovered
+    // afterward. The server independently re-validates the same way
+    // (isValidEmailAddress() in public/validation.js, shared by both)
+    // before ever actually sending anything — see queryWithStream()'s
+    // own doc comment above for why this check alone isn't sufficient
+    // on its own.
+    if (notifyEmail && !isValidEmailAddress(notifyEmailTo)) {
+      notifyEmailToError.textContent = notifyEmailTo
+        ? `"${notifyEmailTo}" doesn't look like a valid email address.`
+        : 'Enter an email address, or uncheck "Email me when this finishes".';
+      notifyEmailToError.style.display = 'block';
       return;
     }
 
@@ -2278,7 +2355,7 @@ function init() {
       event.totalBatches && event.totalBatches > 1 ? ` (batch ${event.batchIndex + 1} of ${event.totalBatches})` : '';
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the

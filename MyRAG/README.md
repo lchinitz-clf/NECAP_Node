@@ -727,6 +727,75 @@ pipeline rather than a variation on `/query` — worth considering if
 comparisons on topics with many attributes turn out to be the common
 case rather than the exception.
 
+## Email notifications
+
+A "Email me when this finishes" checkbox on the query form, with a
+text box right next to it for the recipient address (only meaningful
+when comparing against an ideal-proposal topic — a plain question
+isn't slow enough to need this), sends a completion email once a
+rubric analysis finishes: a short summary of the verdicts in the email
+body, and the same standalone HTML report the "Export HTML" button
+produces attached to it.
+
+**This is the simple version, not a background job.** The run still
+has to stay on one open browser tab/connection for its entire
+duration, exactly like today — closing the tab still stops the
+analysis early (same as the Stop button), and no email goes out for a
+run that never finished. A genuinely decoupled "kick this off and
+close the laptop" version would need rubric analysis moved off the
+request/response lifecycle entirely into a real background job — a
+separate, larger piece of work this feature does not attempt. See
+`src/emailNotify.js`'s own doc comment for the full reasoning.
+
+**Setup**, in `.env` (see "Access control" above for how `.env` works
+and where it goes):
+
+```
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=your16charapppassword
+```
+
+`GMAIL_USER`/`GMAIL_APP_PASSWORD` are the Gmail account that sends the
+notification. The App Password is NOT your regular Gmail password —
+generate one at myaccount.google.com/apppasswords, which requires
+2-Step Verification to be turned on for that account first (Google
+Account → Security → 2-Step Verification). A Google Workspace account
+also needs its admin to allow App Passwords org-wide; some workspaces
+disable that policy, in which case the option won't appear even with
+2-Step Verification on.
+
+The **recipient** is not something you configure in `.env` at all —
+each person using the app types their own address into the text box
+next to the checkbox, for that run only. There's no server-side
+default or fallback recipient of any kind: leave the box blank, or
+type something that isn't a validly-formatted address, and nothing is
+sent — the box itself shows an inline error and the run doesn't even
+start, rather than finishing with no email to show for the checkbox.
+That same address format check runs again independently on the server
+right before actually sending (see `public/validation.js` and
+`src/emailNotify.js`), since a hand-built request to `/query/stream`
+(see "Testing with PowerShell" below) bypasses the browser's own check
+entirely.
+
+Leaving `GMAIL_USER`/`GMAIL_APP_PASSWORD` unset is a supported,
+non-broken state: checking the box just no-ops with a one-time warning
+in the server's own console log instead of sending anything — it never
+errors out the actual analysis. A failed send (bad credentials, Gmail
+rate-limiting, a network hiccup) is handled the same way: logged to the
+console and to `logs/actions-YYYY-MM.jsonl` as an `emailNotifySent`
+entry with `success: false`, never thrown in a way that could make the
+analysis itself look like it failed. See `src/emailNotify.js`'s own doc
+comment for why that's deliberate.
+
+The report attached to the email is built by
+`buildAttributeResultsHtml()` in `public/reportHtml.js` — the exact
+same function the browser's own "Export HTML" button calls, so the two
+are always identical. That file is written to run in both the browser
+(as a plain `<script>`, loaded in `index.html` before `script.js`,
+whose functions it depends on) and in Node (`require()`'d from
+`src/emailNotify.js`) with no bundler involved — see its own doc
+comment if you're wondering how one file manages both.
+
 ## Testing with PowerShell
 
 All examples use `Invoke-RestMethod`, which avoids the JSON-escaping
