@@ -167,6 +167,36 @@ button:disabled { background: #a1a1aa; cursor: default; }
   white-space: pre-wrap;
 }
 
+/* "This model tends to loop at low Consistency" callout next to the
+   temperature field — see REASONING_TEMPERATURE_SUGGESTIONS and
+   updateTemperatureSuggestion() in script.js. Advisory rather than a
+   problem, so it borrows the amber warning color .btn-remove already
+   uses elsewhere rather than .error's red. */
+.model-suggestion {
+  display: none;
+  background: var(--low-bg);
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+.model-suggestion p { margin: 0 0 0.5rem; }
+.model-suggestion .button-row { gap: 0.5rem; }
+.model-suggestion button {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+}
+.model-suggestion .btn-apply {
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.model-suggestion .btn-apply:hover { background: #27272a; }
+
 #embedResult {
   display: none;
   background: var(--ok-bg);

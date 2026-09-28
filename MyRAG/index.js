@@ -1229,6 +1229,19 @@ app.post('/query', async (req, res) => {
  * "batch-done" immediately before "done".
  */
 app.post('/query/stream', async (req, res) => {
+  // Server-side stand-in for "the time recorded by the timer" the
+  // browser shows next to Ask/Stop (performance.now()-based, purely
+  // client-side — see queryStartTime in public/script.js) for the
+  // completion email's report, which the browser has no chance to hand
+  // a number to (the run is over, and the connection with it, before
+  // there's anything left to send). This whole route runs the entire
+  // rubric analysis on this one open connection (see the cancellation
+  // comment below), so "how long this handler ran" is the same
+  // duration the browser's own timer measured, modulo network latency
+  // on this one request/response — close enough that a second,
+  // independent measurement isn't worth the complexity of somehow
+  // threading the client's own number back in after the fact.
+  const requestStartedAt = Date.now();
   const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall, notifyEmail, notifyEmailTo } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -1496,6 +1509,7 @@ app.post('/query/stream', async (req, res) => {
           batches: batchesForReport,
           chatModel: resolvedChatModel,
           numCtx,
+          elapsedMs: Date.now() - requestStartedAt,
         }).catch((err) => console.error('[query/stream] unexpected error sending completion email:', err));
       }
     } else {

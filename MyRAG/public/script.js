@@ -5,11 +5,19 @@
 // shown if this fetch fails or the file's missing, not a second place
 // that needs updating. Called from init() below, first thing on page
 // load.
+// Read by applyConfig() below and, from then on, by anything else that
+// needs the app's configured name rather than the "local-rag" fallback
+// baked into index.html/reportHtml.js — currently just the "Generated
+// by ..." footer in the "Export HTML" report (see the downloadHtmlBtn
+// handler further down), passed through as `meta.appName`.
+let currentAppName = 'local-rag';
+
 async function applyConfig() {
   try {
     const res = await fetch('/config.json', { cache: 'no-store' });
     const config = await res.json();
     if (config.appName) {
+      currentAppName = config.appName;
       document.title = config.appName;
       document.getElementById('appNameHeading').textContent = config.appName;
     }
@@ -49,7 +57,112 @@ async function refreshWorkspaces() {
 // anyway if you left it alone.
 const SERVER_DEFAULT_CHAT_MODEL = 'llama3.1:8b';
 
+// Model families known to document their OWN preference for a higher
+// "Consistency" (temperature) setting than this app's own default of
+// 0.2 — DeepSeek-R1 is the one that prompted this: its model card
+// recommends 0.5-0.7 and specifically warns that lower values (this
+// app's default among them) can send it into repetitive, looping
+// answers, not just "more deterministic" the way low temperature
+// behaves for most other models (see the "deepseek-r1:8b" discussion
+// that led here). Matched with a plain case-insensitive substring
+// against the model's own name/tag as Ollama reports it (see
+// refreshModels() below) rather than a curated exact-name list, so a
+// differently-tagged pull of the same family (say, a custom Modelfile
+// named "my-deepseek-8b") still matches. A list rather than a single
+// hardcoded check specifically so another reasoning-model family with
+// the same documented quirk can be added later (another entry here)
+// without touching any of the logic that reads it below.
+const REASONING_TEMPERATURE_SUGGESTIONS = [
+  {
+    pattern: /deepseek/i,
+    label: 'DeepSeek-R1',
+    recommendedTemperature: 0.6,
+    reason:
+      'DeepSeek’s own documentation recommends this range and warns that lower values ' +
+      'can cause repetitive, looping answers — a low "Consistency" setting is good for ' +
+      'most models, but not this one.',
+  },
+];
+
+/**
+ * @param {string} modelName
+ * @returns {object|undefined} the first entry in
+ *   REASONING_TEMPERATURE_SUGGESTIONS above whose pattern matches, or
+ *   undefined if the model name (as selected in the chat-model
+ *   dropdown) doesn't match any of them.
+ */
+function matchReasoningTemperatureSuggestion(modelName) {
+  return REASONING_TEMPERATURE_SUGGESTIONS.find((s) => s.pattern.test(modelName || ''));
+}
+
 let chatModelSelect, chatModelHint;
+let temperatureInput, temperatureSuggestionWrap, temperatureSuggestionText, temperatureSuggestionApplyBtn;
+let queryAdvancedSettings;
+// The Advanced settings panel the Consistency field itself lives
+// inside (see index.html) — collapsed by default. Its own doc comment
+// on details.advanced in style.css says why: "the more technical
+// controls ... don't clutter the page until someone specifically wants
+// them." Closed <details> content in Chromium isn't hidden with plain
+// CSS `display:none` (which a descendant's own inline style, like the
+// one updateTemperatureSuggestion() below sets, could in principle
+// fight with) — it's excluded from rendering and hit-testing at the
+// engine level, full stop, regardless of anything set on a nested
+// element. So a suggestion box nested inside a still-collapsed panel
+// is invisible and unclickable no matter what its own `style.display`
+// says; updateTemperatureSuggestion() below opens this panel directly
+// whenever it has something to show, so the suggestion is never
+// silently inert behind a summary the person never happened to click.
+
+// Tracks which chat-model selection the suggestion box was last
+// dismissed for (see the Dismiss button's handler in init() below) —
+// re-picking the SAME reasoning model after dismissing it won't bring
+// the box back nagging you again, but switching to a different model
+// and back, or reloading the page, will re-evaluate from scratch.
+// null means "nothing dismissed since the last model change."
+let temperatureSuggestionDismissedFor = null;
+
+/**
+ * Shows or hides the "this model tends to loop at low Consistency"
+ * callout next to the temperature field, based on the currently
+ * selected chat model and the field's current value — called after
+ * the model list loads, on every chat-model selection change, and
+ * whenever the Consistency field itself changes (so raising it past
+ * the recommendation, or lowering it back below, both react live).
+ * Purely advisory: this never touches the field's value on its own —
+ * only the Apply button in the box it shows does that, and only when
+ * clicked. See REASONING_TEMPERATURE_SUGGESTIONS above for the match
+ * table this reads.
+ */
+function updateTemperatureSuggestion() {
+  const match = matchReasoningTemperatureSuggestion(chatModelSelect.value);
+  const currentTemperature = Number(temperatureInput.value);
+  const shouldShow =
+    match &&
+    chatModelSelect.value !== temperatureSuggestionDismissedFor &&
+    // Not >= : if it's already at or above what the model itself
+    // recommends, there's nothing useful to suggest — this also means
+    // clicking Apply below hides the box on its own, since the field's
+    // new value no longer qualifies, with no extra bookkeeping needed.
+    (Number.isNaN(currentTemperature) || currentTemperature < match.recommendedTemperature);
+
+  if (!shouldShow) {
+    temperatureSuggestionWrap.style.display = 'none';
+    return;
+  }
+
+  temperatureSuggestionText.textContent = `${match.label} models like this one work best around ${match.recommendedTemperature}, not the ${currentTemperature} currently set. ${match.reason}`;
+  temperatureSuggestionApplyBtn.textContent = `Use ${match.recommendedTemperature}`;
+  temperatureSuggestionApplyBtn.dataset.recommendedTemperature = String(match.recommendedTemperature);
+  temperatureSuggestionWrap.style.display = 'block';
+  // See queryAdvancedSettings's own doc comment above: a closed
+  // <details> hides its content at the rendering-engine level, which
+  // the `display: block` set right above cannot fight its way past —
+  // without this, someone who has never opened "Advanced settings"
+  // would have a suggestion box that's technically in the DOM and
+  // technically "visible" by its own style, and still completely
+  // unseen and unclickable.
+  queryAdvancedSettings.open = true;
+}
 
 // Loads models actually pulled into this Ollama installation (GET
 // /models -> Ollama's /api/tags) into the chat-model dropdown. This
@@ -73,6 +186,7 @@ async function refreshModels() {
       opt.selected = true;
       chatModelSelect.appendChild(opt);
       chatModelHint.textContent = '';
+      updateTemperatureSuggestion();
       return;
     }
 
@@ -87,6 +201,13 @@ async function refreshModels() {
       chatModelSelect.value = SERVER_DEFAULT_CHAT_MODEL;
     }
     chatModelHint.textContent = '';
+    // The dropdown's selection can change right above (falling back to
+    // SERVER_DEFAULT_CHAT_MODEL, or just landing on whatever option
+    // ended up first) without any 'change' event ever firing — that
+    // only fires on a user-driven selection — so this needs its own
+    // explicit check rather than relying on the listener wired up in
+    // init().
+    updateTemperatureSuggestion();
   } catch (err) {
     console.warn('Could not load model list:', err);
     chatModelSelect.innerHTML = '';
@@ -96,6 +217,7 @@ async function refreshModels() {
     opt.selected = true;
     chatModelSelect.appendChild(opt);
     chatModelHint.textContent = 'Is Ollama running? Falling back to the server default if you ask a question anyway.';
+    updateTemperatureSuggestion();
   }
 }
 
@@ -476,20 +598,25 @@ let attributeResultsWrap, attributeResultsBody, downloadCsvBtn, downloadHtmlBtn;
 let queryStartTime = null;
 let queryTimerHandle = null;
 
-/** @param {number} ms @returns {string} e.g. "4.2s" or "1m 05s" */
-function formatElapsedMs(ms) {
-  const totalSeconds = ms / 1000;
-  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
-  // Round the total once and derive minutes/seconds from that single
-  // integer, rather than flooring minutes and separately rounding
-  // the remainder — rounding each independently can carry the
-  // seconds up to 60 without it rolling over into the next minute
-  // (e.g. 59m 59.6s would render as the nonsensical "59m 60s").
-  const roundedTotalSeconds = Math.round(totalSeconds);
-  const minutes = Math.floor(roundedTotalSeconds / 60);
-  const seconds = roundedTotalSeconds % 60;
-  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
-}
+// formatElapsedMs() now lives in reportHtml.js (loaded via <script>
+// before this file in index.html, same as escapeHtml()/
+// buildAttributeResultsHtml() elsewhere in this file) so the "Run
+// time" row it formats in the standalone report (see the
+// downloadHtmlBtn handler below, and src/emailNotify.js for the
+// completion-email attachment) is worded identically to the live
+// readout next to Ask/Stop that uses the very same function. Still
+// just a plain global here, same as before.
+
+// Set once a request settles (success, error, or Stop) to the exact
+// millisecond value the live timer next to Ask/Stop just rendered its
+// final frame from (see the `finally` block in the submit handler
+// below) — this is "the time recorded by the timer" the standalone
+// report's "Run time" row (see downloadHtmlBtn below) shows for the
+// browser's own "Export HTML" download. Reset to null at the top of
+// every new run (alongside latestBatches) so a stale number from a
+// previous run can never end up attached to results it doesn't
+// belong to.
+let lastRunElapsedMs = null;
 
 // Holds the AbortController for whichever /query/stream request is
 // currently in flight, or null when none is. stopBtn's click handler
@@ -1714,6 +1841,34 @@ function init() {
   chatModelSelect = document.getElementById('chatModel');
   chatModelHint = document.getElementById('chatModelHint');
 
+  temperatureInput = document.getElementById('temperature');
+  temperatureSuggestionWrap = document.getElementById('temperatureSuggestion');
+  temperatureSuggestionText = document.getElementById('temperatureSuggestionText');
+  temperatureSuggestionApplyBtn = document.getElementById('temperatureSuggestionApply');
+  const temperatureSuggestionDismissBtn = document.getElementById('temperatureSuggestionDismiss');
+  queryAdvancedSettings = document.getElementById('queryAdvancedSettings');
+
+  // Re-evaluated on every chat-model change and every edit to the
+  // field itself — see updateTemperatureSuggestion()'s own doc comment
+  // above for why both matter. refreshModels() below (which can change
+  // chatModelSelect.value once the pulled-models list loads) triggers
+  // its own check once that fetch resolves.
+  chatModelSelect.addEventListener('change', updateTemperatureSuggestion);
+  temperatureInput.addEventListener('input', updateTemperatureSuggestion);
+  temperatureSuggestionApplyBtn.addEventListener('click', () => {
+    temperatureInput.value = temperatureSuggestionApplyBtn.dataset.recommendedTemperature;
+    // Re-check rather than just hiding directly: the field's new value
+    // no longer qualifies (see updateTemperatureSuggestion()'s
+    // shouldShow check), so this naturally hides the box without
+    // needing its own separate "hide" branch to stay in sync with that
+    // logic.
+    updateTemperatureSuggestion();
+  });
+  temperatureSuggestionDismissBtn.addEventListener('click', () => {
+    temperatureSuggestionDismissedFor = chatModelSelect.value;
+    updateTemperatureSuggestion();
+  });
+
   idealTopicSelect = document.getElementById('idealTopic');
   idealTopicHint = document.getElementById('idealTopicHint');
   idealTopicHintDefault = idealTopicHint.textContent;
@@ -2173,6 +2328,14 @@ function init() {
       question: document.getElementById('question').value.trim() || undefined,
       chatModel: chatModelSelect.value || undefined,
       numCtx,
+      appName: currentAppName,
+      // Unlike the fields above, NOT re-read live — there's no live
+      // form field for "how long did that run take." lastRunElapsedMs
+      // is set once, right when the run this data came from actually
+      // finished (see the submit handler's `finally` block above), and
+      // reset to null at the start of the next one, same lifecycle as
+      // latestBatches itself.
+      elapsedMs: lastRunElapsedMs != null ? lastRunElapsedMs : undefined,
     };
 
     const html = buildAttributeResultsHtml(latestBatches, meta);
@@ -2206,6 +2369,7 @@ function init() {
     reasoningWrap.style.display = 'none';
     reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
     latestBatches = [];
+    lastRunElapsedMs = null;
     attributeResultsBody.innerHTML = '';
     attributeResultsWrap.style.display = 'none';
     // The answer section specifically is forced open for every new
@@ -2530,7 +2694,15 @@ function init() {
       // 100ms stale by the time execution actually reaches here.
       clearInterval(queryTimerHandle);
       queryTimerHandle = null;
-      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - queryStartTime);
+      // Computed once and reused for both the live readout and
+      // lastRunElapsedMs, rather than calling performance.now() twice —
+      // this is the exact number the "Run time" row in the standalone
+      // report (see downloadHtmlBtn below) shows when this run's
+      // results are exported, so the two can never disagree by even a
+      // fraction of a millisecond.
+      const finalElapsedMs = performance.now() - queryStartTime;
+      elapsedTimeEl.textContent = formatElapsedMs(finalElapsedMs);
+      lastRunElapsedMs = finalElapsedMs;
     }
   });
 
