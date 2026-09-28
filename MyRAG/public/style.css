@@ -493,3 +493,55 @@ tr.batch-summary-row td {
 #rubricTopicsBody td.rubric-topic-actions { white-space: nowrap; }
 #rubricTopicsBody .btn-secondary,
 #rubricTopicsBody .btn-remove { margin-right: 0.35rem; }
+
+/* Logs tab — the entry-list table's rows are clickable as a whole
+   (see the delegated listener on logEntriesBody in script.js), not
+   just via the .chunk-link button in their first cell, so the whole
+   row gets pointer/hover affordance too. .selected marks whichever
+   row's detail is currently shown below the table; a line that failed
+   to parse (logViewer.js's `broken` case) is dimmed and italicized
+   rather than looking like a normal entry. */
+#logEntriesBody tr[data-line] { cursor: pointer; }
+#logEntriesBody tr[data-line]:hover { background: var(--bg-soft); }
+#logEntriesBody tr.selected { background: var(--low-bg); }
+#logEntriesBody tr.log-row-broken { color: var(--muted); font-style: italic; }
+
+/* Entry detail — its own section.card at the top of the page, sharing
+   the Document storage area card's slot there (see setActiveTab() in
+   script.js), with a plain <dl> laid out as a compact two-column
+   label/value grid, one pair per field getLogEntry() returned. Starts
+   showing #logEntryDetailPlaceholder's hint text; clicking a row
+   swaps that out for the filled-in <dl> instead (see
+   showLogEntryDetail() in script.js, which rebuilds this element's
+   entire content on every click rather than ever appending to it). */
+.log-entry-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.9rem;
+  row-gap: 0.5rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.log-entry-detail dt { font-weight: 600; color: var(--muted); white-space: nowrap; }
+.log-entry-detail dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The answer, when someone explicitly asks to see it, gets its own
+   scroll region rather than however tall the text happens to be — per
+   the design discussion, even a single answer can be too long to
+   comfortably view inline, so this caps it instead of letting the
+   page itself grow to match. */
+#logAnswerWrap {
+  margin-top: 0.75rem;
+}
+#logAnswerWrap h4 { font-size: 0.85rem; margin: 0 0 0.4rem; }
+#logAnswerBody {
+  max-height: 22rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-soft);
+}

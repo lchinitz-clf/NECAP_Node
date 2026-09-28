@@ -33,6 +33,7 @@ const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQ
 const { parseComparisonAnswer } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
+const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
 const { basicAuth } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
 
@@ -1572,6 +1573,127 @@ app.post('/query/stream', async (req, res) => {
     }
   } finally {
     if (!clientGone) res.end();
+  }
+});
+
+// ---- Logs tab ----
+//
+// Read-only browsing of the JSONL files src/activityLog.js writes —
+// see src/logViewer.js for the actual file reading/parsing and why a
+// log line's 0-based position in its file is a safe, stable id to
+// address it by. All three routes below are pure reads (no logAction()
+// call of their own — viewing logs isn't itself a state-changing
+// action, same reasoning GET .../documents/:sourceFile/chunks above
+// isn't logged either) and, like every other route in this file, pass
+// through whatever basicAuth.js has configured — there's no separate
+// permission tier for this tab; anyone who can already reach the rest
+// of this app can read the logs (see the "Logs" section of README.md,
+// added alongside this feature, for why that's an accepted tradeoff
+// for now rather than an oversight).
+
+/**
+ * GET /logs
+ *
+ * Lists every log file actually present in logs/, newest month first
+ * — this is what populates the "Logs" tab's file picker. Always 200,
+ * even with an empty `files` array on a brand new install that hasn't
+ * logged anything yet.
+ */
+app.get('/logs', (req, res) => {
+  res.json({ files: listLogFiles() });
+});
+
+/**
+ * GET /logs/:filename/summaries
+ *
+ * The compact, clickable list for one log file — one short entry per
+ * line (never the full record, never `answer` — see
+ * summarizeLogFile()'s own doc comment in src/logViewer.js), newest
+ * line first. :filename must be exactly one of the names GET /logs
+ * just returned (e.g. "activity-2026-09.jsonl") — anything else is a
+ * 400, and a well-formed name for a file that doesn't actually exist
+ * is a 404, same two-tier validation-then-lookup split workspaceId
+ * uses elsewhere in this file.
+ */
+app.get('/logs/:filename/summaries', (req, res) => {
+  const { filename } = req.params;
+  if (!isValidLogFileName(filename)) {
+    return res.status(400).json({ error: `Invalid log file name "${filename}".` });
+  }
+
+  try {
+    const result = summarizeLogFile(filename);
+    if (!result) return res.status(404).json({ error: `No log file named "${filename}".` });
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /logs/:filename/lines/:line
+ *
+ * The full record for exactly one line, with `answer` stripped out —
+ * see getLogEntry()'s own doc comment in src/logViewer.js for exactly
+ * what that means for a line that failed to parse. :line is the same
+ * 0-based index a GET .../summaries response's `line` field already
+ * gave the browser for this entry — not a user-typed value, so an
+ * out-of-range or malformed one here normally only happens from a
+ * hand-built request (see README.md's "Testing with PowerShell"
+ * section), same 404-not-500 treatment getChunk() gets for an unknown
+ * chunk id above.
+ */
+app.get('/logs/:filename/lines/:line', (req, res) => {
+  const { filename } = req.params;
+  if (!isValidLogFileName(filename)) {
+    return res.status(400).json({ error: `Invalid log file name "${filename}".` });
+  }
+  if (!/^\d+$/.test(req.params.line)) {
+    return res.status(400).json({ error: `Invalid log line "${req.params.line}".` });
+  }
+  const line = Number(req.params.line);
+
+  try {
+    const entry = getLogEntry(filename, line);
+    if (!entry) return res.status(404).json({ error: `No line ${line} in log file "${filename}".` });
+    res.json(entry);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /logs/:filename/lines/:line/answer
+ *
+ * Just the `answer` text GET .../lines/:line above deliberately left
+ * out — fetched only when "Show answer" is actually clicked for an
+ * entry whose `hasAnswer` came back true, so a long generated answer
+ * never crosses the wire unless someone specifically asks for that one
+ * entry's. A line with no answer at all (true for every action-log
+ * entry, and for most activity-log entries — see hasAnswer's own doc
+ * comment in src/logViewer.js) 404s here rather than returning an
+ * empty string, since the UI shouldn't be offering this button at all
+ * in that case.
+ */
+app.get('/logs/:filename/lines/:line/answer', (req, res) => {
+  const { filename } = req.params;
+  if (!isValidLogFileName(filename)) {
+    return res.status(400).json({ error: `Invalid log file name "${filename}".` });
+  }
+  if (!/^\d+$/.test(req.params.line)) {
+    return res.status(400).json({ error: `Invalid log line "${req.params.line}".` });
+  }
+  const line = Number(req.params.line);
+
+  try {
+    const answer = getLogEntryAnswer(filename, line);
+    if (answer === null) return res.status(404).json({ error: `No answer recorded for line ${line} in log file "${filename}".` });
+    res.json({ answer });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 

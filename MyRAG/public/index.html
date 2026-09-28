@@ -37,11 +37,12 @@
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="documents">Document Management</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="rubric">Rubric Control</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="query">Query and Response</button>
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="logs">Logs</button>
     </div>
   </div>
 </div>
 
-<section class="card">
+<section class="card" id="workspaceCard">
   <h2>Document storage area</h2>
   <label for="workspace">Storage area name</label>
   <input type="text" id="workspace" list="workspaceList" placeholder="e.g. ma-climate-plan" autocomplete="off" />
@@ -61,6 +62,37 @@
       time you import a document into it.
     </span>
   </details>
+</section>
+
+<!-- Shares the Document storage area card's slot at the top of the
+     page — shown only while the Logs tab is active (see setActiveTab()
+     in script.js), and the storage-area card above is hidden while
+     it's shown, since the Logs tab isn't scoped to any one storage
+     area and that card would just be irrelevant filler there. Sitting
+     here, above the entry list further down #tabPanel-logs, means
+     clicking a row's detail never lands somewhere you have to scroll
+     to find, however long that list gets. Starts with a placeholder
+     until a row is actually clicked; per the user's explicit
+     direction, each new click REPLACES this section's content rather
+     than appending to it, so the page can't grow without bound as
+     someone clicks through entries. See showLogEntryDetail() in
+     script.js. -->
+<section class="card" id="logEntryDetailWrap" style="display:none;">
+  <h2>Entry detail</h2>
+  <p class="hint" id="logEntryDetailPlaceholder">Click an entry below to see its details here.</p>
+  <dl id="logEntryDetailBody" class="log-entry-detail" style="display:none;"></dl>
+
+  <!-- Only shown when the selected entry actually has an `answer`
+       (hasAnswer from the server) — revealing it is an explicit,
+       separate action, never automatic, since even one answer can be
+       too long to want to see by default. -->
+  <div class="button-row" id="logAnswerButtonRow" style="display:none;">
+    <button type="button" id="showLogAnswerBtn" class="btn-secondary">Show answer</button>
+  </div>
+  <div id="logAnswerWrap" style="display:none;">
+    <h4>Answer</h4>
+    <div id="logAnswerBody"></div>
+  </div>
 </section>
 
 <div id="tabPanel-documents" class="tab-panel">
@@ -658,6 +690,41 @@
 </section>
 
 </div><!-- /tabPanel-query -->
+
+<div id="tabPanel-logs" class="tab-panel">
+
+<section class="card">
+  <h2>Logs</h2>
+  <p class="hint">
+    Browse this server's own activity and action logs — the same JSONL
+    files it writes to disk, without needing shell access. Everyone who
+    can reach this app can see every entry here, including other
+    people's questions and answers; there's no per-user filtering yet.
+  </p>
+
+  <div>
+    <label for="logFileSelect">Log file</label>
+    <select id="logFileSelect">
+      <option value="">Loading…</option>
+    </select>
+    <p class="hint" id="logFileHint"></p>
+  </div>
+
+  <div class="button-row">
+    <button type="button" id="logsRefreshBtn" class="btn-secondary">Refresh</button>
+  </div>
+  <div class="status" id="logsStatus"></div>
+  <div class="error" id="logsError"></div>
+
+  <table>
+    <thead>
+      <tr><th>Time</th><th>User</th><th>Type</th><th>Workspace / Topic</th><th>Status</th></tr>
+    </thead>
+    <tbody id="logEntriesBody"></tbody>
+  </table>
+</section>
+
+</div><!-- /tabPanel-logs -->
 
 <div class="modal-backdrop" id="chunkModalBackdrop">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chunkModalTitle">

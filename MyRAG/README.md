@@ -1075,6 +1075,59 @@ A few deliberate limits worth knowing:
   have described is completely unaffected — see `appendToLog()`'s own
   doc comment in `src/activityLog.js`.
 
+## Viewing logs in the browser
+
+The "Logs" tab (hamburger menu, top right) lets you browse both files
+described above — `logs/activity-YYYY-MM.jsonl` and
+`logs/actions-YYYY-MM.jsonl` — without needing shell access to the
+server:
+
+1. **Pick a log file** from the dropdown. It lists every monthly file
+   actually present in `logs/`, newest month first, each labeled with
+   its kind ("Activity" or "Actions") and how many entries it has.
+2. **The entry list** shows every line in that file as a clickable row,
+   newest first — its time, who it belongs to (a real username if
+   Basic Auth is configured with named users, an IP address otherwise
+   — see "A few deliberate limits worth knowing" below), type, the
+   storage area/topic it belongs to, and its status — without pulling
+   the full record (let alone a long generated answer) over the wire
+   just to build this list.
+3. **Click a row** to see that one entry's full detail — every field
+   the server recorded for it, *except* `answer` — in the "Entry
+   detail" card at the top of the page, in the Document storage area
+   card's usual spot (hidden while the Logs tab is active, since Logs
+   isn't scoped to a storage area). Keeping it there, above the entry
+   list rather than below it, means you see it right away even when
+   the list itself runs long. Clicking a different row replaces this
+   card's content with the new entry's; it never stacks multiple
+   entries' detail on the page.
+4. **"Show answer"** appears only for an entry that actually has one
+   (only a completed `activity` log entry ever does — `actions` log
+   entries never carry one). Clicking it fetches and reveals just that
+   text, in its own scrollable box — a deliberate extra step, since
+   even a single answer can be long enough that showing it automatically
+   would make the page unwieldy.
+
+A line that failed to parse — the one failure mode an append-only file
+is exposed to, if the server crashed mid-write and left a truncated
+trailing line — shows up as a clearly marked "(unreadable line)" row
+instead of breaking the rest of the list.
+
+Two things worth knowing:
+
+- **Everyone who can reach this app can see every entry here**,
+  including other people's questions and answers — there's no
+  per-user filtering yet. This follows the same all-or-nothing model
+  the rest of the app already has (see "Access control" above): if
+  Basic Auth is configured, you need valid credentials to reach the
+  Logs tab at all, same as everything else, but there's currently no
+  narrower scoping to "only entries from the user I'm logged in as."
+  Worth keeping in mind before pointing this at a shared deployment
+  with sensitive questions in it.
+- **There's no filtering or search yet** — the entry list always shows
+  every line in the selected file. For a busy installation with a very
+  large monthly file, that can be a long list to scroll through.
+
 ## Chunking: structure-aware, not just word count
 
 `chunkText()` (`src/chunker.js`) used to be a blind word-count sliding

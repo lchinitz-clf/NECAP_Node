@@ -1102,10 +1102,10 @@ let answerToggle;
 
 // ---- Tabs (hamburger menu) ----
 //
-// The page's sections are grouped into three always-present panel
+// The page's sections are grouped into four always-present panel
 // divs in index.html (#tabPanel-documents, #tabPanel-rubric,
-// #tabPanel-query) — "Document Management," "Rubric Control," and
-// "Query and Response" respectively. Switching tabs only ever toggles
+// #tabPanel-query, #tabPanel-logs) — "Document Management," "Rubric
+// Control," "Query and Response," and "Logs" respectively. Switching tabs only ever toggles
 // each panel's own display:block/none; nothing inside a panel is
 // re-rendered, rebuilt, or removed from the DOM when it's hidden, so
 // in-progress state in a tab you switch away from (a half-typed
@@ -1115,11 +1115,12 @@ let answerToggle;
 // code elsewhere in this file needed to change for tabs to exist —
 // every element a handler looks up is still on the page, just
 // sometimes inside a panel with display:none.
-const TAB_IDS = ['documents', 'rubric', 'query'];
+const TAB_IDS = ['documents', 'rubric', 'query', 'logs'];
 const TAB_LABELS = {
   documents: 'Document Management',
   rubric: 'Rubric Control',
   query: 'Query and Response',
+  logs: 'Logs',
 };
 // Which tab was open persists across a reload, same
 // localStorage-per-browser convention initSectionToggle() above uses
@@ -1148,6 +1149,19 @@ function setActiveTab(tabId) {
     item.classList.toggle('active', item.dataset.tab === tabId);
   }
   tabMenuActiveLabel.textContent = TAB_LABELS[tabId];
+
+  // The Document storage area card only matters for the other three
+  // tabs (Documents, Rubric, Query) — the Logs tab browses every log
+  // file across the whole server, not anything scoped to one storage
+  // area, so showing it there would just be irrelevant filler. Its
+  // slot at the top of the page is reused for the log entry detail
+  // card instead, which wants that same prominent, no-scrolling-needed
+  // position since the entry list further down #tabPanel-logs can get
+  // long. Guarded with `if` since setActiveTab() runs once during
+  // initTabs(), before every element below it in init() has
+  // necessarily been assigned yet in every possible init ordering.
+  if (workspaceCard) workspaceCard.style.display = tabId === 'logs' ? 'none' : '';
+  if (logEntryDetailWrap) logEntryDetailWrap.style.display = tabId === 'logs' ? '' : 'none';
 
   try {
     localStorage.setItem(TAB_STORAGE_KEY, tabId);
@@ -1192,6 +1206,339 @@ function initTabs() {
     // Storage unavailable — fall back to the first tab.
   }
   setActiveTab(initialTab);
+}
+
+// ---- Logs tab ----
+//
+// Backs #tabPanel-logs: pick a log file -> see a compact, newest-first
+// list of its lines as clickable rows (summarizeLogFile() on the
+// server never sends the full record, let alone `answer`, for every
+// line at once) -> click one to see everything about that entry
+// EXCEPT its answer (getLogEntry() strips that out server-side too)
+// -> optionally click "Show answer" to fetch just that one field.
+// Three separate fetches of increasing weight, same "don't pull the
+// heavy part over the wire until it's actually asked for" shape
+// showChunkModal() above already uses for block text.
+//
+// Per explicit user direction: the detail view is INLINE (not a
+// modal), and every new detail render REPLACES logEntryDetailBody's
+// content rather than appending to it — clicking a different entry,
+// or reloading the row list, must never leave the page accumulating
+// old detail sections. Filtering/searching the entry list is
+// deliberately not implemented (also per that direction) — every
+// entry in the selected file is always shown.
+let logFileSelect, logFileHint, logsRefreshBtn, logsStatus, logsError;
+let logEntriesBody;
+let logEntryDetailWrap, logEntryDetailPlaceholder, logEntryDetailBody, logAnswerButtonRow, showLogAnswerBtn, logAnswerWrap, logAnswerBody;
+
+// The Document storage area card at the top of the page (outside every
+// tab panel, since Documents/Rubric/Query all need it) — hidden while
+// the Logs tab is active, since Logs isn't scoped to a storage area at
+// all, and its slot in the layout is reused for logEntryDetailWrap
+// instead. See setActiveTab().
+let workspaceCard;
+
+// Which file/line the currently-shown detail (if any) belongs to —
+// only used by the "Show answer" handler, so it knows what to fetch
+// without re-reading it out of the DOM.
+let currentLogLine = null;
+
+// Friendly display names for the fields getLogEntry() can return.
+// Anything not listed here still renders — just under its raw key
+// name — so a future field activityLog.js starts writing shows up
+// automatically instead of silently vanishing from the detail view.
+const LOG_FIELD_LABELS = {
+  timestamp: 'Time',
+  type: 'Type',
+  workspaceId: 'Storage area',
+  topicId: 'Topic ID',
+  topicLabel: 'Topic',
+  sourceFile: 'Source file',
+  question: 'Question',
+  status: 'Status',
+  chatModel: 'Chat model',
+  error: 'Error',
+  sourceChunkIds: 'Source blocks',
+  success: 'Success',
+  ip: 'IP address',
+  user: 'User',
+  to: 'Sent to',
+};
+
+function formatLogFieldValue(key, value) {
+  if (key === 'timestamp') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+  }
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '(none)';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value);
+  return String(value);
+}
+
+function logEntryScopeLabel(s) {
+  if (s.workspaceId && s.topicLabel) return `${s.workspaceId} — ${s.topicLabel}`;
+  if (s.workspaceId && s.topicId) return `${s.workspaceId} — ${s.topicId}`;
+  if (s.workspaceId) return s.workspaceId;
+  if (s.topicLabel) return s.topicLabel;
+  if (s.topicId) return s.topicId;
+  if (s.sourceFile) return s.sourceFile;
+  return '';
+}
+
+// Same "who" convention as the README's "Activity log" section and
+// logViewer.js's summarizeEntry(): a real username when Basic Auth is
+// configured with named users, the IP address otherwise — whichever
+// one this entry actually has.
+function logEntryWhoLabel(s) {
+  return s.user || s.ip || '';
+}
+
+function logEntryStatusLabel(s) {
+  if (s.broken) return '(unreadable line)';
+  if (s.status) return s.status;
+  if (typeof s.success === 'boolean') return s.success ? 'success' : 'failed';
+  return '';
+}
+
+/**
+ * Renders the clickable per-line list for whichever file is currently
+ * selected. Each row carries the line's own stable index in
+ * data-line (see logViewer.js's doc comment on why that index is
+ * safe to reuse later, even after more lines are appended) and a
+ * .chunk-link-styled button in its first cell — the actual
+ * "clickable link" the row is built around, with the whole row also
+ * clickable via the delegated listener wired in init().
+ */
+function renderLogEntriesTable(summaries) {
+  logEntriesBody.innerHTML = '';
+
+  if (!summaries.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    td.className = 'muted';
+    td.textContent = 'No entries in this log file yet.';
+    tr.appendChild(td);
+    logEntriesBody.appendChild(tr);
+    return;
+  }
+
+  for (const s of summaries) {
+    const tr = document.createElement('tr');
+    tr.dataset.line = String(s.line);
+    if (s.broken) tr.classList.add('log-row-broken');
+
+    const timeTd = document.createElement('td');
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'chunk-link';
+    link.textContent = s.timestamp ? new Date(s.timestamp).toLocaleString() : `Line ${s.line}`;
+    timeTd.appendChild(link);
+    tr.appendChild(timeTd);
+
+    const whoTd = document.createElement('td');
+    whoTd.textContent = logEntryWhoLabel(s);
+    tr.appendChild(whoTd);
+
+    const typeTd = document.createElement('td');
+    typeTd.textContent = s.type || '';
+    tr.appendChild(typeTd);
+
+    const scopeTd = document.createElement('td');
+    scopeTd.textContent = logEntryScopeLabel(s);
+    tr.appendChild(scopeTd);
+
+    const statusTd = document.createElement('td');
+    statusTd.textContent = logEntryStatusLabel(s);
+    tr.appendChild(statusTd);
+
+    logEntriesBody.appendChild(tr);
+  }
+}
+
+/**
+ * Resets the entry-detail card back to its empty placeholder state —
+ * used whenever the selected file changes, the file list is
+ * refreshed, or there's simply nothing (yet) to show detail for. Also
+ * drops the row highlighting and the last-shown-answer state, so
+ * nothing from a previous file or entry can leak into whatever's
+ * shown next. Note this does NOT hide logEntryDetailWrap itself — that
+ * card's own visibility is tied to which tab is active (see
+ * setActiveTab()), not to whether an entry is currently selected; this
+ * only resets its content back to the "nothing selected yet" state.
+ */
+function resetLogEntryDetail() {
+  logEntryDetailBody.innerHTML = '';
+  logEntryDetailBody.style.display = 'none';
+  logEntryDetailPlaceholder.style.display = 'block';
+  logAnswerWrap.style.display = 'none';
+  logAnswerBody.textContent = '';
+  logAnswerButtonRow.style.display = 'none';
+  showLogAnswerBtn.disabled = false;
+  currentLogLine = null;
+  for (const tr of logEntriesBody.querySelectorAll('tr[data-line]')) {
+    tr.classList.remove('selected');
+  }
+}
+
+/**
+ * Fetches and shows the full detail (everything except `answer`) for
+ * one line of the currently-selected file. Always starts by wiping
+ * logEntryDetailBody's previous content — see this section's own
+ * top-of-block comment for why that's a hard requirement here, not
+ * just tidiness.
+ * @param {number} line
+ */
+async function showLogEntryDetail(line) {
+  const name = logFileSelect.value;
+  if (!name) return;
+
+  currentLogLine = line;
+
+  logEntryDetailPlaceholder.style.display = 'none';
+  logEntryDetailBody.style.display = 'grid';
+  logEntryDetailBody.innerHTML = '';
+  const loadingDt = document.createElement('dt');
+  loadingDt.textContent = 'Loading…';
+  logEntryDetailBody.appendChild(loadingDt);
+  logAnswerWrap.style.display = 'none';
+  logAnswerBody.textContent = '';
+  logAnswerButtonRow.style.display = 'none';
+  showLogAnswerBtn.disabled = false;
+
+  for (const tr of logEntriesBody.querySelectorAll('tr[data-line]')) {
+    tr.classList.toggle('selected', tr.dataset.line === String(line));
+  }
+
+  try {
+    const res = await fetch(`/logs/${encodeURIComponent(name)}/lines/${line}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+    logEntryDetailBody.innerHTML = '';
+
+    if (data.broken) {
+      const dt = document.createElement('dt');
+      dt.textContent = 'This line could not be read';
+      const dd = document.createElement('dd');
+      dd.textContent = data.raw || '(no content)';
+      logEntryDetailBody.appendChild(dt);
+      logEntryDetailBody.appendChild(dd);
+      return;
+    }
+
+    for (const key of Object.keys(data)) {
+      // hasAnswer only drives the button below, not a row of its own;
+      // line is already shown via the selected row itself.
+      if (key === 'hasAnswer' || key === 'line') continue;
+      const value = data[key];
+      if (value === undefined || value === null || value === '') continue;
+      const dt = document.createElement('dt');
+      dt.textContent = LOG_FIELD_LABELS[key] || key;
+      const dd = document.createElement('dd');
+      dd.textContent = formatLogFieldValue(key, value);
+      logEntryDetailBody.appendChild(dt);
+      logEntryDetailBody.appendChild(dd);
+    }
+
+    if (data.hasAnswer) {
+      logAnswerButtonRow.style.display = 'block';
+    }
+  } catch (err) {
+    logEntryDetailBody.innerHTML = '';
+    const dt = document.createElement('dt');
+    dt.textContent = 'Error';
+    const dd = document.createElement('dd');
+    dd.textContent = err.message;
+    logEntryDetailBody.appendChild(dt);
+    logEntryDetailBody.appendChild(dd);
+  }
+}
+
+/**
+ * Loads the compact per-line list for whichever file is now selected.
+ * Always clears any open detail first — a detail view left over from
+ * a different file would show a line index that means something else
+ * entirely in this one.
+ */
+async function loadLogFileSummaries() {
+  const name = logFileSelect.value;
+  resetLogEntryDetail();
+  logsError.style.display = 'none';
+
+  if (!name) {
+    logEntriesBody.innerHTML = '';
+    logFileHint.textContent = '';
+    return;
+  }
+
+  logsStatus.textContent = 'Loading…';
+  try {
+    const res = await fetch(`/logs/${encodeURIComponent(name)}/summaries`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+    renderLogEntriesTable(data.summaries);
+    logFileHint.textContent =
+      `${data.lineCount} entr${data.lineCount === 1 ? 'y' : 'ies'} in this file, newest first.`;
+    logsStatus.textContent = '';
+  } catch (err) {
+    logEntriesBody.innerHTML = '';
+    logsError.textContent = err.message;
+    logsError.style.display = 'block';
+    logsStatus.textContent = '';
+  }
+}
+
+/**
+ * Loads which log files exist (GET /logs) and repopulates the file
+ * picker, same refreshModels()-style pattern above. Keeps whatever
+ * file was already selected if it's still there — a plain Refresh
+ * shouldn't silently jump someone to a different file — otherwise
+ * lands on the newest one.
+ */
+async function refreshLogFiles() {
+  logsError.style.display = 'none';
+  const previousSelection = logFileSelect.value;
+
+  try {
+    const res = await fetch('/logs');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load log files');
+
+    const files = data.files || [];
+    logFileSelect.innerHTML = '';
+
+    if (files.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No log files yet';
+      logFileSelect.appendChild(opt);
+      logFileHint.textContent = '';
+      logEntriesBody.innerHTML = '';
+      resetLogEntryDetail();
+      return;
+    }
+
+    for (const f of files) {
+      const opt = document.createElement('option');
+      opt.value = f.name;
+      const kindLabel = f.kind === 'activity' ? 'Activity' : 'Actions';
+      opt.textContent = `${kindLabel} — ${f.year}-${String(f.month).padStart(2, '0')} (${f.lineCount})`;
+      logFileSelect.appendChild(opt);
+    }
+
+    logFileSelect.value =
+      previousSelection && files.some((f) => f.name === previousSelection)
+        ? previousSelection
+        : files[0].name;
+
+    await loadLogFileSummaries();
+  } catch (err) {
+    logsError.textContent = err.message;
+    logsError.style.display = 'block';
+  }
 }
 
 // ---- Rubric Control ----
@@ -1835,6 +2182,7 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
  * any of this at plain top-level script scope would be too early.
  */
 function init() {
+  workspaceCard = document.getElementById('workspaceCard');
   workspaceInput = document.getElementById('workspace');
   workspaceList = document.getElementById('workspaceList');
 
@@ -1971,6 +2319,20 @@ function init() {
   rubricExportCsvBtn = document.getElementById('rubricExportCsvBtn');
   rubricFormStatus = document.getElementById('rubricFormStatus');
   rubricFormError = document.getElementById('rubricFormError');
+
+  logFileSelect = document.getElementById('logFileSelect');
+  logFileHint = document.getElementById('logFileHint');
+  logsRefreshBtn = document.getElementById('logsRefreshBtn');
+  logsStatus = document.getElementById('logsStatus');
+  logsError = document.getElementById('logsError');
+  logEntriesBody = document.getElementById('logEntriesBody');
+  logEntryDetailWrap = document.getElementById('logEntryDetailWrap');
+  logEntryDetailPlaceholder = document.getElementById('logEntryDetailPlaceholder');
+  logEntryDetailBody = document.getElementById('logEntryDetailBody');
+  logAnswerButtonRow = document.getElementById('logAnswerButtonRow');
+  showLogAnswerBtn = document.getElementById('showLogAnswerBtn');
+  logAnswerWrap = document.getElementById('logAnswerWrap');
+  logAnswerBody = document.getElementById('logAnswerBody');
 
   // ---- Collapsible section toggles ----
   // Documents-in-this-area and the per-attribute results table just
@@ -2229,6 +2591,45 @@ function init() {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
+  });
+
+  // ---- Logs tab ----
+
+  logFileSelect.addEventListener('change', loadLogFileSummaries);
+  logsRefreshBtn.addEventListener('click', refreshLogFiles);
+
+  // One delegated listener for every row, same pattern documentsBody's
+  // Remove buttons and rubricTopicsBody's Edit/Delete buttons use above
+  // — rows added by a later refresh need no re-attachment.
+  logEntriesBody.addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-line]');
+    if (!tr) return;
+    showLogEntryDetail(Number(tr.dataset.line));
+  });
+
+  showLogAnswerBtn.addEventListener('click', async () => {
+    const name = logFileSelect.value;
+    if (!name || currentLogLine == null) return;
+
+    showLogAnswerBtn.disabled = true;
+    logAnswerBody.textContent = 'Loading…';
+    logAnswerWrap.style.display = 'block';
+
+    try {
+      const res = await fetch(`/logs/${encodeURIComponent(name)}/lines/${currentLogLine}/answer`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+      logAnswerBody.textContent = data.answer;
+      // Revealing it is a one-time action per entry — the button's job
+      // is done, and it stays gone until a different entry (with its
+      // own hasAnswer check) is clicked, per showLogEntryDetail()/
+      // resetLogEntryDetail() above.
+      logAnswerButtonRow.style.display = 'none';
+    } catch (err) {
+      logAnswerBody.textContent = `Could not load answer: ${err.message}`;
+      showLogAnswerBtn.disabled = false;
+    }
   });
 
   // ---- Rubric Control ----
@@ -2727,4 +3128,5 @@ function init() {
   refreshIdealTopics();
   resetRubricForm();
   refreshRubricTopics();
+  refreshLogFiles();
 }
