@@ -1018,212 +1018,212 @@
         {
           "name": "Haz12 - Data Quality and Data Sources - Source Documentation",
           "proposal": "Are the data sources used clearly documented and cited?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz13 - Data Quality and Data Sources - Data Currency",
           "proposal": "Were the most recent datasets available at the time of plan development used?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz14 - Data Quality and Data Sources - Best Available Local and State Data",
           "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz15 - Data Quality and Data Sources - Flood Risk Data",
           "proposal": "For flooding analyses, does the plan incorporate the best available flood data, including state flood-risk tools, watershed studies, or local modeling where available?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz16 - Data Quality and Data Sources - Data Limitations and Uncertainty",
           "proposal": "Does the plan explain limitations and uncertainties associated with the data sources used?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz17 - Data Quality and Data Sources - Demographic Data Currency",
           "proposal": "Are demographic and socioeconomic datasets sufficiently current to reflect recent community conditions?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz18 - Data Quality and Data Sources - Historical and Projected Evidence",
           "proposal": "Are historical disaster records used alongside future climate projections?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz19 - Hazard Measurement and Modeling - Risk Measurement Method",
           "proposal": "Does the plan clearly explain how hazard risk was measured?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz20 - Hazard Measurement and Modeling - Model Assumptions",
           "proposal": "Are assumptions used in risk calculations transparently documented?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz21 - Hazard Measurement and Modeling - Risk Rating Method",
           "proposal": "Does the plan explain how hazard probability, severity, exposure, and vulnerability were combined to generate risk ratings?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz22 - Hazard Measurement and Modeling - Future Climate Projections",
           "proposal": "Does the plan use future climate projections when assessing long-term risk?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz23 - Hazard Measurement and Modeling - Planning Horizons",
           "proposal": "Are planning horizons clearly specified, such as current conditions, 2050, 2070, or 2100?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz24 - Hazard Measurement and Modeling - Technical Appropriateness",
           "proposal": "Are the methods used to model hazards technically appropriate and supported by scientific evidence?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz25 - Hazard Measurement and Modeling - Risk Concept Clarity",
           "proposal": "Does the plan distinguish among hazard exposure, vulnerability, and risk?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz26 - Hazard Measurement and Modeling - Projection Uncertainty",
           "proposal": "Are uncertainties in climate projections explicitly discussed?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz27 - Vulnerability Assessment - Population Vulnerability by Hazard",
           "proposal": "Does the plan evaluate which populations are most vulnerable to each hazard?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz28 - Vulnerability Assessment - Social Vulnerability Indicators",
           "proposal": "Does the assessment incorporate social vulnerability indicators such as income, age, disability status, race and ethnicity, language isolation, housing tenure, and health status?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz29 - Vulnerability Assessment - Cumulative Vulnerability",
           "proposal": "Does the plan identify neighborhoods experiencing multiple overlapping vulnerabilities?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz30 - Vulnerability Assessment - Spatial Analysis of Vulnerability",
           "proposal": "Does the plan map social vulnerability alongside hazard exposure?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz31 - Vulnerability Assessment - Displacement and Economic Risk",
           "proposal": "Does the plan consider the risk of displacement, housing instability, or economic disruption resulting from climate hazards?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz32 - Vulnerability Assessment - Public Health Impacts",
           "proposal": "Does the plan assess public health impacts associated with identified hazards?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz33 - Risk Prioritization - Transparent Prioritization Process",
           "proposal": "Does the plan provide a transparent process for prioritizing hazards?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz34 - Risk Prioritization - Prioritization Criteria",
           "proposal": "Are prioritization criteria clearly defined?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz35 - Risk Prioritization - Likelihood and Consequence",
           "proposal": "Are both likelihood and consequence considered in prioritization?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz36 - Risk Prioritization - Equity in Prioritization",
           "proposal": "Are impacts to vulnerable populations weighted or considered separately in prioritization methods?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz37 - Risk Prioritization - Highest-Risk People, Assets, and Systems",
           "proposal": "Does the plan identify which assets, populations, and systems face the highest overall risk?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz38 - Risk Prioritization - Future Conditions in Prioritization",
           "proposal": "Are future climate conditions incorporated into prioritization decisions?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz39 - Review of Inputs and Assumptions - Input Data Quality Review",
           "proposal": "Does the plan critically evaluate the quality and completeness of its input datasets?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz40 - Review of Inputs and Assumptions - Data Gaps",
           "proposal": "Does the plan identify important data gaps?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz41 - Review of Inputs and Assumptions - Expert and Stakeholder Inputs",
           "proposal": "Are expert judgments and stakeholder inputs documented?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz42 - Review of Inputs and Assumptions - Local Knowledge",
           "proposal": "Does the plan explain how local knowledge influenced hazard identification and risk assessment?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz43 - Review of Inputs and Assumptions - Municipal and Utility Consultation",
           "proposal": "Were municipal departments, utility providers, public health agencies, and emergency managers consulted when identifying hazards and assets?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz44 - Review of Inputs and Assumptions - Data and Assessment Updates",
           "proposal": "Does the plan include a process for updating datasets and revising risk assessments as better information becomes available?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz45 - Overall Assessment - Missing Hazards",
           "proposal": "Based on available evidence, are any significant hazards missing from the assessment?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz46 - Overall Assessment - Missing Critical Assets",
           "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz47 - Overall Assessment - Opportunities to Improve Accuracy",
           "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz48 - Overall Assessment - Decision-Usefulness",
           "proposal": "Does the risk assessment appear sufficient to support prioritization of mitigation actions and funding decisions?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz49 - Advocate Lens - Hazard and Social Vulnerability Overlap",
           "proposal": "Does the plan identify where vulnerable populations and high-risk physical hazards overlap?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz50 - Advocate Lens - Equitable Investment Prioritization",
           "proposal": "Does the plan prioritize mitigation investments in areas facing both high hazard exposure and high social vulnerability?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz51 - Advocate Lens - Historically Underserved Neighborhoods",
           "proposal": "Does the plan evaluate whether historically underserved neighborhoods have received proportional attention in the risk assessment?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz52 - Advocate Lens - Community Assets and Social Infrastructure",
           "proposal": "Does the plan recognize community assets and social networks as resilience resources, not just physical infrastructure?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz53 - Advocate Lens - Community-Generated Data",
           "proposal": "Does the plan incorporate local, community-generated, or resident-collected data where available?",
-          "included": false
+          "included": true
         }
       ],
       "description": "City level hazard mitigation plans.",
