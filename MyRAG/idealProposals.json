@@ -1240,7 +1240,7 @@
         {
           "name": "Haz11-heat",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to excessive heat events?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz11-heat-people",
@@ -1260,7 +1260,7 @@
         {
           "name": "Haz46",
           "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz47",
