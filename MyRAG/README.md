@@ -643,6 +643,14 @@ reload the page once first.
   proposal", and "Include" (`TRUE`/`FALSE`) — so the exported file
   shows which rows are currently excluded rather than silently
   dropping them.
+- **Attribute order matters, and is editable.** `attributes` is a
+  plain array, and its order is exactly the order attributes are asked
+  about and the order they appear in the per-attribute results table —
+  there's no separate ordering field to keep in sync. In the Rubric
+  Control editor, each attribute row has &#9650;/&#9660; buttons (next
+  to Remove) that swap it with its neighbor; they disable themselves at
+  the top/bottom row. Like everything else in the editor, reordering
+  only takes effect once you save the topic.
 
 ### How it works: approach 1 — fold into the question (implemented)
 

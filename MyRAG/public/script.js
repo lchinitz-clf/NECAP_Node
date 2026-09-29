@@ -1661,19 +1661,79 @@ function addRubricAttributeRow(name = '', proposal = '', included = true) {
   includedInput.checked = included !== false;
   includedTd.appendChild(includedInput);
 
-  const removeTd = document.createElement('td');
+  const actionsTd = document.createElement('td');
+  actionsTd.className = 'rubric-attr-actions-cell';
+
+  // Reordering is plain DOM manipulation (swap this row with its
+  // neighbor) rather than anything touching a separate order/index
+  // field — readRubricAttributeRows() below already reads attributes
+  // back in whatever order the rows are actually in, and nothing
+  // server-side or in the results table re-sorts them (see
+  // batchAttributes()/getIncludedAttributes() in index.js and
+  // responseParser.js's per-attribute splitting, both of which just
+  // walk the array in order), so moving a row on screen is the whole
+  // feature — there's nothing else to keep in sync.
+  const moveUpBtn = document.createElement('button');
+  moveUpBtn.type = 'button';
+  moveUpBtn.className = 'btn-secondary rubric-attr-move rubric-attr-move-up';
+  moveUpBtn.textContent = '▲';
+  moveUpBtn.title = 'Move attribute up';
+  moveUpBtn.setAttribute('aria-label', 'Move attribute up');
+  moveUpBtn.addEventListener('click', () => {
+    const prev = tr.previousElementSibling;
+    if (!prev) return;
+    rubricAttributesBody.insertBefore(tr, prev);
+    updateRubricAttributeMoveButtons();
+  });
+
+  const moveDownBtn = document.createElement('button');
+  moveDownBtn.type = 'button';
+  moveDownBtn.className = 'btn-secondary rubric-attr-move rubric-attr-move-down';
+  moveDownBtn.textContent = '▼';
+  moveDownBtn.title = 'Move attribute down';
+  moveDownBtn.setAttribute('aria-label', 'Move attribute down');
+  moveDownBtn.addEventListener('click', () => {
+    const next = tr.nextElementSibling;
+    if (!next) return;
+    rubricAttributesBody.insertBefore(next, tr);
+    updateRubricAttributeMoveButtons();
+  });
+
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'btn-remove';
   removeBtn.textContent = 'Remove';
-  removeBtn.addEventListener('click', () => tr.remove());
-  removeTd.appendChild(removeBtn);
+  removeBtn.addEventListener('click', () => {
+    tr.remove();
+    updateRubricAttributeMoveButtons();
+  });
+
+  actionsTd.appendChild(moveUpBtn);
+  actionsTd.appendChild(moveDownBtn);
+  actionsTd.appendChild(removeBtn);
 
   tr.appendChild(nameTd);
   tr.appendChild(proposalTd);
   tr.appendChild(includedTd);
-  tr.appendChild(removeTd);
+  tr.appendChild(actionsTd);
   rubricAttributesBody.appendChild(tr);
+  updateRubricAttributeMoveButtons();
+}
+
+/**
+ * Enables/disables each attribute row's up/down buttons based on its
+ * current position — the first row can't move up, the last can't move
+ * down. Called after every add, remove, or move, so a boundary button
+ * never sits there clickable but a no-op.
+ */
+function updateRubricAttributeMoveButtons() {
+  const rows = [...rubricAttributesBody.querySelectorAll('tr')];
+  rows.forEach((row, i) => {
+    const upBtn = row.querySelector('.rubric-attr-move-up');
+    const downBtn = row.querySelector('.rubric-attr-move-down');
+    if (upBtn) upBtn.disabled = i === 0;
+    if (downBtn) downBtn.disabled = i === rows.length - 1;
+  });
 }
 
 function clearRubricAttributeRows() {
