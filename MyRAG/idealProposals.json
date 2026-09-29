@@ -1,5 +1,10 @@
 {
-  "defaultCompareInstruction": [
+    "defaultCompareInstruction": ["Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.",
+				  "After your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.",
+				  "If more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.",
+				  "For each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].",
+				  "Once you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.",
+				  "Do not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
   ],
   "topics": [
     {
