@@ -1150,17 +1150,22 @@ function setActiveTab(tabId) {
   }
   tabMenuActiveLabel.textContent = TAB_LABELS[tabId];
 
-  // The Document storage area card only matters for the other three
-  // tabs (Documents, Rubric, Query) — the Logs tab browses every log
-  // file across the whole server, not anything scoped to one storage
-  // area, so showing it there would just be irrelevant filler. Its
+  // The Document storage area card only matters for Documents and
+  // Query — both work within one storage area at a time. Rubric
+  // topics (idealProposals.json) and the Logs tab are both global,
+  // not scoped to any one storage area (none of the /ideal-proposals
+  // routes in index.js take a workspaceId, same as /logs), so the
+  // card would just be irrelevant filler on either of those tabs. Its
   // slot at the top of the page is reused for the log entry detail
-  // card instead, which wants that same prominent, no-scrolling-needed
-  // position since the entry list further down #tabPanel-logs can get
-  // long. Guarded with `if` since setActiveTab() runs once during
+  // card while on Logs specifically (see logEntryDetailWrap below),
+  // since that card wants the same prominent, no-scrolling-needed
+  // position given how long the entry list further down
+  // #tabPanel-logs can get; Rubric just leaves that slot empty.
+  // Guarded with `if` since setActiveTab() runs once during
   // initTabs(), before every element below it in init() has
   // necessarily been assigned yet in every possible init ordering.
-  if (workspaceCard) workspaceCard.style.display = tabId === 'logs' ? 'none' : '';
+  const workspaceScopedTab = tabId !== 'logs' && tabId !== 'rubric';
+  if (workspaceCard) workspaceCard.style.display = workspaceScopedTab ? '' : 'none';
   if (logEntryDetailWrap) logEntryDetailWrap.style.display = tabId === 'logs' ? '' : 'none';
 
   try {
