@@ -30,7 +30,7 @@ const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes } = require('./src/idealProposals');
-const { parseComparisonAnswer } = require('./src/responseParser');
+const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
 const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
@@ -1243,7 +1243,7 @@ app.post('/query/stream', async (req, res) => {
   // independent measurement isn't worth the complexity of somehow
   // threading the client's own number back in after the fact.
   const requestStartedAt = Date.now();
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall, notifyEmail, notifyEmailTo } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -1442,19 +1442,128 @@ app.post('/query/stream', async (req, res) => {
       // `matches` here plays the same role as in /query above — lets
       // parseComparisonAnswer() verify any quote against this batch's
       // own retrieved chunk text.
-      const records = attributesSubset && attributesSubset.length
+      let records = attributesSubset && attributesSubset.length
         ? parseComparisonAnswer(answer, attributesSubset, matches)
         : [];
+
+      // This batch's own reported token/cutoff figures, mutable so the
+      // optional retry pass below can fold its own usage into them —
+      // the batch-done event and the report should reflect the FULL
+      // cost of producing this batch's final result, retry included,
+      // not just the first attempt. totalPromptTokens/totalAnswerTokens/
+      // lastDoneReason (the whole-run totals, used by the final "done"
+      // event) are updated the same way, separately, below.
+      let batchPromptTokens = promptTokens;
+      let batchAnswerTokens = answerTokens;
+      let batchDoneReason = doneReason;
+
+      // Optional "retry against the next batch of retrieved chunks"
+      // pass — see mergeRetryRecord()'s doc comment in
+      // src/responseParser.js for the full mechanism and the
+      // "worse/same/better" merge rule this relies on. Fires only
+      // when the browser actually asked for it (`retryNotAddressed`,
+      // the "Retry Not addressed..." checkbox), this is a rubric
+      // comparison at all (nothing to retry against for a plain
+      // question — see idealTopicId above), this batch actually has
+      // an attribute whose verdict is eligible to retry
+      // (RETRY_TRIGGER_VERDICTS), `threshold` was supplied (the
+      // browser always sends its live Relevance field, but a caller
+      // that doesn't can't be evaluated against it), AND every one of
+      // this batch's own retrieved chunks scored at or above that
+      // threshold. That last condition is deliberately a proxy for
+      // "this corpus probably has more genuinely relevant material to
+      // check" rather than "this topic just isn't well covered here at
+      // all" — see the discussion this feature came out of: a topic
+      // with weak retrieval across the board is very unlikely to have
+      // anything BETTER sitting just past the cutoff, since the next
+      // band is by construction even weaker-scoring than this one.
+      //
+      // Deliberately re-runs the WHOLE batch's question against the
+      // next band, even when only one attribute in a multi-attribute
+      // batch actually needs it (attributesPerCall > 1) — there's no
+      // cheaper way to isolate just that one attribute's own
+      // retrieval, and mergeRetryRecord() already protects every OTHER
+      // attribute in the batch from regressing: an attribute that was
+      // already fine will almost always come back "worse" against the
+      // weaker next band and simply keep its original result.
+      let retryMatches = null;
+      let retryIncorporated = false;
+      const shouldRetry =
+        retryNotAddressed &&
+        topic &&
+        records.length > 0 &&
+        threshold !== undefined &&
+        matches.length > 0 &&
+        matches.every((m) => m.score >= threshold) &&
+        records.some((r) => RETRY_TRIGGER_VERDICTS.includes(r.category));
+
+      if (shouldRetry) {
+        try {
+          const retryVector = await embed(retrievalQuery, embedModel, undefined, controller.signal);
+          // Same ranking hybridSearch() always produces (see its own
+          // doc comment: the fused order is stable regardless of
+          // topK, just cut off at a different length) — asking for
+          // twice as many and slicing off the first half is what
+          // isolates ranks topK+1..2*topK, the "next batch," without
+          // ever re-showing this batch's own already-tried chunks.
+          const widerMatches = hybridSearch(workspaceId, retryVector, retrievalQuery, topK * 2);
+          const nextBandMatches = widerMatches.slice(topK);
+          if (nextBandMatches.length > 0) {
+            const retryMessages = buildRagMessages(effectiveQuestion, nextBandMatches, topic ? 'proposal' : undefined);
+            const retryChatResult = await chat(retryMessages, {
+              model: chatModel,
+              temperature,
+              maxTokens,
+              numCtx,
+              repeatPenalty,
+              think,
+              signal: controller.signal,
+            });
+            const retryRecords = parseComparisonAnswer(retryChatResult.text, attributesSubset, nextBandMatches);
+
+            retryIncorporated = records.some((orig, idx) => verdictRank(retryRecords[idx].category) >= verdictRank(orig.category));
+            records = records.map((orig, idx) => mergeRetryRecord(orig, retryRecords[idx]));
+            retryMatches = nextBandMatches;
+
+            batchPromptTokens += retryChatResult.promptTokens || 0;
+            batchAnswerTokens += retryChatResult.answerTokens || 0;
+            totalPromptTokens += retryChatResult.promptTokens || 0;
+            totalAnswerTokens += retryChatResult.answerTokens || 0;
+            if (retryChatResult.doneReason === 'length') {
+              batchDoneReason = 'length';
+              lastDoneReason = 'length';
+            }
+          }
+        } catch (err) {
+          // Never lets a failed retry attempt take down the whole
+          // batch — the original, already-computed `records` (and the
+          // chat call that already streamed to the browser) stand on
+          // their own regardless. Logged, not surfaced as a stream
+          // {"type":"error"} event, since the batch itself still
+          // completed successfully from the browser's point of view.
+          console.error('[query/stream] "retry Not addressed with next batch" attempt failed, keeping original result:', err);
+        }
+      }
+
+      // Only widened when the retry above actually ran AND its
+      // material ended up incorporated into at least one attribute's
+      // merged result (see mergeRetryRecord()) — a "worse" outcome
+      // intentionally leaves the reported sources exactly as they
+      // were, since nothing from that next band is actually reflected
+      // in what's shown.
+      const reportedMatches = retryIncorporated && retryMatches ? matches.concat(retryMatches) : matches;
+      const reportedSources = sourcesSummary(reportedMatches);
+
       allRecords = allRecords.concat(records);
       if (batchesForReport) {
         batchesForReport.push({
           batchIndex: i,
           totalBatches,
-          sources: sourcesSummary(matches),
+          sources: reportedSources,
           records,
-          promptTokens,
-          answerTokens,
-          doneReason,
+          promptTokens: batchPromptTokens,
+          answerTokens: batchAnswerTokens,
+          doneReason: batchDoneReason,
         });
       }
 
@@ -1466,10 +1575,10 @@ app.post('/query/stream', async (req, res) => {
         batchIndex: i,
         totalBatches,
         answer,
-        sources: sourcesSummary(matches),
-        doneReason,
-        promptTokens,
-        answerTokens,
+        sources: reportedSources,
+        doneReason: batchDoneReason,
+        promptTokens: batchPromptTokens,
+        answerTokens: batchAnswerTokens,
         records,
         ...(thinking ? { thinking } : {}),
       });

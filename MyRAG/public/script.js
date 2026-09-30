@@ -583,6 +583,7 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
 let thinkCheckbox, reasoningWrap, reasoningEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
+let retryNotAddressedCheckbox;
 let attributeResultsWrap, attributeResultsBody, downloadCsvBtn, downloadHtmlBtn;
 
 // queryStartTime/queryTimerHandle track the elapsed-time display next
@@ -2180,7 +2181,7 @@ async function submitRubricForm(e) {
  *   body, since a hand-built request (README.md's "Testing with
  *   PowerShell" section) skips this function, and this one, entirely.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2195,7 +2196,19 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
     // about every attribute in one call," for think that's "leave
     // Ollama's own default alone" (see the think param doc above),
     // for notifyEmail/notifyEmailTo that's "don't send anything."
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo }),
+    // `threshold` is sent here (unlike everywhere else it's used —
+    // see renderSources()/renderSourceChips() above, purely
+    // client-side display) specifically so /query/stream can gate the
+    // "retry Not addressed with the next batch of chunks" feature on
+    // it server-side; see that route's own comment for why. Sent
+    // whenever this call is made at all, since it always has a real
+    // value (the field always has a number in it, never blank) —
+    // there's no "leave it out to get a default" meaning to preserve
+    // the way there is for the others above. `retryNotAddressed` is
+    // the "Retry Not addressed..." checkbox's plain boolean, off by
+    // default; omitted entirely would be indistinguishable from
+    // false, so it's always sent too.
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed }),
     signal,
   });
 
@@ -2329,6 +2342,7 @@ function init() {
   elapsedTimeEl = document.getElementById('elapsedTime');
   queryProgressWrap = document.getElementById('queryProgressWrap');
   thinkCheckbox = document.getElementById('thinkEnabled');
+  retryNotAddressedCheckbox = document.getElementById('retryNotAddressed');
   notifyEmailCheckbox = document.getElementById('notifyEmail');
   notifyEmailToInput = document.getElementById('notifyEmailTo');
   notifyEmailToError = document.getElementById('notifyEmailToError');
@@ -3011,7 +3025,7 @@ function init() {
       event.totalBatches && event.totalBatches > 1 ? ` (batch ${event.batchIndex + 1} of ${event.totalBatches})` : '';
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressedCheckbox.checked, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the

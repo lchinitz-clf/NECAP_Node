@@ -618,6 +618,32 @@
             </span>
           </details>
         </div>
+        <div>
+          <label for="retryNotAddressed" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+            <input type="checkbox" id="retryNotAddressed" style="width:auto;" />
+            Retry "Not addressed" with the next batch of chunks
+          </label>
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Only matters when comparing against an ideal proposal
+              below. A genuinely relevant chunk can sometimes rank just
+              outside "Blocks to search" above. When an attribute comes
+              back "Not addressed" AND every chunk retrieved for it
+              already scored above your Relevance setting (a sign this
+              corpus likely has more to check, not that the topic just
+              isn't covered here), checking this box tries that
+              attribute again against the NEXT batch of chunks — ranks
+              "Blocks to search" + 1 through 2 × "Blocks to search" —
+              instead of the same ones already tried. If the retry does
+              no better, only a short note is added; if it does the
+              same or better, its material is added in and the better
+              verdict is kept. Off by default since it can roughly
+              double the number of calls for a run with many "Not
+              addressed" results.
+            </span>
+          </details>
+        </div>
       </div>
     </details>
 

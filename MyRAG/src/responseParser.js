@@ -790,10 +790,114 @@ function parseComparisonAnswer(answerText, attributes, matches) {
   });
 }
 
+// Every verdict this app's verdict-vocabulary regexes above can
+// produce, worst to best, with '' (no verdict the parser could find at
+// all -- see parseComparisonAnswer()'s own doc comment on an empty
+// `category`) as the worst rung rather than a separate special case.
+// This is the ONE authoritative ordering the "retry against the next
+// batch of retrieved chunks" feature (see maybeRetryWithNextBand() in
+// index.js) compares against -- both RETRY_TRIGGER_VERDICTS and
+// mergeRetryRecord() below are built on it, so there's a single place
+// that says which verdict outranks which, not one notion of "better"
+// re-derived per caller.
+const VERDICT_ORDER = ['', 'Not addressed', 'Falls short', 'Matches', 'Exceeds'];
+
+/**
+ * @param {string} category - '' for an unparsed result, otherwise one
+ *   of VERDICT_ORDER's other entries.
+ * @returns {number} that verdict's rank, 0 (worst) upward. An
+ *   unrecognized string (shouldn't happen -- category always comes
+ *   from the same fixed vocabulary parseComparisonAnswer() produces)
+ *   is treated as rank 0 rather than thrown on, same treatment as ''.
+ */
+function verdictRank(category) {
+  const idx = VERDICT_ORDER.indexOf(category || '');
+  return idx === -1 ? 0 : idx;
+}
+
+// Which verdict(s) are currently eligible to trigger a retry against a
+// later, different batch of retrieved chunks (see
+// maybeRetryWithNextBand() in index.js for the full mechanism and why
+// it exists -- in short: a genuinely relevant chunk can rank just
+// outside the originally-retrieved top-K, and re-asking against the
+// NEXT band of chunks, on its own rather than piled on top of the
+// first band, can surface it without diluting the model's attention
+// the way simply asking for more chunks at once would). Deliberately a
+// short list here, not a hardcoded `category === 'Not addressed'`
+// check at the call site, so adding 'Falls short' later -- discussed
+// but not yet built, since a Falls-short result usually already
+// contains real, correct partial material worth keeping regardless of
+// what a retry finds, which is a different tradeoff than a
+// Not-addressed result (which has nothing worth keeping on its own) --
+// is a one-line change here rather than a new code path.
+const RETRY_TRIGGER_VERDICTS = ['Not addressed'];
+
+/**
+ * Combines one attribute's original result with a second attempt run
+ * against a different, later batch of retrieved chunks -- see
+ * maybeRetryWithNextBand() in index.js for when that second attempt
+ * happens at all (only for a verdict in RETRY_TRIGGER_VERDICTS above,
+ * and only when the original retrieval's own chunks all scored above
+ * the run's relevance threshold, a proxy for "there's probably more
+ * genuinely relevant material in this corpus worth checking the next
+ * band of" rather than "this topic just isn't well covered here at
+ * all").
+ *
+ * Compares `original.category` against `retry.category` using
+ * VERDICT_ORDER above:
+ *   - retry ranks WORSE than original: keeps `original` almost
+ *     entirely as-is, only appending a short, generic note that a
+ *     second batch was checked and didn't turn up anything more
+ *     relevant -- never restating the retry's own (worse) verdict or
+ *     text, which would just be noise under an already-superseded
+ *     result.
+ *   - retry ranks the SAME as original: keeps `original.category`,
+ *     but appends the retry's own resultText after a short separator,
+ *     so a reader sees the fuller picture of everywhere this
+ *     attribute's material was actually checked.
+ *   - retry ranks BETTER than original: same appending as the "same"
+ *     case, but `category` becomes the retry's (better) one -- the
+ *     retry found genuinely new, more complete evidence, so it's what
+ *     gets credited, with the original attempt's own text kept too
+ *     rather than discarded (nothing the original attempt said was
+ *     WRONG, just incomplete).
+ * Either way, `name`/`proposal` are untouched -- only `resultText` and
+ * (sometimes) `category` change.
+ *
+ * @param {{name: string, proposal: string, resultText: string, category: string}} original
+ * @param {{name: string, proposal: string, resultText: string, category: string}} retry
+ * @returns {{name: string, proposal: string, resultText: string, category: string}}
+ */
+function mergeRetryRecord(original, retry) {
+  const origRank = verdictRank(original.category);
+  const retryRank = verdictRank(retry.category);
+
+  if (retryRank < origRank) {
+    return {
+      ...original,
+      resultText:
+        `${original.resultText}\n\n(Also checked the next batch of retrieved chunks; ` +
+        'found nothing more relevant there.)',
+    };
+  }
+
+  const merged = {
+    ...original,
+    resultText:
+      `${original.resultText}\n\n— Also checked the next batch of retrieved chunks —\n\n${retry.resultText}`,
+  };
+  if (retryRank > origRank) merged.category = retry.category;
+  return merged;
+}
+
 module.exports = {
   parseComparisonAnswer,
   extractQuotesAndCitations,
   spliceVerifiedQuotes,
   resolveCitation,
   splitQuoteOnEllipsis,
+  VERDICT_ORDER,
+  verdictRank,
+  RETRY_TRIGGER_VERDICTS,
+  mergeRetryRecord,
 };
