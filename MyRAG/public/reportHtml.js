@@ -194,6 +194,59 @@ function renderResultTextHtml(resultText) {
 }
 
 /**
+ * Formats the "Settings" row: one small pill per Advanced-settings
+ * field the run was made with, reusing the same `.chip` styling the
+ * per-attribute Sources line already uses (see the summary/detail
+ * sections in buildAttributeResultsHtml() below) so this reads as more
+ * of the same report chrome rather than a new visual idiom. Each
+ * field mirrors the exact label text next to it under the "Advanced
+ * settings" arrow in index.html, and a field left blank there (which
+ * means "use the model's own default," "no limit," or "all," per that
+ * field's own placeholder — see index.html) is shown as that same
+ * phrase here rather than as a blank or a "0", so the report never
+ * implies a setting was left out when it was actually just left at
+ * its default.
+ *
+ * Deliberately does NOT include Relevance (`threshold`): that field
+ * never affects generation at all — it's a purely client-side filter
+ * applied to already-returned sources for on-screen coloring — and
+ * it's also never sent to the server in the first place, so the
+ * server-rendered email-attachment report has no way to know its
+ * value even if we wanted to show it here. Leaving it out keeps both
+ * report call sites (the browser's own "Export HTML" and the
+ * server's completion-email attachment, see src/emailNotify.js)
+ * showing the exact same set of fields.
+ *
+ * Renders nothing at all (an empty string, so the caller's "Settings"
+ * meta row is simply omitted) when `meta.topK` is undefined -- the
+ * signal that this particular caller didn't supply settings data at
+ * all, rather than supplying a real run's values.
+ * @param {{topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number}} meta
+ * @returns {string} HTML, or '' if meta.topK is undefined
+ */
+function formatSettingsChips(meta) {
+  if (meta.topK === undefined) return '';
+  const items = [
+    ['Blocks to search', meta.topK],
+    ['Consistency', meta.temperature],
+    ['Repeat penalty', meta.repeatPenalty !== undefined ? meta.repeatPenalty : 'model default (1.1)'],
+    ['Max answer length', meta.maxTokens !== undefined ? meta.maxTokens : 'no limit'],
+    ['Request size', meta.numCtx !== undefined ? meta.numCtx : 'model default'],
+    // Mirrors exactly what the "Enable thinking" checkbox means server-side
+    // (see the comment on thinkCheckbox in script.js's submit handler):
+    // checked omits `think` entirely and leaves the model's own default in
+    // place (thinking on, for models that support it) -- unchecked sends
+    // `think: false` explicitly. There's no way to distinguish "checked"
+    // from "this model doesn't support thinking at all" from meta alone,
+    // so "on (default)" is deliberately non-committal about whether
+    // thinking actually happened.
+    ['Thinking', meta.think === false ? 'off' : 'on (default)'],
+    ['Attributes per call', meta.attributesPerCall !== undefined ? meta.attributesPerCall : 'all'],
+  ];
+  return items.map(([label, value]) => `<span class="chip">${escapeHtml(label)}: ${escapeHtml(value)}</span>`).join(' ');
+}
+
+/**
  * Builds a complete, self-contained HTML report from a rubric
  * analysis's accumulated `batches` data — a standalone <!doctype html>
  * document (its own inline <style>, no dependency on this app's
@@ -211,7 +264,15 @@ function renderResultTextHtml(resultText) {
  * attribute's batch.
  *
  * @param {Array<{sources?: Array<{sourceFile: string, chunkIndex: number}>, records?: Array<{name: string, proposal: string, resultText: string, category: string}>, batchIndex: number, totalBatches?: number, promptTokens?: number, answerTokens?: number, doneReason?: string}>} batches
- * @param {{workspaceId?: string, topicLabel?: string|null, question?: string, chatModel?: string, numCtx?: number, elapsedMs?: number, appName?: string}} meta
+ * @param {{workspaceId?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
+ *   `topK` through `attributesPerCall` are the run's Advanced-settings
+ *   values, rendered as the "Settings" chip row by formatSettingsChips()
+ *   above -- see that function's own doc comment for exactly what each
+ *   one means and why Relevance/`threshold` is deliberately not among
+ *   them. Omitting `topK` specifically (rather than any other field
+ *   here) omits the whole row, so a caller that predates this feature,
+ *   or that genuinely has no settings to report, doesn't need to pass
+ *   anything different than it already did.
  *   `elapsedMs` is the same run-duration number the on-screen timer
  *   next to Ask/Stop shows (script.js's `lastRunElapsedMs`) for the
  *   browser's own "Export HTML" download, or the server's own
@@ -240,6 +301,11 @@ function buildAttributeResultsHtml(batches, meta) {
     meta.topicLabel ? ['Ideal-proposal topic', escapeHtml(meta.topicLabel)] : null,
     meta.question ? ['Question', escapeHtml(meta.question)] : null,
     meta.chatModel ? ['Model', escapeHtml(meta.chatModel)] : null,
+    // Not run through escapeHtml() like the other rows here -- this one's
+    // value is already-safe markup (a run of <span class="chip"> pills)
+    // built entirely from escapeHtml()'d pieces inside formatSettingsChips()
+    // itself, not a plain string that would need escaping again.
+    (() => { const chips = formatSettingsChips(meta); return chips ? ['Settings', chips] : null; })(),
     ['Generated', escapeHtml(generatedAt)],
     // != null (not a truthiness check): 0ms is a real, if unlikely,
     // elapsed time and should still render as "0.0s" rather than
@@ -358,6 +424,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatElapsedMs,
     formatBatchSummary,
     renderResultTextHtml,
+    formatSettingsChips,
     buildAttributeResultsHtml,
   };
 }

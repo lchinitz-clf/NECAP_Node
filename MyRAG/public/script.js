@@ -2784,16 +2784,42 @@ function init() {
     // rather than from any state captured back when the query actually
     // ran — this is just for the report's header, and re-reading live
     // avoids needing to plumb a separate "what were the settings for
-    // this answer" object through every batch-done event.
+    // this answer" object through every batch-done event. Same
+    // blank-means-omit / 0-is-meaningful conventions as the submit
+    // handler above for each field — see its own comments for why.
+    const topK = Number(document.getElementById('topK').value) || 5;
+    const rawTemperature = document.getElementById('temperature').value;
+    const temperature = rawTemperature === '' || Number.isNaN(Number(rawTemperature))
+      ? undefined
+      : Number(rawTemperature);
+    const rawRepeatPenalty = document.getElementById('repeatPenalty').value;
+    const repeatPenalty = rawRepeatPenalty === '' || Number.isNaN(Number(rawRepeatPenalty))
+      ? undefined
+      : Number(rawRepeatPenalty);
+    const rawMaxTokens = document.getElementById('maxTokens').value;
+    const maxTokens = rawMaxTokens === '' || Number.isNaN(Number(rawMaxTokens))
+      ? undefined
+      : Number(rawMaxTokens);
     const rawNumCtx = document.getElementById('numCtx').value;
     const numCtx = rawNumCtx === '' || Number.isNaN(Number(rawNumCtx)) ? undefined : Number(rawNumCtx);
+    const rawAttributesPerCall = document.getElementById('attributesPerCall').value;
+    const attributesPerCall = rawAttributesPerCall === '' || Number.isNaN(Number(rawAttributesPerCall))
+      ? undefined
+      : Number(rawAttributesPerCall);
+    const think = thinkCheckbox.checked ? undefined : false;
     const selectedTopicOpt = idealTopicSelect.selectedOptions[0];
     const meta = {
       workspaceId: getWorkspaceId() || undefined,
       topicLabel: idealTopicSelect.value ? (selectedTopicOpt?.dataset.label || selectedTopicOpt?.text) : null,
       question: document.getElementById('question').value.trim() || undefined,
       chatModel: chatModelSelect.value || undefined,
+      topK,
+      temperature,
+      repeatPenalty,
+      maxTokens,
       numCtx,
+      think,
+      attributesPerCall,
       appName: currentAppName,
       // Unlike the fields above, NOT re-read live — there's no live
       // form field for "how long did that run take." lastRunElapsedMs

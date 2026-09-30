@@ -155,7 +155,16 @@ function getTransporter() {
  *   entry per batch actually run, each with its own `records` and
  *   `sources`.
  * @param {string} [params.chatModel]
+ * @param {number} [params.topK]
+ * @param {number} [params.temperature]
+ * @param {number} [params.repeatPenalty]
+ * @param {number} [params.maxTokens]
  * @param {number} [params.numCtx]
+ * @param {boolean} [params.think] - forwarded as-is to
+ *   buildAttributeResultsHtml()'s formatSettingsChips(); see that
+ *   function's own doc comment in public/reportHtml.js for what `false`
+ *   vs. undefined means here (mirrors the "Enable thinking" checkbox).
+ * @param {number} [params.attributesPerCall]
  * @param {number} [params.elapsedMs] - how long /query/stream's own
  *   handler ran for this request (see the `requestStartedAt` timing in
  *   index.js) — the server-side stand-in for the browser's own
@@ -167,7 +176,7 @@ function getTransporter() {
  * @returns {Promise<void>} always resolves — see this module's doc
  *   comment for why it never rejects.
  */
-async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, numCtx, elapsedMs }) {
+async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, topK, temperature, repeatPenalty, maxTokens, numCtx, think, attributesPerCall, elapsedMs }) {
   if (!isConfigured) {
     if (!warnedNotConfigured) {
       console.warn(
@@ -217,7 +226,20 @@ async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyE
       .map(([label, n]) => `${n} ${label}`)
       .join(', ') || 'no attributes could be parsed from the answer — see the attached report for the raw text';
 
-    const html = buildAttributeResultsHtml(batches, { workspaceId, topicLabel, chatModel, numCtx, elapsedMs, appName: getAppName() });
+    const html = buildAttributeResultsHtml(batches, {
+      workspaceId,
+      topicLabel,
+      chatModel,
+      topK,
+      temperature,
+      repeatPenalty,
+      maxTokens,
+      numCtx,
+      think,
+      attributesPerCall,
+      elapsedMs,
+      appName: getAppName(),
+    });
     const subject = `Rubric analysis finished: ${topicLabel} (${workspaceId})`;
     // Plain text, not HTML, for the email body itself — deliberately
     // NOT trying to inline the styled report here: email clients are

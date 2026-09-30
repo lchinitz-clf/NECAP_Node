@@ -1509,7 +1509,13 @@ app.post('/query/stream', async (req, res) => {
           notifyEmailTo,
           batches: batchesForReport,
           chatModel: resolvedChatModel,
+          topK,
+          temperature,
+          repeatPenalty,
+          maxTokens,
           numCtx,
+          think,
+          attributesPerCall,
           elapsedMs: Date.now() - requestStartedAt,
         }).catch((err) => console.error('[query/stream] unexpected error sending completion email:', err));
       }
