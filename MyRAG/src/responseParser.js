@@ -635,28 +635,47 @@ function chunkContainsOrderedPieces(haystack, pieces) {
 function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
 
-  // Besides collapsing whitespace runs, this also reassembles a common
-  // PDF-extraction artifact: a word that was hyphenated across a line
-  // break in the original document ("Sea-\nlevel rise") frequently comes
-  // out of extraction as "Sea- level rise" — the hyphen followed by a
-  // stray space instead of running straight into the next word. A model
-  // quoting the same passage typically writes it the normal way,
-  // "Sea-level rise" (no space), since that's how the word actually
-  // reads. Those are the same words to a human, but this function used
-  // to only collapse whitespace, so that single space was enough to fail
-  // an otherwise-exact substring match for the model's ENTIRE quote (a
-  // real observed case, confirmed against real chunk text with this
-  // exact artifact). The replace below removes the space in "sea- level"
-  // (-> "sea-level") whenever a hyphen/dash sits directly between two
-  // word characters with whitespace after it — never touching a dash
-  // used as ordinary punctuation (" - ", "word — word"), which always
-  // has a space BEFORE the dash too and so doesn't match `\w[-‐-
-  // ―]\s`.
+  // Whitespace-BLIND matching: every whitespace character (space, tab,
+  // newline) is stripped out entirely, not just collapsed, so two
+  // strings that agree on every non-whitespace character but disagree
+  // on exactly where the whitespace falls are treated as identical.
+  // This exists because of a real, repeatedly observed PDF-extraction
+  // artifact: pdf-parse occasionally inserts a stray space in the
+  // middle of an ordinary word, with no relation to hyphenation or line
+  // wrapping at all — confirmed against real chunk text as "Long-te rm"
+  // (for "Long-term"), "Ic e" (for "Ice"), "re al-ti me" (for
+  // "real-time"), "re ly" (for "rely"), and "st orm" (for "storm"), all
+  // from the same single retrieved chunk. A model quoting the same
+  // passage naturally writes the word the normal way, with no stray
+  // space, since that's how the word actually reads — so what should be
+  // an exact, verbatim quote was instead coming back "NOT found
+  // verbatim in any retrieved chunk" purely because of where pdf-parse
+  // happened to split a word, not because of anything wrong with the
+  // quote.
+  //
+  // An earlier version of this function only collapsed repeated
+  // whitespace into one space and separately special-cased a stray
+  // space right after a hyphen ("sea- level" -> "sea-level"). That
+  // narrower fix covered a word broken at a real hyphen but not one
+  // broken anywhere else in the word (exactly the "Ic e" / "re ly"
+  // shape above), so it's replaced here by stripping whitespace
+  // unconditionally — which also makes the old hyphen-specific
+  // replace redundant, since removing every space around a hyphen
+  // has the same end result as the old regex intended.
+  //
+  // Known false-positive risk, accepted deliberately (same tradeoff
+  // class as looksLikeContinuation() in structuredText.js): because
+  // whitespace no longer marks a word boundary at all once both sides
+  // are stripped, a FABRICATED quote formed by jamming two real
+  // adjacent words together (e.g. writing "catfish" when the chunk
+  // actually has "...the cat. Fish..." elsewhere) could in principle
+  // be misreported as verified. This is judged far less likely in
+  // practice than the genuine extraction artifact above, and it's a
+  // strict broadening of a risk this function already accepted for the
+  // hyphen case specifically — see this function's own doc comment.
   const normalize = (s) => String(s || '')
     .toLowerCase()
-    .replace(/(\w)[-‐-―]\s+(\w)/g, '$1-$2')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/\s+/g, '');
 
   const rawPieces = splitQuoteOnEllipsis(quote);
   if (rawPieces.length === 0) return null; // e.g. the "quote" was just an ellipsis with nothing else
