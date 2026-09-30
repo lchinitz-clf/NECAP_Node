@@ -27,166 +27,207 @@
       "attributes": [
         {
           "name": "IF1 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?"
+          "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?",
+          "included": true
         },
         {
           "name": "IF2 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan identify the number of projected extreme INLAND OR STORMWATER FLOODING days by 2050, and how does it compare to current conditions?"
+          "proposal": "Does the plan identify the number of projected extreme INLAND OR STORMWATER FLOODING days by 2050, and how does it compare to current conditions?",
+          "included": true
         },
         {
           "name": "IF3 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan specify which regions or municipalities face the highest projected INLAND OR STORMWATER FLOODING risk?"
+          "proposal": "Does the plan specify which regions or municipalities face the highest projected INLAND OR STORMWATER FLOODING risk?",
+          "included": true
         },
         {
           "name": "IF4 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Which specific neighborhoods or census tracts are most vulnerable to INLAND OR STORMWATER FLOODING?"
+          "proposal": "Which specific neighborhoods or census tracts are most vulnerable to INLAND OR STORMWATER FLOODING?",
+          "included": true
         },
         {
           "name": "IF5 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan address risks associated with different types of inland flooding?"
+          "proposal": "Does the plan address risks associated with different types of inland flooding?",
+          "included": true
         },
         {
           "name": "IF6 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "How the plan improve the quality and accuracy of flood monitoring and forecasting?"
+          "proposal": "How the plan improve the quality and accuracy of flood monitoring and forecasting?",
+          "included": true
         },
         {
           "name": "IF7 - Policy and Regulatory Implementation - Building Codes",
-          "proposal": "Does the plan propose changes to building codes that promote resilience to flooding?"
+          "proposal": "Does the plan propose changes to building codes that promote resilience to flooding?",
+          "included": true
         },
         {
           "name": "IF8 - Policy and Regulatory Implementation - Disclosure",
-          "proposal": "Does the plan create statewide flood risk disclosure requirements for the rental and sale of residential properties?"
+          "proposal": "Does the plan create statewide flood risk disclosure requirements for the rental and sale of residential properties?",
+          "included": true
         },
         {
           "name": "IF9 - Policy and Regulatory Implementation - Zoning",
-          "proposal": "Does the plan propose zoning reforms to discourage or prevent development within floodplains?"
+          "proposal": "Does the plan propose zoning reforms to discourage or prevent development within floodplains?",
+          "included": true
         },
         {
           "name": "IF10 - Policy and Regulatory Implementation - Regulatory",
-          "proposal": "Does the plan create incentives for the insurance industry to offer discounts to homeowners who implement flood mitigation measures?"
+          "proposal": "Does the plan create incentives for the insurance industry to offer discounts to homeowners who implement flood mitigation measures?",
+          "included": true
         },
         {
           "name": "IF11 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "How does the plan support municipalities in developing local INLAND OR STORMWATER FLOODING resilience plans?"
+          "proposal": "How does the plan support municipalities in developing local INLAND OR STORMWATER FLOODING resilience plans?",
+          "included": true
         },
         {
           "name": "IF12 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "Does the plan encourage municipalities to collaborate in adaptation planning at the watershed level?"
+          "proposal": "Does the plan encourage municipalities to collaborate in adaptation planning at the watershed level?",
+          "included": true
         },
         {
           "name": "IF13 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "Does the plan assist municipalities in identifying physical assets most vulnerable to flooding?"
+          "proposal": "Does the plan assist municipalities in identifying physical assets most vulnerable to flooding?",
+          "included": true
         },
         {
           "name": "IF14 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "Does the plan assist municipalities in indentifying neighborhoods and populations most vulnerable to flooding?"
+          "proposal": "Does the plan assist municipalities in indentifying neighborhoods and populations most vulnerable to flooding?",
+          "included": true
         },
         {
           "name": "IF15 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "Does the plan encourage municipal participation in the Community Rating System (CRS) to create discounts National Flood Insurance Program (NFIP) premiums for its residents?"
+          "proposal": "Does the plan encourage municipal participation in the Community Rating System (CRS) to create discounts National Flood Insurance Program (NFIP) premiums for its residents?",
+          "included": true
         },
         {
           "name": "IF16 - Local Capacity Building - Community Outreach",
-          "proposal": "Does the plan outline public education campaigns about inland flooding risks?"
+          "proposal": "Does the plan outline public education campaigns about inland flooding risks?",
+          "included": true
         },
         {
           "name": "IF17 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan improve and fund flood monitoring and early warning systems?"
+          "proposal": "Does the plan improve and fund flood monitoring and early warning systems?",
+          "included": true
         },
         {
           "name": "IF18 - Disaster Response and Preparedness - Emergency Identification",
-          "proposal": "Does the plan promote real time control of reservoirs and detention basins?"
+          "proposal": "Does the plan promote real time control of reservoirs and detention basins?",
+          "included": true
         },
         {
           "name": "IF19 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan promote and fund the creation of Resilience Hubs?"
+          "proposal": "Does the plan promote and fund the creation of Resilience Hubs?",
+          "included": true
         },
         {
           "name": "IF20 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan outline protocols for protecting unhoused residents during inland flooding events?"
+          "proposal": "Does the plan outline protocols for protecting unhoused residents during inland flooding events?",
+          "included": true
         },
         {
           "name": "IF21 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan include surge capacity planning for hospitals and EMS during inland flooding events?"
+          "proposal": "Does the plan include surge capacity planning for hospitals and EMS during inland flooding events?",
+          "included": true
         },
         {
           "name": "IF22 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
-          "proposal": "What strategies will be used to protect or restore floodplains?"
+          "proposal": "What strategies will be used to protect or restore floodplains?",
+          "included": true
         },
         {
           "name": "IF23 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
-          "proposal": "What strategies will be used to repair or remove dams at risk of failure?"
+          "proposal": "What strategies will be used to repair or remove dams at risk of failure?",
+          "included": true
         },
         {
           "name": "IF24 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
-          "proposal": "Does the plan create or protect riparian buffers?"
+          "proposal": "Does the plan create or protect riparian buffers?",
+          "included": true
         },
         {
           "name": "IF25 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
-          "proposal": "Does the plan encourage the use of green infrastructure to reduce runoff?"
+          "proposal": "Does the plan encourage the use of green infrastructure to reduce runoff?",
+          "included": true
         },
         {
           "name": "IF26 - Adaptation Strategies & Long-Term Actions - Buyouts",
-          "proposal": "Does the plan offer voluntary buyouts or relocation assistance to people living in floodplains?"
+          "proposal": "Does the plan offer voluntary buyouts or relocation assistance to people living in floodplains?",
+          "included": true
         },
         {
           "name": "IF27 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "Does that plan reduce flooding risk by elevating structures, utilities, and roads?"
+          "proposal": "Does that plan reduce flooding risk by elevating structures, utilities, and roads?",
+          "included": true
         },
         {
           "name": "IF28 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "Does the plan explicitly address flooding risks to drinking water and wastewater utilities?"
+          "proposal": "Does the plan explicitly address flooding risks to drinking water and wastewater utilities?",
+          "included": true
         },
         {
           "name": "IF29 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "Does the plan address the impact of flooding on combined sewer overflows (CSOs)?"
+          "proposal": "Does the plan address the impact of flooding on combined sewer overflows (CSOs)?",
+          "included": true
         },
         {
           "name": "IF30 - Equity & Environmental Justice - Distribution of Impacts",
-          "proposal": "How does the plan address disproportionate risk of flooding in low-income communities?"
+          "proposal": "How does the plan address disproportionate risk of flooding in low-income communities?",
+          "included": true
         },
         {
           "name": "IF31 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "What community engagement processes does the plan require for resilience strategies for inland flooding?"
+          "proposal": "What community engagement processes does the plan require for resilience strategies for inland flooding?",
+          "included": true
         },
         {
           "name": "IF32 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents facing flooding risks?"
+          "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents facing flooding risks?",
+          "included": true
         },
         {
           "name": "IF33 - Equity & Environmental Justice - System Adaptation",
-          "proposal": "How does the plan ensure that flood resilience investments do not contribute to displacement or gentrification?"
+          "proposal": "How does the plan ensure that flood resilience investments do not contribute to displacement or gentrification?",
+          "included": true
         },
         {
           "name": "IF34 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "Does the plan address multilingual or culturally specific communication needs?"
+          "proposal": "Does the plan address multilingual or culturally specific communication needs?",
+          "included": true
         },
         {
           "name": "IF35 - Equity & Environmental Justice - Distribution of Impacts",
-          "proposal": "Does the plan commit to prioritizing flood mitigation in environmental justice communities?"
+          "proposal": "Does the plan commit to prioritizing flood mitigation in environmental justice communities?",
+          "included": true
         },
         {
           "name": "IF36 - Accountability & Governance - Roles and Responsibilities",
-          "proposal": "Which agencies are responsible for implementing different components of the state’s inland flooding resilience strategies?"
+          "proposal": "Which agencies are responsible for implementing different components of the state’s inland flooding resilience strategies?",
+          "included": true
         },
         {
           "name": "IF37 - Accountability & Governance - Funding and financing",
-          "proposal": "Does the plan identify funding sources for inland flooding resilience work?"
+          "proposal": "Does the plan identify funding sources for inland flooding resilience work?",
+          "included": true
         },
         {
           "name": "IF38 - Accountability & Governance - Costs",
-          "proposal": "Does the plan estimate the cost of proposed inland flooding resilience actions?"
+          "proposal": "Does the plan estimate the cost of proposed inland flooding resilience actions?",
+          "included": true
         },
         {
           "name": "IF39 - Accountability & Governance - Funding and financing",
-          "proposal": "Are there funding mechanisms dedicated to inland flooding mitigation and resilience?"
+          "proposal": "Are there funding mechanisms dedicated to inland flooding mitigation and resilience?",
+          "included": true
         },
         {
           "name": "IF40 - Accountability & Governance - Indicators",
-          "proposal": "What metrics does the plan propose to track progress on reducing flood risk?"
+          "proposal": "What metrics does the plan propose to track progress on reducing flood risk?",
+          "included": true
         }
       ],
-      "description": "Policy proposals for inland flooding."
+      "description": "Policy proposals for inland flooding.",
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
     },
     {
       "id": "coastal-resilience",
@@ -1240,12 +1281,12 @@
         {
           "name": "Haz11-heat",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to excessive heat events?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz11-heat-people",
-          "proposal": "Does the plan quantify the number of people exposed to excessive heat events?",
-          "included": false
+          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive heat events?",
+          "included": true
         },
         {
           "name": "Haz11-flood",
