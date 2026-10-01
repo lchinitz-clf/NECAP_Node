@@ -29,7 +29,9 @@ const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = requi
 const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes } = require('./src/idealProposals');
+const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes, resolveInstructionText, HARDCODED_FALLBACK_COMPARE_INSTRUCTION } = require('./src/idealProposals');
+const { loadBestPracticeAttributes } = require('./src/bestPractices');
+const { filterBestPracticeAttributes, listDistinctHazards, listDistinctStates } = require('./src/bestPracticesFilter');
 const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank, verifyQuotesInPlace } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
@@ -135,6 +137,34 @@ app.get('/models', async (req, res) => {
 app.get('/ideal-proposals', (req, res) => {
   try {
     res.json({ topics: listTopicSummaries() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /best-practices/filters
+ *
+ * Every distinct hazard and state value actually present in
+ * bestPractices.json, for populating the Best Practices Comparison
+ * tab's Hazard/State dropdowns straight from whatever the loaded
+ * dataset actually contains (see listDistinctHazards()/
+ * listDistinctStates() in src/bestPracticesFilter.js) — same
+ * "server resolves the real list, browser just shows it" pattern
+ * /ideal-proposals above already uses for topics. A missing
+ * bestPractices.json yields `{hazards: [], states: []}`, not an
+ * error — same "this feature is entirely optional" treatment
+ * idealProposals.json gets above, via loadBestPracticeAttributes()
+ * already returning [] for a missing file.
+ */
+app.get('/best-practices/filters', (req, res) => {
+  try {
+    const attributes = loadBestPracticeAttributes();
+    res.json({
+      hazards: listDistinctHazards(attributes),
+      states: listDistinctStates(attributes),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -1060,6 +1090,64 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
   ];
 }
 
+/**
+ * Builds a synthetic "topic" object — same shape getTopic() in
+ * idealProposals.js returns (id, label, attributes, resolved
+ * compareInstruction) — out of a hazard/state filter over the Best
+ * Practices benchmark dataset, so it can be handed to EXACTLY the same
+ * comparison machinery a hand-authored idealProposals.json topic
+ * already goes through below (batchAttributes(), composeComparisonQuestion(),
+ * composeRetrievalQuery(), parseComparisonAnswer()) with no changes to
+ * any of that code. The only thing genuinely new here is building this
+ * one object; everything downstream of it is reused as-is, per "let's
+ * reuse what we have until it's clear we need something else."
+ *
+ * `compareInstruction` is resolved the same way getTopic() resolves it
+ * for a topic that doesn't set its own override: idealProposals.json's
+ * file-level defaultCompareInstruction if set, else
+ * HARDCODED_FALLBACK_COMPARE_INSTRUCTION. There's no per-entry override
+ * mechanism here (unlike a hand-authored topic's own optional
+ * compareInstruction) — every Best Practices comparison uses whichever
+ * instruction every OTHER topic without its own override already uses,
+ * deliberately not special-cased, per the "reuse what we have" plan;
+ * worth revisiting once a real run shows whether this wording actually
+ * fits comparing against a real example rather than an idealized
+ * standard.
+ *
+ * The returned attributes have no `included` field, which
+ * getIncludedAttributes()'s isAttributeIncluded() check already treats
+ * as "included" (its default for anything other than an explicit
+ * `included: false`) — so getIncludedAttributes() can be called on
+ * this synthetic topic exactly as it's called on a real one, with no
+ * special-casing needed there either.
+ *
+ * @param {string} hazard - required; see filterBestPracticeAttributes()
+ *   in src/bestPracticesFilter.js for why this one can't be omitted.
+ * @param {string} [state] - omit to match every state that has an
+ *   entry for this hazard.
+ * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string}}
+ * @throws {Error} whatever loadBestPracticeAttributes()/
+ *   filterBestPracticeAttributes() throw (a malformed bestPractices.json,
+ *   or a missing hazard) — left for the caller to turn into the right
+ *   HTTP response, same pattern the idealTopicId resolution right below
+ *   this function already follows.
+ */
+function buildBestPracticesTopic(hazard, state) {
+  const allAttributes = loadBestPracticeAttributes();
+  const attributes = filterBestPracticeAttributes(allAttributes, { hazard, state });
+
+  const { defaultCompareInstruction } = loadTopics();
+  const compareInstruction =
+    resolveInstructionText(defaultCompareInstruction) || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
+
+  return {
+    id: 'best-practices',
+    label: `Best Practices Benchmark (${hazard}${state ? `, ${state}` : ''})`,
+    attributes,
+    compareInstruction,
+  };
+}
+
 function sourcesSummary(matches) {
   return matches.map((m) => ({
     id: m.id,
@@ -1075,7 +1163,7 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, think, attributesPerCall } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
@@ -1094,10 +1182,26 @@ app.post('/query', async (req, res) => {
       return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
     }
     if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
+  } else if (bestPracticesFilter && bestPracticesFilter.hazard) {
+    // Same shape as a real topic (see buildBestPracticesTopic()'s doc
+    // comment above) — everything below this point treats it
+    // identically to one resolved via getTopic(), no special-casing.
+    try {
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazard, bestPracticesFilter.state);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
+    }
+    if (topic.attributes.length === 0) {
+      return res.status(400).json({
+        error: `No Best Practices entries match hazard "${bestPracticesFilter.hazard}"` +
+          (bestPracticesFilter.state ? ` in state "${bestPracticesFilter.state}".` : '.'),
+      });
+    }
   }
 
   if (!question && !topic) {
-    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
+    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic, or a Best Practices hazard, to compare against)' });
   }
 
   // `batches` is what makes the "attributes per call" Advanced setting
@@ -1350,13 +1454,14 @@ app.post('/query/stream', async (req, res) => {
   // independent measurement isn't worth the complexity of somehow
   // threading the client's own number back in after the fact.
   const requestStartedAt = Date.now();
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
   // Same topic-resolution rules as /query above — kept before anything
-  // streams, so a bad idealTopicId or a broken idealProposals.json
-  // still comes back as a clean HTTP error rather than a stream event.
+  // streams, so a bad idealTopicId/bestPracticesFilter or a broken
+  // idealProposals.json/bestPractices.json still comes back as a clean
+  // HTTP error rather than a stream event.
   let topic;
   if (idealTopicId) {
     try {
@@ -1366,10 +1471,23 @@ app.post('/query/stream', async (req, res) => {
       return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
     }
     if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
+  } else if (bestPracticesFilter && bestPracticesFilter.hazard) {
+    try {
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazard, bestPracticesFilter.state);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
+    }
+    if (topic.attributes.length === 0) {
+      return res.status(400).json({
+        error: `No Best Practices entries match hazard "${bestPracticesFilter.hazard}"` +
+          (bestPracticesFilter.state ? ` in state "${bestPracticesFilter.state}".` : '.'),
+      });
+    }
   }
 
   if (!question && !topic) {
-    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic to compare against)' });
+    return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic, or a Best Practices hazard, to compare against)' });
   }
 
   // See the long comment on batchAttributes() in src/idealProposals.js

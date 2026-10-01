@@ -1237,12 +1237,20 @@ let answerToggle;
 // first-time visitor on the Introduction tab rather than the middle
 // of the app. Anyone who has already used the app keeps whatever tab
 // they were last on, same as always.
-const TAB_IDS = ['intro', 'documents', 'rubric', 'query', 'logs'];
+// 'bestPractices' registered here (and nowhere else in this file) so
+// the existing hamburger-menu/tab-switching machinery below knows that
+// panel exists. Its own behavior -- what's in the panel, what it does
+// on click -- is intentionally NOT in this file; see
+// public/bestPracticesTab.js's doc comment for why that's kept
+// separate, and index.html's <body onload> for how it gets
+// initialized without this file ever calling into it.
+const TAB_IDS = ['intro', 'documents', 'rubric', 'query', 'bestPractices', 'logs'];
 const TAB_LABELS = {
   intro: 'Introduction',
   documents: 'Document Management',
   rubric: 'Rubric Control',
   query: 'Query and Response',
+  bestPractices: 'Best Practices Comparison',
   logs: 'Logs',
 };
 // Which tab was open persists across a reload, same

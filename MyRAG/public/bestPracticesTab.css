@@ -1,0 +1,33 @@
+/**
+ * Styles for the "Best Practices Comparison" tab only -- kept in its
+ * own file, linked separately in index.html, rather than appended to
+ * style.css, for the same isolation reason bestPracticesTab.js is its
+ * own file: see that file's doc comment. Every rule here is scoped
+ * under #tabPanel-bestPractices or targets a bp-prefixed class/id that
+ * only this tab's markup uses, so nothing here can collide with or
+ * accidentally restyle anything else on the page.
+ */
+
+#tabPanel-bestPractices .bp-category-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+#tabPanel-bestPractices .bp-sources-cell {
+  font-size: 0.82rem;
+  color: var(--text-muted, #666);
+}
+
+#tabPanel-bestPractices #bpResultWrap table {
+  table-layout: auto;
+}
+
+#tabPanel-bestPractices #bpResultSummary {
+  font-size: 0.88rem;
+  margin: 0.25rem 0 0.75rem;
+}

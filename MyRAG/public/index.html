@@ -4,6 +4,11 @@
 <meta charset="utf-8" />
 <title>local-rag</title>
 <link rel="stylesheet" href="style.css" />
+<!-- Best Practices Comparison tab: its own CSS/JS files, loaded
+     separately from everything above, on purpose -- see
+     bestPracticesTab.js's doc comment for why this tab's whole
+     implementation is kept out of style.css/script.js. -->
+<link rel="stylesheet" href="bestPracticesTab.css" />
 <!-- reportHtml.js and validation.js must load before script.js: both
      define plain globals (buildAttributeResultsHtml(), etc. /
      isValidEmailAddress()) that script.js calls directly — see each
@@ -12,8 +17,9 @@
 <script src="reportHtml.js"></script>
 <script src="validation.js"></script>
 <script src="script.js"></script>
+<script src="bestPracticesTab.js"></script>
 </head>
-<body onload="init()">
+<body onload="init(); initBestPracticesTab()">
 
 <div class="app-header">
   <div>
@@ -45,6 +51,7 @@
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="documents">Document Management</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="rubric">Rubric Control</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="query">Query and Response</button>
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="bestPractices">Best Practices Comparison</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="logs">Logs</button>
     </div>
   </div>
@@ -747,6 +754,91 @@
 </section>
 
 </div><!-- /tabPanel-query -->
+
+<!-- Best Practices Comparison tab. All behavior lives in
+     bestPracticesTab.js (loaded in <head>, initialized via
+     initBestPracticesTab() in <body onload>) -- see that file's own
+     doc comment for why it's a dedicated file rather than an addition
+     to script.js. The only thing shared with any other tab is the
+     #workspace field up in the Document storage area card above,
+     which every workspace-scoped tab already reads the same way. -->
+<div id="tabPanel-bestPractices" class="tab-panel">
+<section class="card">
+  <h2>Best Practices Comparison</h2>
+  <p class="hint">
+    Compares the plan embedded in the storage area above against a
+    benchmark set of real-world climate-adaptation initiatives. Pick a
+    hazard (and, optionally, a state) below; every matching benchmark
+    entry is run through the same per-attribute comparison Rubric
+    Control uses, just sourced from the Best Practices dataset instead
+    of a hand-written rubric.
+  </p>
+
+  <!-- Read-only -- the actual control lives on the Query and Response
+       tab's #chatModel dropdown. See bestPracticesTab.js's
+       refreshChatModelNote()/getChatModel() for how this stays in
+       sync without duplicating that control here. -->
+  <p class="hint" id="bpChatModelNote"></p>
+
+  <label for="bpHazard">Hazard</label>
+  <select id="bpHazard">
+    <option value="">Loading hazards...</option>
+  </select>
+
+  <label for="bpState">State</label>
+  <select id="bpState">
+    <option value="">All states</option>
+  </select>
+  <p class="hint">
+    Leave as "All states" to compare against every state's entries for
+    this hazard, or pick one state to narrow it down.
+  </p>
+
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <label for="bpAttributesPerCall">Attributes per call</label>
+    <input type="number" id="bpAttributesPerCall" value="1" placeholder="all" min="1" step="1" />
+    <details class="tip">
+      <summary aria-label="More information">&#9432;</summary>
+      <span>
+        How many benchmark entries to ask the model about in a single
+        call. A hazard can match a lot of entries (some hazards match
+        well over a hundred), so this defaults to 1 -- one entry per
+        call, same default Rubric Control uses, and for the same
+        reason: it's the most reliable to parse. Raising it trades
+        reliability for fewer, larger calls; leave it blank for "all
+        matching entries in one call," which is not recommended once
+        the match count gets large.
+      </span>
+    </details>
+  </details>
+
+  <div class="button-row" style="margin-top: 1rem;">
+    <button type="button" id="bpCompareBtn" disabled>Compare</button>
+    <button type="button" id="bpStopBtn" class="btn-secondary" style="display:none;">Stop</button>
+  </div>
+
+  <div class="status" id="bpStatus"></div>
+  <div id="bpProgressWrap" style="display:none;">
+    <progress id="bpProgressBar"></progress>
+  </div>
+  <div class="error" id="bpError"></div>
+
+  <div id="bpResultWrap" style="display:none;">
+    <p id="bpResultSummary"></p>
+    <div class="button-row" style="margin: 0 0 0.5rem;">
+      <button type="button" id="bpDownloadCsvBtn" class="btn-secondary">Download CSV</button>
+      <button type="button" id="bpDownloadHtmlBtn" class="btn-secondary">Export HTML</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Best Practice</th><th>Result</th><th>Analysis</th><th>Sources</th></tr>
+      </thead>
+      <tbody id="bpResultsBody"></tbody>
+    </table>
+  </div>
+</section>
+</div><!-- /tabPanel-bestPractices -->
 
 <div id="tabPanel-logs" class="tab-panel">
 
