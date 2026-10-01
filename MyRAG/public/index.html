@@ -404,53 +404,56 @@
       </details>
     </div>
 
-    <div>
-      <label for="notifyEmail" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
-        <input type="checkbox" id="notifyEmail" style="width:auto;" />
-        Email me when this finishes
-      </label>
-      <!-- type="text", not type="email": a type="email" input runs the
-           browser's OWN native format check before the form's "submit"
-           event even fires, which would silently swallow the submit
-           entirely for a malformed (non-empty) address — our own inline
-           error message below (driven by isValidEmailAddress() in
-           validation.js, the single shared check this app uses
-           everywhere) would never even get a chance to show, and
-           whatever error was already on screen from a previous attempt
-           would just sit there unexplained. autocomplete="email" alone
-           is enough to get browser autofill suggestions without that
-           side effect. -->
-      <input
-        type="text"
-        id="notifyEmailTo"
-        placeholder="you@example.com"
-        autocomplete="email"
-        style="margin-top:0.4rem;"
-      />
-      <p class="error" id="notifyEmailToError" style="display:none;"></p>
-      <p class="hint" id="notifyEmailHint">
-        Only meaningful for a comparison against an ideal-proposal
-        topic above — sends a summary plus the same HTML report the
-        "Export HTML" button below produces, to whatever address is
-        typed above. Nothing is sent, and nothing is remembered, if
-        the box is left blank or isn't a valid address — there's no
-        server-side default recipient. Requires this tab to stay open
-        for the whole run, same as today: closing it still stops the
-        analysis (same as the Stop button), so nothing gets sent for a
-        run that never finished.
-      </p>
-      <details class="tip">
-        <summary aria-label="More information">&#9432;</summary>
-        <span>
-          The server also needs GMAIL_USER and GMAIL_APP_PASSWORD set in
-          its .env before it can send anything at all, regardless of
-          what address you type here — see README.md. Checking this
-          box with a valid address when that isn't configured is
-          harmless: nothing sends, and a note is logged on the server
-          instead.
-        </span>
-      </details>
-    </div>
+    <details class="advanced" id="notifyEmailDetails">
+      <summary>Email notification</summary>
+      <div>
+        <label for="notifyEmail" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+          <input type="checkbox" id="notifyEmail" style="width:auto;" />
+          Email me when this finishes
+        </label>
+        <!-- type="text", not type="email": a type="email" input runs the
+             browser's OWN native format check before the form's "submit"
+             event even fires, which would silently swallow the submit
+             entirely for a malformed (non-empty) address — our own inline
+             error message below (driven by isValidEmailAddress() in
+             validation.js, the single shared check this app uses
+             everywhere) would never even get a chance to show, and
+             whatever error was already on screen from a previous attempt
+             would just sit there unexplained. autocomplete="email" alone
+             is enough to get browser autofill suggestions without that
+             side effect. -->
+        <input
+          type="text"
+          id="notifyEmailTo"
+          placeholder="you@example.com"
+          autocomplete="email"
+          style="margin-top:0.4rem;"
+        />
+        <p class="error" id="notifyEmailToError" style="display:none;"></p>
+        <p class="hint" id="notifyEmailHint">
+          Only meaningful for a comparison against an ideal-proposal
+          topic above — sends a summary plus the same HTML report the
+          "Export HTML" button below produces, to whatever address is
+          typed above. Nothing is sent, and nothing is remembered, if
+          the box is left blank or isn't a valid address — there's no
+          server-side default recipient. Requires this tab to stay open
+          for the whole run, same as today: closing it still stops the
+          analysis (same as the Stop button), so nothing gets sent for a
+          run that never finished.
+        </p>
+        <details class="tip">
+          <summary aria-label="More information">&#9432;</summary>
+          <span>
+            The server also needs GMAIL_USER and GMAIL_APP_PASSWORD set in
+            its .env before it can send anything at all, regardless of
+            what address you type here — see README.md. Checking this
+            box with a valid address when that isn't configured is
+            harmless: nothing sends, and a note is logged on the server
+            instead.
+          </span>
+        </details>
+      </div>
+    </details>
 
     <div>
       <label for="chatModel">Chat model</label>
