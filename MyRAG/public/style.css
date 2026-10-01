@@ -371,6 +371,44 @@ td.cat-exceeds, td.cat-matches { color: var(--ok); font-weight: 600; }
 td.cat-falls-short { color: var(--low); font-weight: 600; }
 td.cat-not-addressed { color: #b91c1c; font-weight: 600; }
 
+/* Documents table's "Description" field — a <textarea> (see
+   refreshDocuments() and saveDocumentDescription() in script.js), a
+   few rows tall by default (its `rows` property, set in script.js,
+   not here) since a document's description is often more than one
+   short line. Styled to blend into the cell rather than look like a
+   form control, matching the "this is a table, not a form"
+   surroundings: a quiet border while editable, nothing at all once
+   it's read-only (that's the admin-only-edit state readonly/queryonly
+   see — see applyRolePermissions()'s own doc comment in script.js —
+   so it should read as plain text, not as a form field someone forgot
+   to enable). Resizable vertically only, so it can't stretch the
+   table's other columns by being dragged wider. */
+.doc-description-cell { min-width: 14rem; }
+.doc-description-input {
+  display: block;
+  width: 100%;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.4;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+}
+.doc-description-input::placeholder { color: var(--muted); }
+.doc-description-input[readonly] {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  resize: none;
+  cursor: default;
+}
+.doc-description-input.doc-description-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
 .chunk-link {
   background: none;
   border: none;
@@ -563,4 +601,75 @@ tr.batch-summary-row td {
   border-radius: 6px;
   padding: 0.7rem 0.9rem;
   background: var(--bg-soft);
+}
+
+/* ---- Client-side-only role gating ----
+   See GET /auth/me in index.js, resolveRole() in src/basicAuth.js,
+   and applyRolePermissions() in script.js, which is what actually
+   adds "role-readonly" or "role-queryonly" to <body> once /auth/me
+   resolves (neither class is present at all for the default 'admin'
+   role, or while that fetch is still in flight — see currentRole's
+   own doc comment in script.js for why that's the safe default).
+   Deliberately NOT a security boundary: every element below still
+   exists in the DOM and the routes behind it are not gated — see
+   src/basicAuth.js's own doc comment for that tradeoff. This only
+   controls what's shown.
+
+   queryonly: every tab-menu entry except Query and Response and
+   Introduction is hidden — the latter stays reachable for every role
+   since it's just background reading about the app, nothing
+   data-bearing. script.js's applyRolePermissions() still forces the
+   Query and Response tab active on load regardless of what's in
+   localStorage; this only governs what's offered in the menu
+   afterward. */
+.role-queryonly .tab-menu-item[data-tab="documents"],
+.role-queryonly .tab-menu-item[data-tab="rubric"],
+.role-queryonly .tab-menu-item[data-tab="logs"] {
+  display: none;
+}
+
+/* readonly: every control that changes stored data, by id for the
+   two whole-section cases (the document-import form, and the
+   "Area maintenance" re-initialize/delete buttons) and by class for
+   the per-row case rendered at refresh time (a document's "Remove"
+   button — a rubric topic's "Delete" button is also a .btn-remove,
+   so this one rule hides both; see renderDocuments()/
+   refreshRubricTopics() in script.js). Everything else — viewing,
+   browsing, the chunk viewer, CSV/HTML export — is untouched.
+
+   The rubric add/edit form is deliberately NOT in this list: its
+   "Edit" button (.rubric-edit-btn) is the only way to see a topic's
+   attributes at all (see refreshRubricTopics() in script.js), so
+   hiding the whole form hid the attributes along with it. Instead,
+   the form stays fully visible and usable — Edit, reorder, Excel
+   import, all of it — and only the actual persistence step is
+   blocked: applyRolePermissions() in script.js disables
+   #rubricSaveBtn outright for this role, and submitRubricForm()'s own
+   guard (same function) refuses to save even if that's somehow
+   bypassed. So someone can open a topic, change things, even import a
+   workbook over it — nothing they do there ever reaches the server;
+   Save is the one gate, and it's shut. */
+.role-readonly #importSection,
+.role-readonly #areaMaintenanceSection,
+.role-readonly .btn-remove {
+  display: none !important;
+}
+
+/* ---- Introduction tab ----
+   #introContent is filled once, on page load, with the plain-HTML
+   fragment fetched from intro.html — see loadIntroContent() in
+   script.js. That fragment carries no classes or styling of its own
+   (just h2/h3/p/ol/ul/strong), so these rules just bring it in line
+   with the compact sizing the rest of the app already uses (see h1/h2
+   and .workspace-actions h3 above) rather than each browser's chunky
+   prose defaults. */
+#introContent h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+#introContent h3 { font-size: 0.95rem; margin: 1.1rem 0 0.5rem; }
+#introContent p { font-size: 0.9rem; line-height: 1.55; margin: 0 0 0.75rem; }
+#introContent ol, #introContent ul { font-size: 0.9rem; line-height: 1.55; margin: 0 0 0.75rem; padding-left: 1.4rem; }
+#introContent li { margin-bottom: 0.4rem; }
+#introContent li > ul, #introContent li > ol { margin-top: 0.4rem; margin-bottom: 0; }
+
+.role-readonly #rubricSaveBtn {
+  cursor: not-allowed;
 }

@@ -100,6 +100,99 @@ if (configuredUsers.size === 0) {
 }
 
 /**
+ * Valid role values for AUTH_ROLES, and what each one means — see this
+ * module's own doc comment above for the "WHOLE app uniformly, no
+ * per-route model" caveat: that caveat still applies here. Nothing
+ * below ever blocks a request. Roles are resolved once, server-side
+ * (resolveRole() below, surfaced to the browser only via GET /auth/me
+ * in index.js), specifically so the one username->role table lives in
+ * exactly one place rather than being duplicated into client-side
+ * JavaScript; what each role actually hides in the UI is entirely the
+ * client's own decision (see script.js's applyRolePermissions()) and
+ * is trivially bypassable by anyone willing to open devtools. That's a
+ * deliberate, accepted tradeoff for now, not an oversight — see the
+ * README's "Access control" section.
+ *
+ *   - 'admin'     - full access, same as the app behaves today with no
+ *                   roles configured at all.
+ *   - 'readonly'  - can see everything (documents, chunk viewer, rubric
+ *                   topics/attributes, logs, CSV/HTML export), but every
+ *                   control that changes stored data is hidden: import,
+ *                   rebuild/delete-area, remove-document, and the whole
+ *                   rubric add/edit/import-xlsx UI.
+ *   - 'queryonly' - only the Query and Response tab is visible; every
+ *                   other tab (Documents, Rubric, Logs) is hidden.
+ */
+const VALID_ROLES = new Set(['admin', 'readonly', 'queryonly']);
+
+/**
+ * Parses AUTH_ROLES="alice:admin,bob:readonly,carol:queryonly" into a
+ * `username -> role` Map, same comma-separated-pairs convention as
+ * AUTH_USERS above (split each pair on the FIRST colon, so this would
+ * still work even if a role name ever needed one — it doesn't today,
+ * but there's no reason to paint this into a corner the same way a
+ * password:with:colons edge case would). An entry with an unrecognized
+ * role, or no colon at all, is logged and skipped — same "warn and
+ * ignore the one bad entry rather than failing the whole table" posture
+ * parseConfiguredUsers() takes above — so a typo in one entry doesn't
+ * quietly lock out (or quietly over-grant) every OTHER configured user.
+ * @returns {Map<string, string>}
+ */
+function parseConfiguredRoles() {
+  const roles = new Map();
+  if (!process.env.AUTH_ROLES) return roles;
+
+  for (const rawPair of process.env.AUTH_ROLES.split(',')) {
+    const pair = rawPair.trim();
+    if (!pair) continue;
+    const sep = pair.indexOf(':');
+    if (sep === -1) {
+      console.warn(`[auth] Ignoring malformed AUTH_ROLES entry (expected "username:role"): "${pair}"`);
+      continue;
+    }
+    const username = pair.slice(0, sep).trim();
+    const role = pair.slice(sep + 1).trim();
+    if (!username) continue;
+    if (!VALID_ROLES.has(role)) {
+      console.warn(`[auth] Ignoring AUTH_ROLES entry for "${username}": unrecognized role "${role}" (expected admin, readonly, or queryonly).`);
+      continue;
+    }
+    roles.set(username, role);
+  }
+
+  return roles;
+}
+
+const configuredRoles = parseConfiguredRoles();
+
+/**
+ * Resolves the role for the currently authenticated request (or lack
+ * thereof) into exactly one of VALID_ROLES. Three cases, in order:
+ *
+ *   1. No Basic Auth configured at all (configuredUsers.size === 0, so
+ *      basicAuth() above is a no-op and req.authUser is never set) ->
+ *      'admin'. Running unconfigured already means unrestricted access
+ *      to every route today; a brand-new AUTH_ROLES feature shouldn't
+ *      retroactively lock that down for anyone who hasn't opted in.
+ *   2. Authenticated as a username with no entry in AUTH_ROLES (or
+ *      AUTH_ROLES unset/empty while AUTH_USERS/AUTH_USER+AUTH_PASSWORD
+ *      IS set) -> 'queryonly', the most restrictive role. A missing
+ *      entry must never silently mean full access — that would make
+ *      forgetting to list someone in AUTH_ROLES a privilege-escalation
+ *      bug instead of a safe default.
+ *   3. Authenticated as a username with a valid entry in AUTH_ROLES ->
+ *      that role.
+ * @param {string | undefined} authUser - req.authUser, as set by
+ *   basicAuth() above.
+ * @returns {'admin' | 'readonly' | 'queryonly'}
+ */
+function resolveRole(authUser) {
+  if (configuredUsers.size === 0) return 'admin';
+  if (!authUser) return 'queryonly'; // shouldn't happen past basicAuth(), but never default to admin
+  return configuredRoles.get(authUser) || 'queryonly';
+}
+
+/**
  * Constant-time comparison of two strings, so a wrong password takes
  * the same time to reject regardless of how many leading characters
  * happened to match — closes a very small, but real, timing
@@ -173,4 +266,4 @@ function basicAuth(req, res, next) {
   sendAuthRequired(res);
 }
 
-module.exports = { basicAuth };
+module.exports = { basicAuth, resolveRole, VALID_ROLES };

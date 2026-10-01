@@ -18,8 +18,15 @@
 <div class="app-header">
   <div>
     <h1 id="appNameHeading">local-rag</h1>
-    <p class="sub">Everything below works within a single storage area — pick or create one first.</p>
-    <p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
+    <!-- These two describe how the OTHER tabs work (storage areas,
+         info-icon tips) — neither applies on the Introduction tab,
+         which has neither. Hidden there by setActiveTab() in
+         script.js, same way it already hides the Document storage
+         area card for Logs/Rubric/Introduction. -->
+    <div id="appHeaderHints">
+      <p class="sub">Everything below works within a single storage area — pick or create one first.</p>
+      <p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
+    </div>
   </div>
 
   <!-- Hamburger menu: switches which tab-panel below is visible. See
@@ -34,6 +41,7 @@
       <span id="tabMenuActiveLabel" class="tab-menu-active-label"></span>
     </button>
     <div id="tabMenuList" class="tab-menu-list" role="menu">
+      <button type="button" class="tab-menu-item" role="menuitem" data-tab="intro">Introduction</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="documents">Document Management</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="rubric">Rubric Control</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="query">Query and Response</button>
@@ -95,6 +103,21 @@
   </div>
 </section>
 
+<div id="tabPanel-intro" class="tab-panel">
+
+<section class="card">
+  <!-- Filled once, on page load, with the fragment fetched from
+       intro.html — see loadIntroContent() in script.js. Kept in its
+       own file rather than written directly here specifically so this
+       one tab's content can be edited on its own, without touching
+       index.html at all. -->
+  <div id="introContent">
+    <p class="hint">Loading…</p>
+  </div>
+</section>
+
+</div><!-- /tabPanel-intro -->
+
 <div id="tabPanel-documents" class="tab-panel">
 
 <section class="card" id="documentsWrap" style="display:none;">
@@ -104,7 +127,7 @@
       <p class="hint" id="documentsEmpty"></p>
       <table>
         <thead>
-          <tr><th>Document</th><th>Blocks</th><th>Pages</th><th></th></tr>
+          <tr><th>Document</th><th>Description</th><th>Blocks</th><th>Pages</th><th></th></tr>
         </thead>
         <tbody id="documentsBody"></tbody>
       </table>
@@ -134,7 +157,7 @@
         <p class="error" id="blockLookupError"></p>
       </div>
 
-      <div class="workspace-actions">
+      <div class="workspace-actions" id="areaMaintenanceSection">
         <h3>Area maintenance</h3>
         <div class="row">
           <div>
@@ -175,7 +198,7 @@
   </details>
 </section>
 
-<section class="card">
+<section class="card" id="importSection">
   <details class="section-toggle" id="importDetails" open>
     <summary><h2>1. Import a document</h2></summary>
     <div class="section-toggle-body">
@@ -251,7 +274,7 @@
       <p class="hint" id="rubricTopicsEmpty"></p>
       <p class="error" id="rubricTopicsError"></p>
 
-      <div class="workspace-actions">
+      <div class="workspace-actions" id="rubricFormSection">
         <h3 id="rubricFormHeading">Add a new topic</h3>
         <p class="hint" id="rubricFormHint">
           Fill in a topic id, label, and at least one attribute, or

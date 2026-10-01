@@ -26,6 +26,28 @@ async function applyConfig() {
   }
 }
 
+let introContentEl;
+
+// Fills the Introduction tab with the fragment from intro.html —
+// plain HTML, not Markdown, served as a static file alongside this
+// script. Kept out of index.html entirely so that tab's content can
+// be edited (even by someone not comfortable with the rest of this
+// app's markup) without touching any code, same reasoning
+// config.json's own doc comment above gives for keeping appName out
+// of index.html. Called once from init(), below applyConfig() in the
+// "Initial data loads" section.
+async function loadIntroContent() {
+  try {
+    const res = await fetch('/intro.html', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    introContentEl.innerHTML = await res.text();
+  } catch (err) {
+    console.warn('Could not load intro.html:', err);
+    introContentEl.innerHTML =
+      '<p class="error">Couldn\'t load the introduction text (intro.html). The rest of the app is unaffected.</p>';
+  }
+}
+
 let workspaceInput, workspaceList;
 
 // Loads the list of existing workspaces into the datalist, so the
@@ -333,10 +355,45 @@ async function refreshDocuments() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(doc.sourceFile)}</td>
+        <td class="doc-description-cell"></td>
         <td>${doc.chunks}</td>
         <td>${doc.numPages != null ? doc.numPages : '—'}</td>
         <td><button type="button" class="btn-remove" data-source="${escapeHtml(doc.sourceFile)}">Remove</button></td>
       `;
+
+      // Built via createElement + property assignment, not the
+      // innerHTML template above, specifically so doc.sourceFile and
+      // doc.description never have to go through escapeHtml() at all
+      // — that function only escapes &/</>, not a literal `"`, which
+      // would otherwise be able to break out of an HTML attribute
+      // (see escapeHtml()'s own doc comment in reportHtml.js). Setting
+      // .value and .dataset.source as plain JS properties sidesteps
+      // that risk entirely, for both the filename and whatever text
+      // someone types into the description.
+      const descInput = document.createElement('textarea');
+      descInput.className = 'doc-description-input';
+      descInput.placeholder = 'Add a description…';
+      descInput.rows = 3;
+      descInput.value = doc.description || '';
+      descInput.dataset.source = doc.sourceFile;
+      // Baseline for saveDocumentDescription()'s "did this actually
+      // change" check below — set here, at render time, rather than
+      // only after a first successful save, so typing something and
+      // then retyping the exact original text before clicking away
+      // correctly saves nothing.
+      descInput.dataset.savedValue = doc.description || '';
+      // Editable for admin only — see applyRolePermissions()'s own
+      // doc comment for why this (like every other role-based control
+      // in this app so far) is UI-only, backed up by
+      // saveDocumentDescription()'s own currentRole re-check below,
+      // and ultimately by nothing at all server-side (see the doc
+      // comment on PUT .../description in index.js). `currentRole`
+      // defaults to 'admin' until GET /auth/me resolves (see its own
+      // doc comment), same fail-open behavior every other role check
+      // in this file already has.
+      descInput.readOnly = currentRole !== 'admin';
+      tr.querySelector('.doc-description-cell').appendChild(descInput);
+
       documentsBody.appendChild(tr);
     }
     populateBlockLookupDocuments(data.documents);
@@ -347,6 +404,64 @@ async function refreshDocuments() {
     console.warn('Could not load documents:', err);
     documentsWrap.style.display = 'none';
     resetBlockLookup();
+  }
+}
+
+/**
+ * Saves one document's description — called from the delegated
+ * 'focusout' listener below once a .doc-description-input (a
+ * <textarea> — see refreshDocuments()) loses focus (Ctrl/Cmd+Enter
+ * just blurs the field to get here through the same path; see the
+ * delegated 'keydown' listener, and its own comment for why plain
+ * Enter is deliberately left alone here). Only actually sends a
+ * request if the value changed since the last save (tracked via
+ * `dataset.savedValue`, refreshed both at render time in
+ * refreshDocuments() and after every successful save here) — calling
+ * this on an unchanged value, e.g. tabbing through the field without
+ * typing anything, is a harmless no-op rather than a wasted request.
+ * @param {HTMLTextAreaElement} input
+ */
+async function saveDocumentDescription(input) {
+  // Belt-and-suspenders, same posture as submitRubricForm()'s own
+  // early-return guard: the field is already readOnly for anything
+  // but 'admin' (see refreshDocuments() and applyRolePermissions()
+  // above), which alone already stops this from ever being reached —
+  // this is only here in case that's ever bypassed some other way.
+  // Not a security boundary; see applyRolePermissions()'s own doc
+  // comment, and the doc comment on PUT .../description in index.js.
+  if (currentRole !== 'admin') return;
+
+  const sourceFile = input.dataset.source;
+  const workspaceId = getWorkspaceId();
+  if (!workspaceId || !sourceFile) return;
+
+  if (input.value === (input.dataset.savedValue || '')) return; // unchanged
+
+  try {
+    const res = await fetch(
+      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}/description`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: input.value }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+
+    // The server trims whitespace (see setDescription() in
+    // src/documentMeta.js) — reflect that back into the field so
+    // what's shown always matches what's actually stored, and so the
+    // next focusout's "did this change" check compares against the
+    // real saved value, not whatever untrimmed text was typed.
+    input.value = data.description;
+    input.dataset.savedValue = data.description;
+    input.classList.remove('doc-description-error');
+    input.title = '';
+  } catch (err) {
+    console.warn('Could not save document description:', err);
+    input.classList.add('doc-description-error');
+    input.title = `Could not save this description: ${err.message}`;
   }
 }
 
@@ -1116,8 +1231,15 @@ let answerToggle;
 // code elsewhere in this file needed to change for tabs to exist —
 // every element a handler looks up is still on the page, just
 // sometimes inside a panel with display:none.
-const TAB_IDS = ['documents', 'rubric', 'query', 'logs'];
+// 'intro' listed first specifically so TAB_IDS[0] — the fallback used
+// below both when localStorage has no stored tab yet (a brand new
+// visitor) and when it holds something unrecognized — lands a
+// first-time visitor on the Introduction tab rather than the middle
+// of the app. Anyone who has already used the app keeps whatever tab
+// they were last on, same as always.
+const TAB_IDS = ['intro', 'documents', 'rubric', 'query', 'logs'];
 const TAB_LABELS = {
+  intro: 'Introduction',
   documents: 'Document Management',
   rubric: 'Rubric Control',
   query: 'Query and Response',
@@ -1129,7 +1251,7 @@ const TAB_LABELS = {
 // (falls back to the first tab if storage is unavailable or empty).
 const TAB_STORAGE_KEY = 'local-rag:activeTab';
 
-let tabMenuBtn, tabMenuList, tabMenuActiveLabel;
+let tabMenuBtn, tabMenuList, tabMenuActiveLabel, appHeaderHints;
 
 /**
  * Shows the given tab's panel and hides the other two, updates the
@@ -1156,18 +1278,29 @@ function setActiveTab(tabId) {
   // topics (idealProposals.json) and the Logs tab are both global,
   // not scoped to any one storage area (none of the /ideal-proposals
   // routes in index.js take a workspaceId, same as /logs), so the
-  // card would just be irrelevant filler on either of those tabs. Its
-  // slot at the top of the page is reused for the log entry detail
-  // card while on Logs specifically (see logEntryDetailWrap below),
-  // since that card wants the same prominent, no-scrolling-needed
-  // position given how long the entry list further down
-  // #tabPanel-logs can get; Rubric just leaves that slot empty.
+  // card would just be irrelevant filler on either of those tabs; the
+  // Introduction tab is excluded for the same reason — it isn't
+  // scoped to anything, it's just background reading (see
+  // #introContent/loadIntroContent() below). Its slot at the top of
+  // the page is reused for the log entry detail card while on Logs
+  // specifically (see logEntryDetailWrap below), since that card
+  // wants the same prominent, no-scrolling-needed position given how
+  // long the entry list further down #tabPanel-logs can get; Rubric
+  // and Introduction just leave that slot empty.
   // Guarded with `if` since setActiveTab() runs once during
   // initTabs(), before every element below it in init() has
   // necessarily been assigned yet in every possible init ordering.
-  const workspaceScopedTab = tabId !== 'logs' && tabId !== 'rubric';
+  const workspaceScopedTab = tabId !== 'logs' && tabId !== 'rubric' && tabId !== 'intro';
   if (workspaceCard) workspaceCard.style.display = workspaceScopedTab ? '' : 'none';
   if (logEntryDetailWrap) logEntryDetailWrap.style.display = tabId === 'logs' ? '' : 'none';
+
+  // The two "Everything below works within a single storage area..." /
+  // "For more detail about any item..." lines in the header describe
+  // how the OTHER tabs work — neither a storage area nor an
+  // information-icon tip exists on the Introduction tab, so showing
+  // them there is just confusing. See index.html's own comment on
+  // #appHeaderHints.
+  if (appHeaderHints) appHeaderHints.style.display = tabId === 'intro' ? 'none' : '';
 
   try {
     localStorage.setItem(TAB_STORAGE_KEY, tabId);
@@ -1212,6 +1345,95 @@ function initTabs() {
     // Storage unavailable — fall back to the first tab.
   }
   setActiveTab(initialTab);
+}
+
+// ---- Role (client-side-only; see GET /auth/me and src/basicAuth.js) ----
+//
+// Hides UI elements only — see src/basicAuth.js's own doc comment, and
+// the README's "Access control" section, for why nothing server-side
+// actually enforces any of this: every route behind a hidden button
+// is still reachable by anyone willing to open devtools or build the
+// request by hand. That's a deliberate, accepted tradeoff for now, not
+// an oversight.
+//
+// Defaults to 'admin' (i.e. hide nothing) both before initRole() below
+// resolves and if it fails to resolve at all — the same
+// "unconfigured/unknown means unrestricted" default resolveRole() in
+// src/basicAuth.js uses when no Basic Auth is configured, extended
+// here to "a broken or missing /auth/me fetch" so a network hiccup
+// never hides more of the page than it showed before this feature
+// existed.
+let currentRole = 'admin';
+
+/**
+ * Adds/removes "role-readonly"/"role-queryonly" on <body> — see the
+ * matching ".role-readonly"/".role-queryonly" rules in style.css for
+ * exactly what each one hides — and, for queryonly specifically, also
+ * forces the Query and Response tab active even if a previous visit's
+ * localStorage (see TAB_STORAGE_KEY above) still points somewhere
+ * else, e.g. a stale "documents"/"rubric" value left over from before
+ * this role existed, or from sharing a browser profile with an admin.
+ * Safe to call any time after initTabs() has run — see initRole()
+ * below for why that ordering is guaranteed without the two needing
+ * to coordinate explicitly.
+ *
+ * The rubric Save button, and every already-rendered document
+ * description field, are handled here directly (disabled/read-only
+ * outright) rather than through a CSS rule like everything else,
+ * specifically so they stay that way rather than depending on nothing
+ * else in the file ever touching `.disabled`/`.readOnly` again — see
+ * submitRubricForm()'s and saveDocumentDescription()'s own
+ * early-return guards for the second, independent check that backs
+ * each of those up if the attribute is ever bypassed some other way
+ * (devtools included — see this function's own "not a security
+ * boundary" note above; those guards are about robustness, not
+ * security). Re-applying to already-rendered description fields here
+ * (rather than only at render time in refreshDocuments()) covers the
+ * case where a document list was drawn before this function's first
+ * call — GET /auth/me resolving is a network round-trip, so it's
+ * entirely possible someone picks a storage area before it finishes.
+ * @param {'admin'|'readonly'|'queryonly'} role
+ */
+function applyRolePermissions(role) {
+  currentRole = role;
+  document.body.classList.remove('role-readonly', 'role-queryonly');
+  rubricSaveBtn.disabled = role === 'readonly';
+  for (const input of document.querySelectorAll('.doc-description-input')) {
+    input.readOnly = role !== 'admin';
+  }
+  if (role === 'readonly') document.body.classList.add('role-readonly');
+  if (role === 'queryonly') {
+    document.body.classList.add('role-queryonly');
+    setActiveTab('query');
+  }
+}
+
+/**
+ * Finds out who's logged in, if anyone, and which role that resolves
+ * to (GET /auth/me in index.js, backed by resolveRole() in
+ * src/basicAuth.js), then applies it. Called from init() alongside its
+ * other initial data loads — same fire-and-forget pattern
+ * applyConfig()/refreshWorkspaces() there already use, not awaited —
+ * so this resolving slightly after the rest of the page is already
+ * interactive just means a brief moment before role-based hiding
+ * kicks in, same tradeoff those other initial loads already accept.
+ * This always resolves AFTER initTabs() has already run: a fetch's
+ * continuation can't run until the current synchronous call stack —
+ * all of init(), including its own initTabs() call — has finished, so
+ * applyRolePermissions()'s setActiveTab() call above always finds
+ * tabMenuList already assigned.
+ */
+async function initRole() {
+  try {
+    const res = await fetch('/auth/me');
+    const data = await res.json();
+    applyRolePermissions(['admin', 'readonly', 'queryonly'].includes(data.role) ? data.role : 'admin');
+  } catch (err) {
+    // Network hiccup, or an older server without this route yet —
+    // fail open to 'admin' (i.e. change nothing) rather than leaving
+    // the page in some half-applied state.
+    console.warn('Could not look up login role; showing full access.', err);
+  }
 }
 
 // ---- Logs tab ----
@@ -2045,6 +2267,21 @@ async function submitRubricForm(e) {
   e.preventDefault();
   rubricFormError.style.display = 'none';
 
+  // Belt-and-suspenders: applyRolePermissions() above already
+  // disables rubricSaveBtn for this role, which is normally enough on
+  // its own to keep this function from ever being reached (a disabled
+  // submit button fires neither a click nor the browser's own
+  // implicit-submit-on-Enter). This check is here only in case that
+  // ever stops being true some other way — it is NOT a security
+  // boundary, since nothing stops a request straight to
+  // POST/PUT /ideal-proposals either (see src/basicAuth.js's own doc
+  // comment on this whole feature being UI-only).
+  if (currentRole === 'readonly') {
+    rubricFormError.textContent = 'Read-only access: rubric topics cannot be saved.';
+    rubricFormError.style.display = 'block';
+    return;
+  }
+
   const id = rubricTopicId.value.trim();
   const label = rubricTopicLabel.value.trim();
   const description = rubricTopicDescription.value.trim();
@@ -2260,6 +2497,9 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
  * any of this at plain top-level script scope would be too early.
  */
 function init() {
+  introContentEl = document.getElementById('introContent');
+  appHeaderHints = document.getElementById('appHeaderHints');
+
   workspaceCard = document.getElementById('workspaceCard');
   workspaceInput = document.getElementById('workspace');
   workspaceList = document.getElementById('workspaceList');
@@ -2505,6 +2745,32 @@ function init() {
       documentsError.style.display = 'block';
       btn.disabled = false;
     }
+  });
+
+  // Saves a document's description once its field loses focus.
+  // 'focusout' (unlike plain 'blur') bubbles, so one delegated
+  // listener here covers every row, including ones added by a later
+  // refreshDocuments() — same reasoning the Remove-button listener
+  // above already relies on.
+  documentsBody.addEventListener('focusout', (e) => {
+    const input = e.target.closest('.doc-description-input');
+    if (!input) return;
+    saveDocumentDescription(input);
+  });
+
+  // Plain Enter inserts a newline, same as any multi-line textarea —
+  // deliberately NOT intercepted here, unlike the single-line fields
+  // elsewhere in this app that submit on Enter. Ctrl/Cmd+Enter (the
+  // same "done, but let plain Enter stay a newline" convention several
+  // other multi-line text boxes use) blurs the field instead, to reach
+  // the same 'focusout' save path above without having to click away
+  // first.
+  documentsBody.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+    const input = e.target.closest('.doc-description-input');
+    if (!input) return;
+    e.preventDefault();
+    input.blur();
   });
 
   deleteWorkspaceBtn.addEventListener('click', async () => {
@@ -3121,6 +3387,23 @@ function init() {
         renderSources(finalEvent.sources || [], threshold, topK);
       }
 
+      // Swap the answer box's text for its verified version, now that
+      // the full, final answer is in. Every "Quote: "..." [file, chunk
+      // N]" citation the model wrote gets upgraded in place to the real
+      // file/chunk it was actually found in (never just the model's own
+      // claim) plus a ✓/⚠ marker — see verifyQuotesInPlace() in
+      // src/responseParser.js. The verification itself has to happen
+      // server-side, where the full retrieved chunk text lives; the
+      // browser only ever gets sourceFile/chunkIndex/score up front (see
+      // sourcesSummary() in index.js), never enough to check a quote
+      // against. `verifiedAnswer` is only set for a plain (non-topic)
+      // question — a rubric/comparison run leaves it unset and this is
+      // simply skipped, since that flow already verifies quotes its own
+      // way (the per-attribute results table below).
+      if (finalEvent.verifiedAnswer) {
+        answerEl.textContent = finalEvent.verifiedAnswer;
+      }
+
       // Fallback for the unlikely case where "done" carries records
       // that "batch-done" handling above somehow missed (e.g. an
       // older/differently-behaving server) — never double-counts,
@@ -3228,6 +3511,8 @@ function init() {
   // ---- Initial data loads ----
 
   applyConfig();
+  loadIntroContent();
+  initRole();
   refreshWorkspaces();
   refreshModels();
   refreshIdealTopics();

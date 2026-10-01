@@ -30,11 +30,12 @@ const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes } = require('./src/idealProposals');
-const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank } = require('./src/responseParser');
+const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank, verifyQuotesInPlace } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
+const { getAllDescriptions, setDescription, deleteDescription } = require('./src/documentMeta');
 const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
-const { basicAuth } = require('./src/basicAuth');
+const { basicAuth, resolveRole } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
 
 const app = express();
@@ -61,6 +62,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Sanity check — confirms the server is up before we test anything real.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+/**
+ * GET /auth/me
+ *
+ * The one small server-side piece the client-side-only role UI (see
+ * script.js's applyRolePermissions()) actually needs: a way to find
+ * out who's logged in at all. The browser's own Basic Auth credential
+ * (the native login prompt) is never readable by a page's own
+ * JavaScript — there's no DOM/Fetch API that exposes an
+ * `Authorization` header the browser is resending on every request —
+ * even though basicAuth() middleware above already decodes it into
+ * req.authUser on the server for every request, for the activity log.
+ * This route just hands that back, plus the role it resolves to
+ * (resolveRole() in src/basicAuth.js, built from the AUTH_ROLES env
+ * var — see that file for the full username->role design and its
+ * "no server-side enforcement yet" caveat). No other route changes
+ * behavior based on role; this is purely so the page can decide what
+ * to show.
+ */
+app.get('/auth/me', (req, res) => {
+  res.json({ user: req.authUser || null, role: resolveRole(req.authUser) });
 });
 
 /**
@@ -409,11 +432,62 @@ app.get('/workspaces/:workspaceId/documents', (req, res) => {
   if (wsErr) return res.status(400).json({ error: wsErr });
 
   try {
-    const documents = listDocuments(workspaceId);
+    const descriptions = getAllDescriptions(workspaceId);
+    // documentMeta.json lives separately from store.json specifically
+    // so it survives a rebuild/re-embed (see documentMeta.js) — merged
+    // in here rather than carried inside listDocuments() itself, same
+    // "join at the edge, keep the two files independent" shape as
+    // store.js and documentMeta.js not knowing about each other at all.
+    const documents = listDocuments(workspaceId).map((doc) => ({
+      ...doc,
+      description: descriptions[doc.sourceFile] || '',
+    }));
     const totalChunks = documents.reduce((sum, d) => sum + d.chunks, 0);
     res.json({ workspaceId, documents, totalChunks });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /workspaces/:workspaceId/documents/:sourceFile/description
+ *
+ * Sets (or, given an empty string, clears) one document's free-text
+ * description — see src/documentMeta.js for why this is kept in its
+ * own small file rather than inside store.json. :sourceFile must be
+ * URL-encoded by the caller (the UI does this automatically), same as
+ * the other per-document routes above.
+ *
+ * Like every other role-related behavior in this app so far (see
+ * src/basicAuth.js's own doc comment, and the README's "Roles"
+ * section), this route itself does NOT check who's calling — the
+ * browser UI only shows the description field as editable for the
+ * `admin` role (see renderDocuments() in script.js), but nothing here
+ * stops a hand-built request from any role. A real per-route check
+ * would need to look up the caller's role the same way GET /auth/me
+ * does (resolveRole(req.authUser) in src/basicAuth.js) and reject
+ * anything but 'admin' before reaching setDescription() — worth
+ * doing if this ever needs to be a real boundary rather than a UI
+ * nicety.
+ */
+app.put('/workspaces/:workspaceId/documents/:sourceFile/description', (req, res) => {
+  const { workspaceId, sourceFile } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  const { description } = req.body;
+  if (typeof description !== 'string') {
+    return res.status(400).json({ error: '"description" must be a string.' });
+  }
+
+  try {
+    const saved = setDescription(workspaceId, sourceFile, description);
+    logAction({ req, type: 'documentDescriptionUpdate', workspaceId, success: true, details: { sourceFile, description: saved } });
+    res.json({ workspaceId, sourceFile, description: saved });
+  } catch (err) {
+    console.error(err);
+    logAction({ req, type: 'documentDescriptionUpdate', workspaceId, success: false, error: err.message, details: { sourceFile } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -514,6 +588,7 @@ app.delete('/workspaces/:workspaceId/documents/:sourceFile', (req, res) => {
 
   try {
     const result = deleteDocument(workspaceId, sourceFile);
+    deleteDescription(workspaceId, sourceFile); // so a later document reusing this filename starts with no stale description
     logAction({ req, type: 'documentDelete', workspaceId, success: true, details: { sourceFile, ...result } });
     res.json({ workspaceId, sourceFile, ...result });
   } catch (err) {
@@ -957,6 +1032,18 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
     .map((m) => `[Source: ${m.sourceFile}, chunk ${m.chunkIndex}]\n${m.text}`)
     .join('\n\n---\n\n');
 
+  // Only the plain Q&A case (materialLabel left at its default) gets this
+  // quote-citation request appended. The comparison/rubric case already
+  // asks for the same thing itself, via composeComparisonQuestion()'s own
+  // compareInstruction in src/idealProposals.json — adding it here too
+  // would duplicate (and risk subtly conflicting with) that instruction.
+  const quoteInstruction =
+    materialLabel === 'source material'
+      ? ' For each answer, provide one or more direct quotes from the provided material that best ' +
+        'illustrate the point(s) being made, in the format: Quote: "<a short phrase copied ' +
+        `word-for-word from the ${materialLabel}>" [<source file name>, chunk <chunk number>].`
+      : '';
+
   return [
     {
       role: 'system',
@@ -966,7 +1053,7 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
         `in the ${materialLabel}, say clearly that you don't have that information ` +
         `in the provided documents rather than guessing. The ${label} START and ${label} END markers ` +
         `are section boundaries, not a citation — never use "${label}" as a source name; only the file ` +
-        'name inside a [Source: ...] tag is a real one.\n\n' +
+        `name inside a [Source: ...] tag is a real one.${quoteInstruction}\n\n` +
         `${label} START\n${block}\n${label} END`,
     },
     { role: 'user', content: question },
@@ -1045,6 +1132,13 @@ app.post('/query', async (req, res) => {
   // failed. Stays undefined if no chat call was ever reached at all
   // (e.g. "no-documents").
   let resolvedChatModel;
+  // Only populated for a plain (non-topic) question — see the
+  // verifyQuotesInPlace() call below and its doc comment in
+  // src/responseParser.js. A topic/comparison batch already gets its
+  // quotes verified via parseComparisonAnswer()/the rubric results UI,
+  // so this stays empty there to avoid implying a second, redundant
+  // verification pass exists for that case.
+  let combinedVerifiedAnswer = '';
 
   try {
     for (const attributesSubset of batches) {
@@ -1097,6 +1191,14 @@ app.post('/query', async (req, res) => {
       const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, { model: chatModel, temperature, maxTokens, numCtx, repeatPenalty, think });
 
       combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
+      if (!topic) {
+        // Verified against THIS batch's own retrieved chunks (full text
+        // included, unlike what the browser ever receives) — see
+        // verifyQuotesInPlace()'s doc comment in src/responseParser.js
+        // for why this can only happen here, server-side.
+        const verifiedAnswer = verifyQuotesInPlace(answer, matches);
+        combinedVerifiedAnswer += (combinedVerifiedAnswer ? '\n\n' : '') + verifiedAnswer;
+      }
       allSources = allSources.concat(sourcesSummary(matches));
       totalPromptTokens += promptTokens || 0;
       totalAnswerTokens += answerTokens || 0;
@@ -1141,6 +1243,11 @@ app.post('/query', async (req, res) => {
       answerTokens: totalAnswerTokens,
       records: allRecords,
       totalBatches: batches.length,
+      // Same text as `answer`, but with every "Quote: ... [file, chunk N]"
+      // citation upgraded to its verified form. Only set for a plain
+      // (non-topic) question — see combinedVerifiedAnswer's declaration
+      // above.
+      ...(combinedVerifiedAnswer ? { verifiedAnswer: combinedVerifiedAnswer } : {}),
       // One entry per batch, same order as `sources`/`records` were
       // accumulated in — the exact text embedded to retrieve that
       // batch's chunks. See composeRetrievalQuery() in
@@ -1354,6 +1461,10 @@ app.post('/query/stream', async (req, res) => {
   }
 
   let combinedAnswer = '';
+  // Same purpose as /query's combinedVerifiedAnswer above — only
+  // populated for a plain (non-topic) question. See
+  // verifyQuotesInPlace()'s doc comment in src/responseParser.js.
+  let combinedVerifiedAnswer = '';
   let allRecords = [];
   // Pooled across every batch — same purpose as /query's `allSources`,
   // but this route never otherwise keeps a combined sources array (each
@@ -1434,6 +1545,14 @@ app.post('/query/stream', async (req, res) => {
       });
 
       combinedAnswer += (combinedAnswer ? '\n\n' : '') + answer;
+      // Only computed for a plain question — a topic/comparison batch's
+      // quotes are already verified via parseComparisonAnswer() just
+      // below, surfaced through the rubric results UI instead.
+      let verifiedAnswer;
+      if (!topic) {
+        verifiedAnswer = verifyQuotesInPlace(answer, matches);
+        combinedVerifiedAnswer += (combinedVerifiedAnswer ? '\n\n' : '') + verifiedAnswer;
+      }
       totalPromptTokens += promptTokens || 0;
       totalAnswerTokens += answerTokens || 0;
       lastDoneReason = doneReason;
@@ -1581,6 +1700,7 @@ app.post('/query/stream', async (req, res) => {
         answerTokens: batchAnswerTokens,
         records,
         ...(thinking ? { thinking } : {}),
+        ...(verifiedAnswer ? { verifiedAnswer } : {}),
       });
     }
 
@@ -1593,6 +1713,7 @@ app.post('/query/stream', async (req, res) => {
         doneReason: lastDoneReason,
         records: allRecords,
         totalBatches,
+        ...(combinedVerifiedAnswer ? { verifiedAnswer: combinedVerifiedAnswer } : {}),
       });
       logQueryActivity({
         req,

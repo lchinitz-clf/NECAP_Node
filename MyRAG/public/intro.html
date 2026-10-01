@@ -1,0 +1,102 @@
+<!--
+  Content for the "Introduction" tab — see loadIntroContent() in
+  script.js, which fetches this file on page load and drops its
+  contents straight into #introContent via innerHTML. Deliberately
+  kept as its own file, separate from index.html: this is the one tab
+  whose content is just background reading, not app markup, so it can
+  be edited (by anyone comfortable with a little HTML) without having
+  to find the right spot inside index.html's much larger file, and
+  without touching any code at all.
+
+  This is a fragment, not a full page — no <html>/<head>/<body>, since
+  it's injected directly into a <div> that's already part of the page.
+  Plain HTML tags only (h2/h3/p/ol/ul/strong/br); see style.css's
+  "#introContent" rules for how these are sized to match the rest of
+  the app.
+-->
+
+<h2>New England Climate Adaptation Policy (NECAP) Data Portal</h2>
+
+<p>
+  The goal of the New England Climate Adaptation Policy (NECAP) Data
+  Portal is to provide accurate, up-to-date information on climate
+  adaptation polices in New England.
+</p>
+
+<p>
+  The portal has a structured database of approximately 900 policy
+  initiatives drawn from state-level climate adaptation, coastal
+  resilience and hazard mitigation plans; a chatbot to interact with
+  the policy data; and a system to accelerate the evaluation of
+  climate adaptation plans using sets of critical questions curated by
+  experts from the Conservation Law Foundation.
+</p>
+
+<h3>What each tab does</h3>
+
+<p>
+  The menu in the top right (&#9776;) switches between these:
+</p>
+
+<ol>
+  <li>
+    <strong>Document Management.</strong> Work happens inside a named
+    "area" — type an existing area's name to open it (for example, the
+    area holding the ~900-initiative policy database), or type a new
+    name to start one and import your own PDF, Word, or text documents
+    into it. Every document is automatically split into smaller,
+    searchable blocks on import.
+  </li>
+  <li>
+    <strong>Rubric Control.</strong> This is where the Conservation Law
+    Foundation's critical questions live, organized into named topics
+    (for example, one topic per policy area). Each topic is a list of
+    attributes — a question or expectation, paired with what an ideal
+    answer looks like. Browsing here shows you what each topic actually
+    checks for; you'd only add or edit a topic yourself if you have a
+    new set of questions to apply.
+  </li>
+  <li>
+    <strong>Query and Response.</strong> The chatbot itself. Pick the
+    same area you opened in Document Management, then either type a
+    question in plain language, or pick a topic from the "Compare
+    against an ideal proposal" dropdown to have every document in the
+    area evaluated against that topic's questions, one attribute at a
+    time. Either way, the answer links back to the exact block(s) of
+    text it was drawn from — click a citation to see it in context.
+  </li>
+  <li>
+    <strong>Logs.</strong> A record of past questions and actions, in
+    case you need to revisit what was asked, or by whom.
+  </li>
+</ol>
+
+<h3>Using it for the first time</h3>
+
+<ol>
+  <li>
+    Open <strong>Document Management</strong> and enter the name of
+    the area you want to work in.
+  </li>
+  <li>
+    If it's a new area, import the documents you want to ask questions
+    about. If you're using the existing policy database, you can skip
+    straight to the next step.
+  </li>
+  <li>
+    Switch to <strong>Query and Response</strong>, confirm the same
+    area is still selected, and either ask a question or pick a rubric
+    topic to run a full comparison.
+  </li>
+  <li>
+    Read the answer and check its citations. For a longer comparison
+    run across many attributes, consider turning on the email
+    notification under Advanced settings so you don't have to keep the
+    tab open and watch it finish.
+  </li>
+</ol>
+
+<p class="hint">
+  This page is just background reading — nothing on it is interactive.
+  Use the menu above to get to the rest of the portal.
+</p>

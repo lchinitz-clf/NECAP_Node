@@ -522,6 +522,89 @@ function spliceVerifiedQuotes(text, chunkMatches) {
   return out;
 }
 
+/**
+ * Verifies and re-renders every quote+citation found in a PLAIN
+ * (non-comparison) Q&A answer, upgrading each one in place to its
+ * verified form (renderQuoteMatch() — the real citation plus a ✓/⚠
+ * marker) while leaving every other character of `text` exactly as
+ * the model wrote it, including whatever comes after the LAST quote.
+ *
+ * This is deliberately NOT spliceVerifiedQuotes() above reused
+ * as-is: that function drops everything after its last match on
+ * purpose, because in the per-attribute comparison flow it's built
+ * for, a model's own rambling past its last cited sentence has
+ * nothing else bounding where that attribute's segment ends — the
+ * last citation is the only landmark available. A plain Q&A answer
+ * has no such problem: it's one answer, not a sequence of attribute
+ * segments sharing one blob of text that needs splitting apart, so
+ * there's no reason to ever discard any of it. This function trusts
+ * the model's own length completely and only ever replaces a
+ * quote-shaped span with its verified version — never removes
+ * anything else, and never truncates.
+ *
+ * Used for the plain-question case in index.js's /query and
+ * /query/stream (never for a rubric comparison batch, which verifies
+ * quotes within its own already-isolated per-attribute text via
+ * parseComparisonAnswer() -> spliceVerifiedQuotes() instead — the two
+ * paths are independent, not alternate code paths for the same data).
+ *
+ * @param {string} text
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [chunkMatches] -
+ *   this request's own retrieved chunks, passed straight through to
+ *   resolveCitation() for each quote found.
+ * @returns {string} `text` unchanged if no quote-shaped match is found
+ *   anywhere in it (the common case for a question that didn't prompt
+ *   for quotes, or a model that ignored the instruction).
+ *
+ * Every rendered quote is given its own blank-line-separated
+ * paragraph, regardless of how much (if any) whitespace actually
+ * separated it from the surrounding prose in the model's raw answer.
+ * Without this, a quote can end up glued directly onto the sentence
+ * before or after it with no space at all — either because
+ * extractQuotesAndCitations()'s "Quote:"-label pattern absorbs the
+ * punctuation/whitespace immediately in front of it (see that
+ * function's leading char class, which swallows things like the ". "
+ * before "Quote:" as part of the match itself, discarded once
+ * renderQuoteMatch() renders only the quote+citation+verdict), or
+ * because a model that skips the "Quote:" label and just drops a
+ * quoted phrase inline (extractQuotesAndCitations()'s other two
+ * fallback patterns) sometimes writes it with no separating space at
+ * all. Forcing the same blank-line offset on every match, independent
+ * of the source text's own spacing, fixes both cases the same way
+ * instead of trying to detect and preserve whatever punctuation each
+ * one happened to have.
+ */
+function verifyQuotesInPlace(text, chunkMatches) {
+  const found = extractQuotesAndCitations(text);
+  if (found.length === 0) return text;
+
+  let out = '';
+  let cursor = 0;
+  for (const m of found) {
+    // Trailing whitespace is dropped here because the blank line added
+    // below (when something is actually rendered) supplies its own —
+    // keeping both would double up into three or four newlines.
+    out += text.slice(cursor, m.start).replace(/\s+$/, '');
+    // A "none"-shaped match renders to '' (see renderQuoteMatch()) —
+    // same as spliceVerifiedQuotes() above, that drops just the
+    // matched placeholder span itself (e.g. "Quote: none [Source: x,
+    // chunk 3]"), not the prose around it, which stays exactly as
+    // written on both sides, with no forced blank line of its own.
+    const rendered = renderQuoteMatch(m, chunkMatches);
+    if (rendered) out += (out ? '\n\n' : '') + rendered;
+    cursor = m.end;
+  }
+  // Everything after the LAST match — kept in full, unlike
+  // spliceVerifiedQuotes() — offset from the last rendered quote the
+  // same way, after trimming off whatever leading blank lines the
+  // source text already had there (so this doesn't stack on top of
+  // the blank line just added above).
+  const tail = text.slice(cursor).replace(/^\s+/, '');
+  if (tail) out += (out ? '\n\n' : '') + tail;
+
+  return out;
+}
+
 // Matches an ellipsis a model used to shorten a quote — "...", a
 // spaced-out ". . .", the single Unicode "…" character, or any of
 // those wrapped in brackets ("[...]"). The bracketed alternatives are
@@ -894,6 +977,7 @@ module.exports = {
   parseComparisonAnswer,
   extractQuotesAndCitations,
   spliceVerifiedQuotes,
+  verifyQuotesInPlace,
   resolveCitation,
   splitQuoteOnEllipsis,
   VERDICT_ORDER,

@@ -305,6 +305,59 @@ front of what's here today), not changes to `index.js` itself.
 
 </details>
 
+### Roles (client-side only, for now)
+
+If you've set up named logins via `AUTH_USERS` above, you can
+optionally also give each one a role, which controls what the browser
+UI *shows* that person — it does not add any new server-side
+restriction (see the "Honest limitations" callout below before relying
+on this for anything more than steering people away from buttons they
+shouldn't be clicking). Add a new `AUTH_ROLES` line next to
+`AUTH_USERS`, either in the real environment or in your `.env` file:
+
+```
+AUTH_ROLES=alice:admin,bob:readonly,carol:queryonly
+```
+
+Same comma-separated `username:role` format as `AUTH_USERS` (though the
+role, unlike a password, can never itself contain a colon). The three
+roles:
+
+- **`admin`** — full access, exactly like today. This is also what
+  everyone gets, regardless of `AUTH_ROLES`, if `AUTH_USERS`/`AUTH_USER`
+  + `AUTH_PASSWORD` aren't set at all — i.e. running with no login
+  configured still means unrestricted access, same as before this
+  feature existed.
+- **`readonly`** — can see and browse everything (documents, the chunk
+  viewer, rubric topics and attributes, logs, CSV/HTML export), but
+  every control that would change stored data is hidden: importing a
+  document, "Re-initialize this area," "Delete this area," each
+  document's "Remove" button, and the whole rubric add/edit form
+  (including the Excel-import panel and each topic's Edit/Delete
+  buttons).
+- **`queryonly`** — only the Query and Response tab is shown at all;
+  Document Management, Rubric Control, and Logs are hidden entirely.
+
+A logged-in username with **no** entry in `AUTH_ROLES` gets `queryonly`
+— the most restrictive role, never `admin` — so forgetting to list
+someone can't accidentally hand them more access than intended; only
+list the people who should see more than the Query tab.
+
+**Honest limitations.** This hides elements in the page's own
+JavaScript; it does not add a per-route permission check anywhere in
+`index.js`. Every route a hidden button would have called is still
+reachable by anyone who knows (or guesses) its URL — opening the
+browser's devtools, or just building the HTTP request by hand, bypasses
+all of this completely. Treat it as "steering people toward the parts
+of the app meant for them," not as a real access boundary between
+different users' trust levels — the same posture `src/basicAuth.js`'s
+own doc comment already takes toward this whole app ("no per-route or
+per-user permission model here, just known-credential-or-not"), just
+extended one step further. If that stops being good enough later,
+the role is already resolved server-side per request (`GET /auth/me`,
+backed by `resolveRole()` in `src/basicAuth.js`) — real route-level
+enforcement would build on that, not replace it.
+
 ## Using the browser UI
 
 Once the server's running, open `http://localhost:3500/` in a browser
