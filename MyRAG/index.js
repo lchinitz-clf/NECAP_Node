@@ -171,6 +171,60 @@ app.get('/best-practices/filters', (req, res) => {
   }
 });
 
+/**
+ * POST /best-practices/preview
+ *
+ * Live preview for the Best Practices Comparison tab's Hazard/State
+ * multi-selects: given the same {hazards, states} shape the Hazard/
+ * State selections are already sent as in `bestPracticesFilter` (see
+ * buildBestPracticesTopic() below), re-filters bestPractices.json with
+ * the exact same filterBestPracticeAttributes() and reports back how
+ * many -- and which -- entries would be compared, WITHOUT actually
+ * running a comparison: no workspaceId, no retrieval, no chat call.
+ * This is what lets the UI show "N items currently in the comparison
+ * list" (and preview their names) the moment a hazard/state selection
+ * changes, rather than only finding out how many entries matched after
+ * clicking Compare and waiting for the first batch.
+ *
+ * Deliberately returns the FULL matching attribute list in this one
+ * response, not just `count` -- see bestPracticesTab.js's
+ * renderPreview()/showPreviewDetail() for why: the UI needs every
+ * matching entry's full text in hand so that clicking any one name
+ * later shows its full text INSTANTLY, with no second round trip per
+ * click. Sending the full list unconditionally, every time the
+ * selection changes, is deliberately not gated by match count on this
+ * end -- even the largest realistic match count here (order of a few
+ * hundred rows, well short of the full ~747-row sheet, since a real
+ * selection always narrows by at least one hazard) is a small JSON
+ * payload for a server and browser both running locally. The
+ * "under ~200, show the names; 200 or more, show a button first"
+ * split the user actually sees is purely a rendering choice the
+ * browser makes with data it already has -- see renderPreview() --
+ * never a reason to ask this endpoint for less.
+ *
+ * Body: { hazards: string[], states?: string[] }
+ * Response: { count: number, entries: Array<Object> } -- `entries` is
+ *   every matching attribute object exactly as
+ *   loadBestPracticeAttributes() returns it (name, proposal, state,
+ *   hazards, sectors, commitmentLevels, scope, fundingStatus,
+ *   fundingSource, status, url, notes), in filterBestPracticeAttributes()'s
+ *   usual original-sheet order.
+ */
+app.post('/best-practices/preview', (req, res) => {
+  const { hazards, states } = req.body || {};
+  if (!Array.isArray(hazards) || hazards.length === 0) {
+    return res.status(400).json({ error: 'hazards (a non-empty array) is required.' });
+  }
+  try {
+    const allAttributes = loadBestPracticeAttributes();
+    const entries = filterBestPracticeAttributes(allAttributes, { hazards, states });
+    res.json({ count: entries.length, entries });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
+  }
+});
+
 // Same allowlist-pattern approach isValidWorkspaceId() uses in
 // workspace.js — a topic id never touches the filesystem directly (it
 // only ever lives inside idealProposals.json), but keeping it to the
@@ -1090,6 +1144,42 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
   ];
 }
 
+// Appended to whichever compareInstruction a Best Practices run would
+// otherwise use (see buildBestPracticesTopic() below) — the one
+// deliberate divergence from "reuse exactly what Rubric Control uses,"
+// because a Best Practices comparison has a real failure mode a
+// hand-authored rubric topic doesn't: each attribute here is drawn
+// from a REAL state's actual program (see best_practices_to_json.py's
+// `proposal` text, which routinely names that state outright, e.g.
+// "Massachusetts funds a Community Wildfire Protection Plan..."), and
+// the plan being evaluated is very often from a DIFFERENT state. Of
+// course a Maine plan never mentions Massachusetts by name — that's
+// not a meaningful gap, but without this paragraph a model has
+// nothing telling it not to treat it as one. The question being asked
+// is whether the plan's own content is SIMILAR to the benchmark entry,
+// not whether it references the same state, agency, or program by
+// name.
+//
+// Deliberately generic rather than naming the specific state(s)
+// involved in any one run: a single run's attributes can span several
+// different states at once (see filterBestPracticeAttributes() in
+// src/bestPracticesFilter.js, which matches on hazard/state as an OR
+// across however many of each were selected), so there's no single
+// "the other state is X" sentence that would stay accurate for every
+// attribute in the batch. Appended as the LAST paragraph of whatever
+// compareInstruction resolves to, rather than spliced into the middle
+// of it, specifically so this never has to assume anything about that
+// text's own internal structure — it might be the hardcoded fallback
+// below, or a hand-edited, multi-paragraph defaultCompareInstruction
+// from idealProposals.json tuned over time via Rubric Control; this
+// paragraph reads sensibly appended after either one unchanged.
+const BEST_PRACTICES_JURISDICTION_GUIDANCE =
+  "Each attribute below describes a real-world initiative from a specific state, which may be different " +
+  "from the state the material above describes. Do not penalize the material for failing to mention that " +
+  "other state, its agencies, or its specifically-named program by name — a plan from one state will " +
+  "naturally never reference another state's program. Judge only whether the material's own approach is " +
+  "substantively similar in content and intent, regardless of which state is involved.";
+
 /**
  * Builds a synthetic "topic" object — same shape getTopic() in
  * idealProposals.js returns (id, label, attributes, resolved
@@ -1098,11 +1188,13 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
  * comparison machinery a hand-authored idealProposals.json topic
  * already goes through below (batchAttributes(), composeComparisonQuestion(),
  * composeRetrievalQuery(), parseComparisonAnswer()) with no changes to
- * any of that code. The only thing genuinely new here is building this
- * one object; everything downstream of it is reused as-is, per "let's
- * reuse what we have until it's clear we need something else."
+ * any of that code. Building this synthetic topic, and appending
+ * BEST_PRACTICES_JURISDICTION_GUIDANCE above to its compareInstruction,
+ * are the only things genuinely new here; everything downstream of it
+ * is reused as-is, per "let's reuse what we have until it's clear we
+ * need something else."
  *
- * `compareInstruction` is resolved the same way getTopic() resolves it
+ * `compareInstruction` starts from the same text getTopic() resolves
  * for a topic that doesn't set its own override: idealProposals.json's
  * file-level defaultCompareInstruction if set, else
  * HARDCODED_FALLBACK_COMPARE_INSTRUCTION. There's no per-entry override
@@ -1110,9 +1202,13 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
  * compareInstruction) — every Best Practices comparison uses whichever
  * instruction every OTHER topic without its own override already uses,
  * deliberately not special-cased, per the "reuse what we have" plan;
- * worth revisiting once a real run shows whether this wording actually
- * fits comparing against a real example rather than an idealized
- * standard.
+ * HARDCODED_FALLBACK_COMPARE_INSTRUCTION, with
+ * BEST_PRACTICES_JURISDICTION_GUIDANCE above appended as one more
+ * paragraph — that addition is the one deliberate special-case; there
+ * is still no per-entry override mechanism the way a hand-authored
+ * topic's own optional compareInstruction is, so every Best Practices
+ * comparison gets the same base instruction plus the same jurisdiction
+ * guidance, regardless of which hazard/state(s) were picked.
  *
  * The returned attributes have no `included` field, which
  * getIncludedAttributes()'s isAttributeIncluded() check already treats
@@ -1121,28 +1217,40 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
  * this synthetic topic exactly as it's called on a real one, with no
  * special-casing needed there either.
  *
- * @param {string} hazard - required; see filterBestPracticeAttributes()
- *   in src/bestPracticesFilter.js for why this one can't be omitted.
- * @param {string} [state] - omit to match every state that has an
- *   entry for this hazard.
+ * @param {string[]} hazards - required, at least one; see
+ *   filterBestPracticeAttributes() in src/bestPracticesFilter.js for
+ *   why this one can't be omitted or empty. More than one is matched
+ *   as an OR, same as that function.
+ * @param {string[]} [states] - omit or pass an empty array to match
+ *   every state that has an entry for one of the selected hazards.
+ *   More than one is matched as an OR, same as hazards.
  * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string}}
  * @throws {Error} whatever loadBestPracticeAttributes()/
  *   filterBestPracticeAttributes() throw (a malformed bestPractices.json,
- *   or a missing hazard) — left for the caller to turn into the right
+ *   or no hazards at all) — left for the caller to turn into the right
  *   HTTP response, same pattern the idealTopicId resolution right below
  *   this function already follows.
  */
-function buildBestPracticesTopic(hazard, state) {
+function buildBestPracticesTopic(hazards, states) {
   const allAttributes = loadBestPracticeAttributes();
-  const attributes = filterBestPracticeAttributes(allAttributes, { hazard, state });
+  const attributes = filterBestPracticeAttributes(allAttributes, { hazards, states });
 
   const { defaultCompareInstruction } = loadTopics();
-  const compareInstruction =
+  const baseCompareInstruction =
     resolveInstructionText(defaultCompareInstruction) || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
+  const compareInstruction = `${baseCompareInstruction}\n\n${BEST_PRACTICES_JURISDICTION_GUIDANCE}`;
 
+  // Label is purely descriptive (shown in the UI's run summary and in
+  // the exported report's "Ideal-proposal topic" row -- see
+  // buildExportMeta() in bestPracticesTab.js) -- never parsed back out
+  // by anything, so a plain comma-joined list for each of hazards/
+  // states (in whichever order the caller selected them) is all this
+  // needs, with no special-casing for exactly one of either.
+  const hazardsLabel = (hazards || []).join(', ');
+  const statesLabel = states && states.length ? states.join(', ') : 'all states';
   return {
     id: 'best-practices',
-    label: `Best Practices Benchmark (${hazard}${state ? `, ${state}` : ''})`,
+    label: `Best Practices Benchmark (${hazardsLabel}; ${statesLabel})`,
     attributes,
     compareInstruction,
   };
@@ -1182,20 +1290,26 @@ app.post('/query', async (req, res) => {
       return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
     }
     if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
-  } else if (bestPracticesFilter && bestPracticesFilter.hazard) {
+  } else if (bestPracticesFilter && Array.isArray(bestPracticesFilter.hazards) && bestPracticesFilter.hazards.length > 0) {
     // Same shape as a real topic (see buildBestPracticesTopic()'s doc
     // comment above) — everything below this point treats it
     // identically to one resolved via getTopic(), no special-casing.
+    // `hazards`/`states` are arrays (see buildBestPracticesTopic() and
+    // filterBestPracticeAttributes() in src/bestPracticesFilter.js) —
+    // one or more of each, matched as an OR, per the multi-select
+    // Hazard/State controls on the Best Practices Comparison tab.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazard, bestPracticesFilter.state);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
     }
     if (topic.attributes.length === 0) {
       return res.status(400).json({
-        error: `No Best Practices entries match hazard "${bestPracticesFilter.hazard}"` +
-          (bestPracticesFilter.state ? ` in state "${bestPracticesFilter.state}".` : '.'),
+        error: `No Best Practices entries match hazard(s) "${bestPracticesFilter.hazards.join(', ')}"` +
+          (bestPracticesFilter.states && bestPracticesFilter.states.length
+            ? ` in state(s) "${bestPracticesFilter.states.join(', ')}".`
+            : '.'),
       });
     }
   }
@@ -1471,17 +1585,21 @@ app.post('/query/stream', async (req, res) => {
       return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
     }
     if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
-  } else if (bestPracticesFilter && bestPracticesFilter.hazard) {
+  } else if (bestPracticesFilter && Array.isArray(bestPracticesFilter.hazards) && bestPracticesFilter.hazards.length > 0) {
+    // `hazards`/`states` are arrays, matched as an OR -- see the
+    // matching comment on /query above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazard, bestPracticesFilter.state);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
     }
     if (topic.attributes.length === 0) {
       return res.status(400).json({
-        error: `No Best Practices entries match hazard "${bestPracticesFilter.hazard}"` +
-          (bestPracticesFilter.state ? ` in state "${bestPracticesFilter.state}".` : '.'),
+        error: `No Best Practices entries match hazard(s) "${bestPracticesFilter.hazards.join(', ')}"` +
+          (bestPracticesFilter.states && bestPracticesFilter.states.length
+            ? ` in state(s) "${bestPracticesFilter.states.join(', ')}".`
+            : '.'),
       });
     }
   }

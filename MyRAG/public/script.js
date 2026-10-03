@@ -695,7 +695,7 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 
 // ---- Query form ----
 
-let form, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
+let queryForm, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
 let thinkCheckbox, reasoningWrap, reasoningEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
 let retryNotAddressedCheckbox;
@@ -898,14 +898,21 @@ function renderTokenUsage(promptTokens, answerTokens, numCtx, totalBatches) {
     : `Your question and the retrieved blocks used ${promptText} tokens; the answer used ${answerText} more.`;
 }
 
-// Human labels for src/responseParser.js's four fixed category
+// Human labels for src/responseParser.js's five fixed category
 // strings, mapped to the CSS classes in style.css that color-code them
 // in the per-attribute results table — an unparsed/empty category (see
 // that module's caveat about parsing reliability) intentionally gets
-// no class and a plain, honest label instead of guessing.
+// no class and a plain, honest label instead of guessing. "Unverified
+// match" is the one category never chosen by the model itself -- it's
+// a downgrade this app's own parseComparisonAnswer() applies on top of
+// a model-reported "Matches" that didn't carry a quote this app could
+// independently verify (see that function's doc comment in
+// responseParser.js) -- shown in its own color here so it never reads
+// as an ordinary, fully-evidenced "Matches".
 const CATEGORY_CLASS = {
   Exceeds: 'cat-exceeds',
   Matches: 'cat-matches',
+  'Unverified match': 'cat-unverified-match',
   'Falls short': 'cat-falls-short',
   'Not addressed': 'cat-not-addressed',
 };
@@ -1413,6 +1420,24 @@ function applyRolePermissions(role) {
   if (role === 'queryonly') {
     document.body.classList.add('role-queryonly');
     setActiveTab('query');
+  }
+
+  // Best Practices Comparison is admin-only (see the matching
+  // .role-readonly/.role-queryonly rule in style.css hiding its menu
+  // item). For queryonly the unconditional setActiveTab('query') call
+  // above already moves off of it every time regardless, but readonly
+  // has no forced tab of its own -- this covers the one case that
+  // would otherwise slip through: a readonly user whose stored
+  // last-active tab (see TAB_STORAGE_KEY above) is still
+  // 'bestPractices' from before they were demoted from admin, or from
+  // sharing a browser profile with an admin. Same "stale localStorage"
+  // scenario this function's own doc comment already describes for
+  // queryonly, just applied to this one tab for every non-admin role.
+  if (role !== 'admin') {
+    const activeItem = tabMenuList.querySelector('.tab-menu-item.active');
+    if (activeItem && activeItem.dataset.tab === 'bestPractices') {
+      setActiveTab('query');
+    }
   }
 }
 
@@ -2575,7 +2600,7 @@ function init() {
   embedProgressWrap = document.getElementById('embedProgressWrap');
   embedProgressBar = document.getElementById('embedProgressBar');
 
-  form = document.getElementById('queryForm');
+  queryForm = document.getElementById('queryForm');
   statusEl = document.getElementById('status');
   errorEl = document.getElementById('error');
   resultEl = document.getElementById('result');
@@ -3131,7 +3156,7 @@ function init() {
     URL.revokeObjectURL(url);
   });
 
-  form.addEventListener('submit', async (e) => {
+  queryForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     errorEl.style.display = 'none';

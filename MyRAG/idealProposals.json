@@ -1276,12 +1276,12 @@
         {
           "name": "Haz11",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to each hazard?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz11-heat",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to excessive heat events?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz11-heat-people",
@@ -1291,22 +1291,22 @@
         {
           "name": "Haz11-flood",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to flooding events?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz14",
           "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz46",
           "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
-          "included": false
+          "included": true
         },
         {
           "name": "Haz47",
           "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?",
-          "included": false
+          "included": true
         }
       ],
       "description": "Boston HMP items for which we have a human review",

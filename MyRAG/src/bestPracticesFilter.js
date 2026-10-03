@@ -41,45 +41,73 @@ function includesCaseInsensitive(list, value) {
 }
 
 /**
+ * Checks whether any of `needles` is present in `list`, by the same
+ * case-insensitive comparison includesCaseInsensitive() above uses for
+ * a single value -- the OR-across-several-selections generalization of
+ * it, used below for matching an entry's `hazards` array against
+ * however many hazards the user selected at once (see
+ * filterBestPracticeAttributes()'s own doc comment for why this is an
+ * intersection test, not "every selected hazard must be present").
+ * `needles` being empty never matches anything -- there's no sensible
+ * "empty hazard list" filter value for callers here, since `hazards`
+ * is always required and validated non-empty before this is ever
+ * called (see below).
+ * @param {string[]} list
+ * @param {string[]} needles
+ * @returns {boolean}
+ */
+function intersectsCaseInsensitive(list, needles) {
+  return (needles || []).some((needle) => includesCaseInsensitive(list, needle));
+}
+
+/**
  * Narrows a Best Practices attribute list down to the entries matching
- * a hazard (required) and, optionally, a state.
+ * one or more hazards (required, at least one) and, optionally, one or
+ * more states.
  *
- * `hazard` is a membership test against each entry's own `hazards`
+ * `hazards` is a membership test against each entry's own `hazards`
  * array, NOT an equality check -- real data has plenty of entries
  * tagged with more than one hazard (e.g. an electric-grid resilience
  * grant tagged Straight Line Winds, Wildfire, Winter Weather, AND
- * Tornado all at once), so an entry should match a hazard filter if
- * that hazard is anywhere in its list, regardless of how many others
- * are also there.
+ * Tornado all at once), so an entry should match if ANY of the
+ * selected hazards is anywhere in its own list -- a boolean OR across
+ * both sides of the comparison, not just the entry's side: selecting
+ * Wildfire AND Flooding returns every entry that matches either one,
+ * the same way selecting just Wildfire always has.
  *
- * `state` is left undefined/omitted to mean "every state that has an
- * entry for this hazard" -- the default this was designed around (see
- * the real-data distribution this came out of: every common hazard
- * spans multiple states, so comparing against all of them is a
+ * `states` left empty/omitted means "every state that has an entry for
+ * one of the selected hazards" -- the default this was designed around
+ * (see the real-data distribution this came out of: every common
+ * hazard spans multiple states, so comparing against all of them is a
  * genuinely richer report, not just a fallback for "didn't specify
- * one"). Passing a state narrows to just that one.
+ * one"). Passing one or more states narrows to entries whose own
+ * (single) state is among the ones selected -- again an OR, not a
+ * requirement that every selected state be represented.
  *
  * @param {Array<Object>} attributes - as produced by
  *   best_practices_to_json.py (or loaded from its output file)
- * @param {{hazard: string, state?: string}} filter
+ * @param {{hazards: string[], states?: string[]}} filter
  * @returns {Array<Object>} the matching subset, in the same order as
  *   `attributes` -- never reordered, so a caller that cares about the
  *   sheet's original row order (e.g. for stable batching) doesn't need
  *   to re-sort.
- * @throws {Error} if `hazard` is missing or blank -- there's no
+ * @throws {Error} if `hazards` is missing or empty -- there's no
  *   sensible "match everything" behavior for this filter the way
- *   there is for `state` (a Best Practices run with no hazard at all
+ *   there is for `states` (a Best Practices run with no hazard at all
  *   isn't "compare against the whole 747-row sheet," it's a request
  *   that doesn't make sense for this feature yet).
  */
-function filterBestPracticeAttributes(attributes, { hazard, state } = {}) {
-  if (!hazard || !hazard.trim()) {
-    throw new Error('hazard is required to filter Best Practices attributes.');
+function filterBestPracticeAttributes(attributes, { hazards, states } = {}) {
+  const hazardList = (hazards || []).filter((h) => h && h.trim());
+  if (hazardList.length === 0) {
+    throw new Error('At least one hazard is required to filter Best Practices attributes.');
   }
+  const stateList = (states || []).filter((s) => s && s.trim());
   return (attributes || []).filter((entry) => {
-    if (!includesCaseInsensitive(entry.hazards, hazard)) return false;
-    if (state && state.trim() && (entry.state || '').trim().toLowerCase() !== state.trim().toLowerCase()) {
-      return false;
+    if (!intersectsCaseInsensitive(entry.hazards, hazardList)) return false;
+    if (stateList.length > 0) {
+      const entryState = (entry.state || '').trim().toLowerCase();
+      if (!stateList.some((s) => s.trim().toLowerCase() === entryState)) return false;
     }
     return true;
   });

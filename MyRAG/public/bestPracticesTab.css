@@ -18,6 +18,41 @@
   white-space: nowrap;
 }
 
+/* Per-category color modifiers (see BP_CATEGORY_MODIFIER_CLASS in
+   bestPracticesTab.js) layered on top of the neutral badge above --
+   same color meaning as style.css's td.cat-* rules for the main
+   results table: green for a fully-evidenced Matches/Exceeds, blue for
+   an Unverified match (a Matches downgraded by this app's own
+   post-processing because none of its cited quotes could be verified
+   -- see parseComparisonAnswer() in src/responseParser.js) so it never
+   reads as identical to a fully-evidenced match, amber for Falls
+   short, red for Not addressed. An unparsed/empty category gets no
+   modifier class at all and keeps the plain neutral style above. */
+#tabPanel-bestPractices .bp-cat-exceeds,
+#tabPanel-bestPractices .bp-cat-matches {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+#tabPanel-bestPractices .bp-cat-unverified-match {
+  color: #1d4ed8;
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+#tabPanel-bestPractices .bp-cat-falls-short {
+  color: var(--low);
+  border-color: var(--low);
+  background: var(--low-bg);
+}
+
+#tabPanel-bestPractices .bp-cat-not-addressed {
+  color: #b91c1c;
+  border-color: #b91c1c;
+  background: #fef2f2;
+}
+
 #tabPanel-bestPractices .bp-sources-cell {
   font-size: 0.82rem;
   color: var(--text-muted, #666);
@@ -30,4 +65,104 @@
 #tabPanel-bestPractices #bpResultSummary {
   font-size: 0.88rem;
   margin: 0.25rem 0 0.75rem;
+}
+
+/* The "Chat model: ..." note (see refreshChatModelNote() in
+   bestPracticesTab.js) deliberately looks like a status callout, not
+   a p.hint -- it's reporting which model is about to run a real
+   comparison, not offering optional extra context, so it needs to be
+   noticed on the way to clicking Compare rather than blend in with
+   the page's quieter, muted-gray hint text. --info-* is scoped to
+   this file (style.css has --ok/--low for its green/amber semantics
+   already; blue is the conventional third "neutral/informational"
+   tone, so this adds its own rather than repurposing either of
+   those). Border + tint + left accent + weight is the standard "info
+   banner" treatment (Bootstrap/Material alike) rather than inventing
+   a new visual idiom. */
+#tabPanel-bestPractices .bp-chat-model-note {
+  --bp-info: #1d4ed8;
+  --bp-info-bg: #eff6ff;
+  --bp-info-border: #bfdbfe;
+  display: block;
+  margin: 0.6rem 0 1.1rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--bp-info);
+  background: var(--bp-info-bg);
+  border: 1px solid var(--bp-info-border);
+  border-left: 4px solid var(--bp-info);
+  border-radius: 6px;
+}
+
+/* Live Hazard/State preview (see refreshPreview()/renderPreview()/
+   showPreviewDetail() in bestPracticesTab.js, and POST
+   /best-practices/preview in index.js). #bpPreviewCount reuses the
+   page's own p.hint look (muted gray, small) -- this is incidental
+   information while still choosing a selection, not a status callout
+   like .bp-chat-model-note above, so it shouldn't compete for
+   attention the way that one deliberately does. */
+#tabPanel-bestPractices #bpPreview {
+  margin: 0.4rem 0 1rem;
+}
+
+#tabPanel-bestPractices #bpShowFullListBtn {
+  margin-top: 0.3rem;
+}
+
+/* The name list itself: a bounded, scrollable box rather than letting
+   up to ~200 names push the rest of the page down -- plain <li>/<ul>
+   defaults are stripped since every item is really a button, not
+   prose. */
+#tabPanel-bestPractices .bp-preview-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+#tabPanel-bestPractices .bp-preview-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #18181b;
+  border: none;
+  border-radius: 0;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+#tabPanel-bestPractices .bp-preview-item:hover { background: var(--bg-soft); }
+#tabPanel-bestPractices .bp-preview-list li + li .bp-preview-item {
+  border-top: 1px solid var(--border);
+}
+
+/* Detail panel for whichever name was last clicked -- a plain bordered
+   card (same radius/border convention as section.card in style.css,
+   just smaller and nested) rather than the blue info-callout treatment
+   above, since this is reference material being looked up, not a
+   status the user needs to notice on the way to clicking something. */
+#tabPanel-bestPractices .bp-preview-detail {
+  margin-top: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  font-size: 0.88rem;
+}
+#tabPanel-bestPractices .bp-preview-detail h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+#tabPanel-bestPractices .bp-preview-detail p {
+  margin: 0.35rem 0;
+}
+#tabPanel-bestPractices .bp-preview-detail-meta {
+  color: var(--text-muted, #666);
+  font-size: 0.82rem;
 }

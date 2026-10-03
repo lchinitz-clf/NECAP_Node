@@ -59,6 +59,18 @@
  * one. Same philosophy as the rest of this file throughout: never
  * silently trust unreliable model output when it can instead be
  * checked, corrected from data, or clearly marked as unverified.
+ *
+ * That same philosophy is also why a model-reported "Matches" verdict
+ * isn't always taken at face value: parseComparisonAnswer() below
+ * downgrades it to "Unverified match" whenever none of that
+ * attribute's own cited quotes actually verified against the
+ * retrieved chunks (see hasVerifiedQuote() below). This is a decision
+ * made by this app's own post-processing, never one the model is
+ * asked to make itself — a model has no way to know in advance
+ * whether ITS OWN quote will pass this verbatim check, so there is no
+ * category word it could possibly pick for that. "Exceeds" is
+ * deliberately left untouched by this downgrade (see VERDICT_ORDER's
+ * doc comment below for why).
  */
 
 // Checked longest/most-specific phrase first so e.g. "not addressed"
@@ -785,6 +797,49 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
 }
 
 /**
+ * Decides whether at least one quote+citation found in `text` (see
+ * extractQuotesAndCitations() above) actually verified against
+ * `matches` — i.e. resolveCitation() confirmed it genuinely appears,
+ * verbatim, in one of this batch's own retrieved chunks. This is the
+ * sole input to parseComparisonAnswer()'s "Matches" ->
+ * "Unverified match" downgrade below: a category of "Matches" is kept
+ * as-is as long as EVEN ONE of possibly several cited quotes checks
+ * out, exactly mirroring how a person skimming a multi-quote answer
+ * would judge it — one solid piece of verified evidence is enough,
+ * regardless of how many other quotes alongside it turned out
+ * fabricated, paraphrased, or simply absent.
+ *
+ * Must be called on the RAW segment text, before spliceVerifiedQuotes()
+ * has replaced each raw quote span with its already-rendered ✓/⚠ form
+ * — once rendered, the original quote text needed to re-run
+ * resolveCitation() is gone (replaced with e.g. `"..."
+ * [file, chunk 3] ✓ quote verified`, which extractQuotesAndCitations()
+ * was never meant to parse back out again).
+ *
+ * A "none"-shaped match (quote === '', i.e. the model explicitly said
+ * it had no quote for this point) never counts either way — that's
+ * the model declining to offer evidence, not evidence that failed a
+ * check, so it's simply skipped here exactly like
+ * extractQuotesAndCitations()'s other callers skip it.
+ *
+ * @param {string} text - an attribute's isolated, pre-splice segment text
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [matches] -
+ *   this batch's own retrieved chunks. Omitting this (e.g. an isolated
+ *   unit test with nothing to verify against) makes every quote come
+ *   back unverifiable, same as resolveCitation() itself treats a
+ *   missing `matches` array.
+ * @returns {boolean}
+ */
+function hasVerifiedQuote(text, matches) {
+  const found = extractQuotesAndCitations(text);
+  return found.some((m) => {
+    if (!m.quote) return false;
+    const resolved = resolveCitation(m.quote, matches, m.claimedSourceFile, m.claimedChunkIndex);
+    return !!(resolved && resolved.verified);
+  });
+}
+
+/**
  * Parses one batch's chat answer into a structured record per
  * attribute in that batch — the input to both the on-screen
  * per-attribute table and the CSV export in the browser UI. Always
@@ -852,6 +907,20 @@ function parseComparisonAnswer(answerText, attributes, matches) {
       resultText = text.trim();
     }
 
+    // A "Matches" verdict only keeps that name if at least one of its
+    // own cited quotes actually verifies (see hasVerifiedQuote()'s doc
+    // comment above for exactly what counts) — otherwise it's
+    // downgraded to "Unverified match" rather than left looking
+    // identical to a fully-evidenced match. This MUST run on the raw,
+    // pre-splice `resultText` (spliceVerifiedQuotes() below replaces
+    // each quote span with its already-rendered ✓/⚠ form, which
+    // hasVerifiedQuote()'s own extractQuotesAndCitations() call can no
+    // longer parse back out). "Exceeds" is deliberately left alone —
+    // see VERDICT_ORDER's doc comment below.
+    if (category === 'Matches' && !hasVerifiedQuote(resultText, matches)) {
+      category = 'Unverified match';
+    }
+
     // Finds every quote+citation in this attribute's text (not just
     // the first — see spliceVerifiedQuotes()'s doc comment), verifies
     // each one against this batch's actual retrieved chunks, and
@@ -873,17 +942,31 @@ function parseComparisonAnswer(answerText, attributes, matches) {
   });
 }
 
-// Every verdict this app's verdict-vocabulary regexes above can
-// produce, worst to best, with '' (no verdict the parser could find at
-// all -- see parseComparisonAnswer()'s own doc comment on an empty
-// `category`) as the worst rung rather than a separate special case.
-// This is the ONE authoritative ordering the "retry against the next
-// batch of retrieved chunks" feature (see maybeRetryWithNextBand() in
-// index.js) compares against -- both RETRY_TRIGGER_VERDICTS and
-// mergeRetryRecord() below are built on it, so there's a single place
-// that says which verdict outranks which, not one notion of "better"
-// re-derived per caller.
-const VERDICT_ORDER = ['', 'Not addressed', 'Falls short', 'Matches', 'Exceeds'];
+// Every verdict this app can produce, worst to best, with '' (no
+// verdict the parser could find at all -- see parseComparisonAnswer()'s
+// own doc comment on an empty `category`) as the worst rung rather than
+// a separate special case. This is the ONE authoritative ordering the
+// "retry against the next batch of retrieved chunks" feature (see
+// maybeRetryWithNextBand() in index.js) compares against -- both
+// RETRY_TRIGGER_VERDICTS and mergeRetryRecord() below are built on it,
+// so there's a single place that says which verdict outranks which, not
+// one notion of "better" re-derived per caller.
+//
+// Only four of these five come straight out of the model's own
+// vocabulary via CATEGORY_PATTERNS above. "Unverified match" is never
+// one the model picks itself -- it's a downgrade parseComparisonAnswer()
+// applies on top of a model-reported "Matches" whenever none of that
+// attribute's cited quotes actually verified (see hasVerifiedQuote()'s
+// and parseComparisonAnswer()'s doc comments). It's ranked directly
+// below "Matches" and above "Falls short": the material itself was
+// still judged a genuine match, just one this app couldn't independently
+// back up with a verified quote, which is strictly more than a
+// "Falls short" (a judged PARTIAL match) ever claims, but a real step
+// short of a "Matches" this app could actually confirm. "Exceeds" is
+// deliberately never subject to this same downgrade -- it is reserved,
+// unconditionally, for when the model judged the material to go beyond
+// what was asked, which this downgrade has no bearing on either way.
+const VERDICT_ORDER = ['', 'Not addressed', 'Falls short', 'Unverified match', 'Matches', 'Exceeds'];
 
 /**
  * @param {string} category - '' for an unparsed result, otherwise one
@@ -912,7 +995,17 @@ function verdictRank(category) {
 // contains real, correct partial material worth keeping regardless of
 // what a retry finds, which is a different tradeoff than a
 // Not-addressed result (which has nothing worth keeping on its own) --
-// is a one-line change here rather than a new code path.
+// is a one-line change here rather than a new code path. "Unverified
+// match" is deliberately NOT in this list either, for a different
+// reason than "Falls short" above: a retry exists to go look for
+// material that might not have been in the originally-retrieved
+// chunks at all, but an "Unverified match" already found real,
+// on-topic material and the model already judged it a genuine
+// match -- the only thing missing is independent confirmation of a
+// quote, which asking the SAME question against a different batch of
+// chunks has no particular reason to supply. (Nothing stops a later
+// change from adding it here too, the same one-line way, should that
+// judgment change.)
 const RETRY_TRIGGER_VERDICTS = ['Not addressed'];
 
 /**
@@ -979,6 +1072,7 @@ module.exports = {
   spliceVerifiedQuotes,
   verifyQuotesInPlace,
   resolveCitation,
+  hasVerifiedQuote,
   splitQuoteOnEllipsis,
   VERDICT_ORDER,
   verdictRank,

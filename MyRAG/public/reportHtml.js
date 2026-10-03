@@ -26,16 +26,19 @@
  * requireable from Node.
  */
 
-// Maps src/responseParser.js's four fixed category strings to a badge
+// Maps src/responseParser.js's five fixed category strings to a badge
 // color for the standalone HTML report below — same color meaning the
-// on-screen results table already uses (green for Matches/Exceeds,
-// amber for Falls short, red for Not addressed) but its own small set
-// of class names, since the report is a fully self-contained document
-// with its own inline <style> rather than a page that loads this app's
-// style.css.
+// on-screen results table already uses (green for a fully-evidenced
+// Matches/Exceeds, blue for an Unverified match -- see
+// parseComparisonAnswer()'s "Matches" -> "Unverified match" downgrade
+// in responseParser.js -- amber for Falls short, red for Not
+// addressed) but its own small set of class names, since the report is
+// a fully self-contained document with its own inline <style> rather
+// than a page that loads this app's style.css.
 const REPORT_BADGE_CLASS = {
   Exceeds: 'badge-ok',
   Matches: 'badge-ok',
+  'Unverified match': 'badge-info',
   'Falls short': 'badge-warn',
   'Not addressed': 'badge-bad',
 };
@@ -352,6 +355,7 @@ function buildAttributeResultsHtml(batches, meta) {
     --ok: #15803d; --ok-bg: #f0fdf4;
     --warn: #b45309; --warn-bg: #fffbeb;
     --bad: #b91c1c; --bad-bg: #fef2f2;
+    --info: #1d4ed8; --info-bg: #eff6ff;
   }
   body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1.25rem; color: #18181b; line-height: 1.5; }
   h1 { margin-bottom: 0.25rem; }
@@ -367,6 +371,7 @@ function buildAttributeResultsHtml(batches, meta) {
   .badge-ok { color: var(--ok); background: var(--ok-bg); }
   .badge-warn { color: var(--warn); background: var(--warn-bg); }
   .badge-bad { color: var(--bad); background: var(--bad-bg); }
+  .badge-info { color: var(--info); background: var(--info-bg); }
   .badge-neutral { color: var(--muted); background: var(--bg-soft); }
   .attribute { padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
   .attribute:last-child { border-bottom: none; }

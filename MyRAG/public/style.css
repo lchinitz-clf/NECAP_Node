@@ -368,6 +368,15 @@ td.score-below { color: var(--low); }
 
 #attributeResultsWrap h3 { font-size: 0.95rem; }
 td.cat-exceeds, td.cat-matches { color: var(--ok); font-weight: 600; }
+/* "Unverified match" -- a model-reported Matches downgraded by this
+   app's own post-processing because none of its cited quotes could be
+   verified (see parseComparisonAnswer() in src/responseParser.js) --
+   gets its own blue rather than sharing cat-matches's green, so it
+   never reads as a fully-evidenced match at a glance. Same blue
+   already used for this app's other "informational, not a
+   pass/fail judgment" callouts (e.g. .bp-chat-model-note in
+   bestPracticesTab.css). */
+td.cat-unverified-match { color: #1d4ed8; font-weight: 600; }
 td.cat-falls-short { color: var(--low); font-weight: 600; }
 td.cat-not-addressed { color: #b91c1c; font-weight: 600; }
 
@@ -621,9 +630,19 @@ tr.batch-summary-row td {
    data-bearing. script.js's applyRolePermissions() still forces the
    Query and Response tab active on load regardless of what's in
    localStorage; this only governs what's offered in the menu
-   afterward. */
+   afterward.
+
+   Best Practices Comparison is admin-only: readonly and queryonly
+   both lose it, which is why data-tab="bestPractices" appears in BOTH
+   rules below rather than only the queryonly one below it. See
+   applyRolePermissions() in script.js for the matching forced-tab-
+   switch logic that keeps a non-admin role from landing on this panel
+   via a stale localStorage value even though its menu item is hidden
+   here. */
+.role-readonly .tab-menu-item[data-tab="bestPractices"],
 .role-queryonly .tab-menu-item[data-tab="documents"],
 .role-queryonly .tab-menu-item[data-tab="rubric"],
+.role-queryonly .tab-menu-item[data-tab="bestPractices"],
 .role-queryonly .tab-menu-item[data-tab="logs"] {
   display: none;
 }

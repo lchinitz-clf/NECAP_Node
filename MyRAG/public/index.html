@@ -767,32 +767,64 @@
   <h2>Best Practices Comparison</h2>
   <p class="hint">
     Compares the plan embedded in the storage area above against a
-    benchmark set of real-world climate-adaptation initiatives. Pick a
-    hazard (and, optionally, a state) below; every matching benchmark
-    entry is run through the same per-attribute comparison Rubric
-    Control uses, just sourced from the Best Practices dataset instead
-    of a hand-written rubric.
+    benchmark set of real-world climate-adaptation initiatives. Pick
+    one or more hazards (and, optionally, one or more states) below;
+    every benchmark entry matching ANY selected hazard -- and, if any
+    states are picked, also matching ANY selected state -- is run
+    through the same per-attribute comparison Rubric Control uses,
+    just sourced from the Best Practices dataset instead of a
+    hand-written rubric.
   </p>
 
   <!-- Read-only -- the actual control lives on the Query and Response
        tab's #chatModel dropdown. See bestPracticesTab.js's
        refreshChatModelNote()/getChatModel() for how this stays in
        sync without duplicating that control here. -->
-  <p class="hint" id="bpChatModelNote"></p>
+  <p class="bp-chat-model-note" id="bpChatModelNote"></p>
 
-  <label for="bpHazard">Hazard</label>
-  <select id="bpHazard">
-    <option value="">Loading hazards...</option>
-  </select>
-
-  <label for="bpState">State</label>
-  <select id="bpState">
-    <option value="">All states</option>
+  <!-- Both multi-select (shift-click or ctrl/cmd-click to pick more
+       than one -- see getSelectedValues() in bestPracticesTab.js for
+       how the selections are read, and filterBestPracticeAttributes()
+       in src/bestPracticesFilter.js for the OR matching logic server-
+       side). Neither has a blank "Select..."/"All states" placeholder
+       option any more -- that only made sense for a single-select;
+       here "none selected" IS the meaningful state for each (invalid
+       for Hazard, "every state" for State), communicated below via
+       hint text instead of a selectable option. -->
+  <label for="bpHazard">Hazard (one or more)</label>
+  <select id="bpHazard" multiple size="6">
+    <option value="" disabled>Loading hazards...</option>
   </select>
   <p class="hint">
-    Leave as "All states" to compare against every state's entries for
-    this hazard, or pick one state to narrow it down.
+    Shift-click or ctrl/cmd-click to select more than one. At least one
+    hazard is required; an entry matches if it's tagged with ANY
+    hazard you've picked here.
   </p>
+
+  <label for="bpState">State (optional)</label>
+  <select id="bpState" multiple size="6"></select>
+  <p class="hint">
+    Leave nothing selected to compare against every state's entries for
+    the selected hazard(s), or shift-click/ctrl-click to pick one or
+    more specific states to narrow it down (an entry matches if its
+    state is ANY one you've picked here).
+  </p>
+
+  <!-- Live preview of what the current Hazard/State selection would
+       actually compare -- updates on every Hazard/State 'change', well
+       before Compare is ever clicked. See refreshPreview()/
+       renderPreview()/showPreviewDetail() in bestPracticesTab.js and
+       POST /best-practices/preview in index.js. bpPreviewList only
+       shows (rather than bpShowFullListBtn) once there are fewer than
+       ~200 matching entries, or after that button is clicked; clicking
+       any one name in it shows that entry's full text in
+       bpPreviewDetail just below. -->
+  <div id="bpPreview">
+    <p class="hint" id="bpPreviewCount"></p>
+    <button type="button" id="bpShowFullListBtn" class="btn-secondary" style="display:none;"></button>
+    <ul id="bpPreviewList" class="bp-preview-list" style="display:none;"></ul>
+    <div id="bpPreviewDetail" class="bp-preview-detail" style="display:none;"></div>
+  </div>
 
   <details class="advanced">
     <summary>Advanced</summary>

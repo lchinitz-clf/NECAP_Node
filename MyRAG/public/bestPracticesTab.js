@@ -54,7 +54,8 @@
  *     generated yet on this install — handled below as "feature
  *     unavailable," not a hard error).
  *   - POST /query/stream with { workspaceId, bestPracticesFilter:
- *     {hazard, state?}, attributesPerCall } reuses the EXACT SAME
+ *     {hazards: string[], states?: string[]}, attributesPerCall }
+ *     reuses the EXACT SAME
  *     comparison engine Rubric Control's idealTopicId path already
  *     runs through server-side (see buildBestPracticesTopic() in
  *     index.js) — this file just has to speak the same ndjson stream
@@ -71,6 +72,7 @@
   let resultWrap, resultSummaryEl, resultsBody;
   let chatModelNoteEl;
   let downloadCsvBtn, downloadHtmlBtn;
+  let previewCountEl, showFullListBtn, previewListEl, previewDetailEl;
 
   let abortController = null;
   let rowsRendered = 0;
@@ -88,6 +90,59 @@
   // for a Best Practices run specifically.
   let runStartedAt = null;
   let lastElapsedMs = null;
+
+  // Every matching Best Practices attribute object from the most
+  // recent POST /best-practices/preview response (see refreshPreview()
+  // below) -- the FULL data for each entry, not just its name, so a
+  // later click on any one name in the rendered list (renderPreview()/
+  // showPreviewDetail() below) can show its full text instantly with
+  // no second round trip. Replaced wholesale on every selection
+  // change; never mutated in place.
+  let previewEntries = [];
+  // Whether the name list is currently being shown in full despite
+  // being at or above PREVIEW_AUTO_RENDER_THRESHOLD -- set only by
+  // clicking showFullListBtn (see renderPreview() below), and reset to
+  // false on every fresh Hazard/State selection so a later, smaller
+  // selection doesn't inherit an unrelated "stay expanded" choice made
+  // for a different, larger one.
+  let previewListExpanded = false;
+  // Monotonically increasing guard against a stale /best-practices/preview
+  // response landing after a NEWER selection's request already
+  // resolved -- a rapid shift-click drag across several options can
+  // fire 'change' (and therefore a new preview fetch) several times in
+  // quick succession; without this, a slow early response arriving
+  // last could overwrite the correct, later one.
+  let previewRequestToken = 0;
+  let previewDebounceTimer = null;
+  // Below this many matches, the name list renders automatically;
+  // 200+ shows "Show full list?" first instead -- the threshold the
+  // user asked for to keep a huge hazard (some match well over a
+  // hundred entries on the real sheet) from dumping a giant list onto
+  // the page unasked. Purely a client-side rendering choice -- see
+  // POST /best-practices/preview's own doc comment in index.js for why
+  // the full data is fetched either way.
+  const PREVIEW_AUTO_RENDER_THRESHOLD = 200;
+
+  // Maps src/responseParser.js's five fixed category strings to a
+  // modifier class (see bestPracticesTab.css) that colors this tab's
+  // own .bp-category-badge -- mirrors CATEGORY_CLASS in script.js's
+  // main results table (same color meaning: green for a
+  // fully-evidenced Matches/Exceeds, blue for an Unverified match --
+  // a model-reported Matches downgraded by this app's own
+  // post-processing because none of its cited quotes could be
+  // verified, see parseComparisonAnswer() in src/responseParser.js --
+  // amber for Falls short, red for Not addressed), just under this
+  // tab's own bp-prefixed class names instead of reusing script.js's
+  // cat- ones, per this file's isolation policy above. An
+  // unparsed/empty category intentionally has no entry here, same as
+  // CATEGORY_CLASS, leaving the badge in its plain neutral style.
+  const BP_CATEGORY_MODIFIER_CLASS = {
+    Exceeds: 'bp-cat-exceeds',
+    Matches: 'bp-cat-matches',
+    'Unverified match': 'bp-cat-unverified-match',
+    'Falls short': 'bp-cat-falls-short',
+    'Not addressed': 'bp-cat-not-addressed',
+  };
 
   /**
    * Reads the shared storage-area field — see this file's own doc
@@ -132,9 +187,13 @@
   function refreshChatModelNote() {
     if (!chatModelNoteEl) return;
     const model = getChatModel();
+    // Leading "ⓘ" is a plain text character, not markup -- this stays
+    // a textContent assignment (no innerHTML, no escaping concerns)
+    // the same way it always has; see bestPracticesTab.css for why
+    // this note is styled as a status callout rather than a p.hint.
     chatModelNoteEl.textContent = model
-      ? `Chat model: ${model} (set on the Query and Response tab)`
-      : 'Chat model: not yet loaded (set on the Query and Response tab) — using the server default for now.';
+      ? `ⓘ Chat model: ${model} (set on the Query and Response tab)`
+      : 'ⓘ Chat model: not yet loaded (set on the Query and Response tab) — using the server default for now.';
   }
 
   function showError(message) {
@@ -158,6 +217,211 @@
   }
 
   /**
+   * Reads every selected option's value out of a <select multiple> --
+   * both bpHazard and bpState are one now (see index.html), so Hazard/
+   * State are no longer "pick exactly one, or the one blank placeholder
+   * meaning 'unset'" — every selected option is a real value, and
+   * "nothing selected" is simply an empty array, not a placeholder
+   * option of its own. Used for both reading the live selection to
+   * run a comparison (runComparison() below) and for the export-meta
+   * labels (buildExportMeta() below).
+   * @param {HTMLSelectElement} select
+   * @returns {string[]} in the select's own option order (not
+   *   necessarily the order the user clicked them in, same as the DOM's
+   *   own `.selectedOptions` behaves).
+   */
+  function getSelectedValues(select) {
+    return Array.from(select.selectedOptions || []).map((opt) => opt.value).filter(Boolean);
+  }
+
+  /** Hides whatever entry's full text is currently shown in the detail panel. */
+  function hidePreviewDetail() {
+    previewDetailEl.style.display = 'none';
+    previewDetailEl.innerHTML = '';
+  }
+
+  /**
+   * Shows one matching entry's full text in the detail panel just
+   * below the list -- instant, since `previewEntries` already holds
+   * every matching entry's full data from the most recent
+   * /best-practices/preview response (see that endpoint's own doc
+   * comment in index.js for why it ships this eagerly rather than
+   * lazily per click). Clicking a different name simply replaces
+   * whatever was shown here; nothing here ever fetches anything.
+   * @param {number} idx - index into `previewEntries`
+   */
+  function showPreviewDetail(idx) {
+    const entry = previewEntries[idx];
+    if (!entry) return;
+
+    previewDetailEl.innerHTML = '';
+
+    const title = document.createElement('h4');
+    title.textContent = entry.name;
+    previewDetailEl.appendChild(title);
+
+    // A short "State: Maine • Hazard(s): Wildfire, Flooding • ..."
+    // meta line -- only the fields that are actually present on this
+    // entry (see best_practices_to_json.py's attribute shape; not
+    // every field is populated for every row), joined with the same
+    // "•" separator used elsewhere in this app for a compact one-line
+    // summary of several small facts.
+    const metaParts = [];
+    if (entry.state) metaParts.push(`State: ${entry.state}`);
+    if (entry.hazards && entry.hazards.length) metaParts.push(`Hazard(s): ${entry.hazards.join(', ')}`);
+    if (entry.sectors && entry.sectors.length) metaParts.push(`Sector(s): ${entry.sectors.join(', ')}`);
+    if (entry.status && entry.status.length) metaParts.push(`Status: ${entry.status.join(', ')}`);
+    if (entry.commitmentLevels && entry.commitmentLevels.length) {
+      metaParts.push(`Commitment: ${entry.commitmentLevels.join(', ')}`);
+    }
+    if (metaParts.length) {
+      const metaP = document.createElement('p');
+      metaP.className = 'bp-preview-detail-meta';
+      metaP.textContent = metaParts.join(' • ');
+      previewDetailEl.appendChild(metaP);
+    }
+
+    const proposalP = document.createElement('p');
+    proposalP.textContent = entry.proposal || '(no description in this entry)';
+    previewDetailEl.appendChild(proposalP);
+
+    if (entry.notes) {
+      const notesP = document.createElement('p');
+      notesP.className = 'bp-preview-detail-meta';
+      notesP.textContent = `Notes: ${entry.notes}`;
+      previewDetailEl.appendChild(notesP);
+    }
+
+    if (entry.url) {
+      const link = document.createElement('a');
+      link.href = entry.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = entry.url;
+      previewDetailEl.appendChild(link);
+    }
+
+    previewDetailEl.style.display = '';
+    previewDetailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  /**
+   * Renders the "N items currently in the comparison list" line plus
+   * either the clickable name list (under PREVIEW_AUTO_RENDER_THRESHOLD,
+   * or once showFullListBtn has been clicked) or the "Show full list?"
+   * button (at/above it) -- purely from `previewEntries` and
+   * `previewListExpanded`, both already in hand; this never fetches
+   * anything itself. Called right after a fresh /best-practices/preview
+   * response lands (refreshPreview() below) and again when
+   * showFullListBtn is clicked, so it never needs to know WHICH of
+   * those triggered it.
+   */
+  function renderPreview() {
+    const count = previewEntries.length;
+    previewCountEl.textContent = `${count} item${count === 1 ? '' : 's'} currently in the comparison list.`;
+
+    if (count === 0) {
+      showFullListBtn.style.display = 'none';
+      previewListEl.style.display = 'none';
+      previewListEl.innerHTML = '';
+      return;
+    }
+
+    if (count >= PREVIEW_AUTO_RENDER_THRESHOLD && !previewListExpanded) {
+      showFullListBtn.style.display = '';
+      showFullListBtn.textContent = `Show full list? (${count} items)`;
+      previewListEl.style.display = 'none';
+      previewListEl.innerHTML = '';
+      return;
+    }
+
+    showFullListBtn.style.display = 'none';
+    previewListEl.style.display = '';
+    previewListEl.innerHTML = '';
+    previewEntries.forEach((entry, idx) => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bp-preview-item';
+      btn.textContent = entry.name;
+      btn.addEventListener('click', () => showPreviewDetail(idx));
+      li.appendChild(btn);
+      previewListEl.appendChild(li);
+    });
+  }
+
+  /**
+   * Re-fetches POST /best-practices/preview for whatever Hazard/State
+   * selection is live RIGHT NOW and re-renders the count/list from the
+   * result -- see that endpoint's own doc comment in index.js for the
+   * request/response shape and why it ships every matching entry's
+   * full data eagerly. Guarded against two races: `previewRequestToken`
+   * so a slow, now-superseded response can never overwrite a newer
+   * one's result (see that variable's own doc comment above), and a
+   * zero-hazards selection short-circuits before ever reaching the
+   * network, since the server would just reject it the same way
+   * runComparison() already guards against submitting it.
+   */
+  async function refreshPreview() {
+    const hazards = getSelectedValues(hazardSelect);
+    const states = getSelectedValues(stateSelect);
+
+    // Whatever was shown for the PREVIOUS selection is no longer
+    // necessarily meaningful once the selection itself has changed --
+    // its entries (and therefore its indices into `previewEntries`)
+    // may be completely different now.
+    hidePreviewDetail();
+    previewListExpanded = false;
+
+    if (hazards.length === 0) {
+      previewRequestToken += 1; // invalidate any still-in-flight request
+      previewEntries = [];
+      previewCountEl.textContent = 'Pick at least one hazard to see how many benchmark entries would be compared.';
+      showFullListBtn.style.display = 'none';
+      previewListEl.style.display = 'none';
+      previewListEl.innerHTML = '';
+      return;
+    }
+
+    const myToken = ++previewRequestToken;
+    previewCountEl.textContent = 'Checking how many benchmark entries match...';
+    showFullListBtn.style.display = 'none';
+    previewListEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/best-practices/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hazards, states }),
+      });
+      const data = await res.json();
+      if (myToken !== previewRequestToken) return; // superseded by a newer selection -- discard
+      if (!res.ok) throw new Error(data.error || 'Failed to preview Best Practices entries');
+
+      previewEntries = data.entries || [];
+      renderPreview();
+    } catch (err) {
+      if (myToken !== previewRequestToken) return;
+      previewEntries = [];
+      previewCountEl.textContent = `Could not preview matching entries: ${err.message}`;
+    }
+  }
+
+  /**
+   * Debounced entry point wired to both Hazard and State selects'
+   * 'change' events (see initBestPracticesTab() below). A plain
+   * multi-select only ever fires 'change' once per discrete click, not
+   * per keystroke, but a fast shift-click drag across several options
+   * can still fire it several times in a row -- this collapses a quick
+   * burst of those into a single refreshPreview() call after things
+   * settle, rather than firing one request per click.
+   */
+  function schedulePreviewRefresh() {
+    if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
+    previewDebounceTimer = setTimeout(refreshPreview, 200);
+  }
+
+  /**
    * Populates the Hazard/State dropdowns from GET /best-practices/filters.
    * An empty hazards list (missing or empty bestPractices.json — see
    * loadBestPracticeAttributes()'s own doc comment in
@@ -165,10 +429,17 @@
    * this install yet," not an error: the tab stays visible but
    * explains itself and disables Compare, rather than showing a
    * confusing empty dropdown a click does nothing useful with.
+   *
+   * Neither select gets a blank placeholder option any more (see
+   * index.html's own comment on the multi-select markup) — the one
+   * exception is the "(none available)"/"(failed to load)" diagnostic
+   * option below, added `disabled` specifically so it can't actually
+   * be selected in a multi-select the way a plain unselected placeholder
+   * used to just sit there doing nothing.
    */
   async function loadFilters() {
-    hazardSelect.innerHTML = '<option value="">Loading hazards...</option>';
-    stateSelect.innerHTML = '<option value="">All states</option>';
+    hazardSelect.innerHTML = '<option value="" disabled>Loading hazards...</option>';
+    stateSelect.innerHTML = '';
 
     try {
       const res = await fetch('/best-practices/filters');
@@ -179,8 +450,11 @@
       const states = data.states || [];
 
       if (hazards.length === 0) {
-        hazardSelect.innerHTML = '<option value="">(none available)</option>';
+        hazardSelect.innerHTML = '<option value="" disabled>(none available)</option>';
         compareBtn.disabled = true;
+        previewCountEl.textContent = '';
+        showFullListBtn.style.display = 'none';
+        previewListEl.style.display = 'none';
         showError(
           'No Best Practices data is loaded on this server yet -- ' +
           'bestPractices.json is missing or empty. Generate it with ' +
@@ -190,7 +464,7 @@
         return;
       }
 
-      hazardSelect.innerHTML = '<option value="">Select a hazard...</option>';
+      hazardSelect.innerHTML = '';
       for (const hazard of hazards) {
         const opt = document.createElement('option');
         opt.value = hazard;
@@ -207,9 +481,17 @@
 
       compareBtn.disabled = false;
       showError('');
+      // Nothing is selected yet right after a fresh load, but this
+      // still gives the preview area its correct initial message
+      // ("Pick at least one hazard...") rather than leaving it blank
+      // until the user's first click.
+      refreshPreview();
     } catch (err) {
-      hazardSelect.innerHTML = '<option value="">(failed to load)</option>';
+      hazardSelect.innerHTML = '<option value="" disabled>(failed to load)</option>';
       compareBtn.disabled = true;
+      previewCountEl.textContent = '';
+      showFullListBtn.style.display = 'none';
+      previewListEl.style.display = 'none';
       showError(`Could not load Best Practices filters: ${err.message}`);
     }
   }
@@ -239,6 +521,8 @@
       const categoryTd = document.createElement('td');
       const badge = document.createElement('span');
       badge.className = 'bp-category-badge';
+      const modifierClass = BP_CATEGORY_MODIFIER_CLASS[record.category];
+      if (modifierClass) badge.classList.add(modifierClass);
       badge.textContent = record.category || '(unparsed)';
       categoryTd.appendChild(badge);
       tr.appendChild(categoryTd);
@@ -273,12 +557,12 @@
       return;
     }
 
-    const hazard = hazardSelect.value;
-    if (!hazard) {
-      showError('Pick a hazard first.');
+    const hazards = getSelectedValues(hazardSelect);
+    if (hazards.length === 0) {
+      showError('Pick at least one hazard first.');
       return;
     }
-    const state = stateSelect.value || undefined;
+    const states = getSelectedValues(stateSelect);
 
     const rawAttributesPerCall = parseInt(attributesPerCallInput.value, 10);
     const attributesPerCall = Number.isFinite(rawAttributesPerCall) && rawAttributesPerCall > 0
@@ -304,7 +588,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          bestPracticesFilter: { hazard, state },
+          bestPracticesFilter: { hazards, states },
           attributesPerCall,
           chatModel: getChatModel(),
         }),
@@ -365,7 +649,8 @@
       lastElapsedMs = performance.now() - runStartedAt;
       statusEl.textContent = `Done -- ${rowsRendered} entr${rowsRendered === 1 ? 'y' : 'ies'} compared across ${finalEvent.totalBatches} batch${finalEvent.totalBatches === 1 ? '' : 'es'}.`;
       resultSummaryEl.textContent =
-        `Hazard: ${hazard}` + (state ? `, State: ${state}` : ' (all states)') +
+        `Hazard${hazards.length === 1 ? '' : 's'}: ${hazards.join(', ')}` +
+        (states.length ? `, State${states.length === 1 ? '' : 's'}: ${states.join(', ')}` : ' (all states)') +
         ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against "${workspaceId}".`;
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -400,8 +685,8 @@
    * @returns {Object}
    */
   function buildExportMeta() {
-    const hazard = hazardSelect.value || undefined;
-    const state = stateSelect.value || undefined;
+    const hazards = getSelectedValues(hazardSelect);
+    const states = getSelectedValues(stateSelect);
     const rawAttributesPerCall = parseInt(attributesPerCallInput.value, 10);
     const attributesPerCall = Number.isFinite(rawAttributesPerCall) && rawAttributesPerCall > 0
       ? rawAttributesPerCall
@@ -409,8 +694,8 @@
     const appNameEl = document.getElementById('appNameHeading');
     return {
       workspaceId: getWorkspaceId() || undefined,
-      topicLabel: hazard
-        ? `Best Practices — ${hazard}${state ? ` (${state})` : ' (all states)'}`
+      topicLabel: hazards.length
+        ? `Best Practices — ${hazards.join(', ')}${states.length ? ` (${states.join(', ')})` : ' (all states)'}`
         : undefined,
       chatModel: getChatModel(),
       attributesPerCall,
@@ -463,6 +748,10 @@
     chatModelNoteEl = document.getElementById('bpChatModelNote');
     downloadCsvBtn = document.getElementById('bpDownloadCsvBtn');
     downloadHtmlBtn = document.getElementById('bpDownloadHtmlBtn');
+    previewCountEl = document.getElementById('bpPreviewCount');
+    showFullListBtn = document.getElementById('bpShowFullListBtn');
+    previewListEl = document.getElementById('bpPreviewList');
+    previewDetailEl = document.getElementById('bpPreviewDetail');
 
     // Any element missing means this page doesn't have the Best
     // Practices panel at all (e.g. an older index.html) -- bail out
@@ -473,6 +762,17 @@
     stopBtn.addEventListener('click', stopComparison);
     downloadCsvBtn.addEventListener('click', downloadCsv);
     downloadHtmlBtn.addEventListener('click', downloadHtmlReport);
+
+    // Live preview (see refreshPreview()'s own doc comment above) --
+    // every Hazard/State selection change schedules a re-check of how
+    // many (and which) benchmark entries currently match, well before
+    // Compare is ever clicked.
+    hazardSelect.addEventListener('change', schedulePreviewRefresh);
+    stateSelect.addEventListener('change', schedulePreviewRefresh);
+    showFullListBtn.addEventListener('click', () => {
+      previewListExpanded = true;
+      renderPreview();
+    });
 
     loadFilters();
 
