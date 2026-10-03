@@ -843,6 +843,30 @@
         the match count gets large.
       </span>
     </details>
+
+    <!-- Manual override for BEST_PRACTICES_JURISDICTION_GUIDANCE in
+         index.js -- parallel to Rubric Control's own "Comparison
+         instruction (optional)" textarea (#rubricCompareInstruction
+         above): blank means "use the hard-coded default," anything
+         typed here is sent as-is and used in its place instead. See
+         getJurisdictionGuidanceOverride() in bestPracticesTab.js. -->
+    <label for="bpJurisdictionGuidance">Jurisdiction guidance override (optional)</label>
+    <textarea id="bpJurisdictionGuidance" placeholder="Leave blank to use the default jurisdiction guidance paragraph (BEST_PRACTICES_JURISDICTION_GUIDANCE in index.js)"></textarea>
+    <details class="tip">
+      <summary aria-label="More information">&#9432;</summary>
+      <span>
+        Every Best Practices comparison appends one extra paragraph to
+        the comparison instruction, telling the model not to penalize
+        a plan for not naming the same state or program a benchmark
+        entry names (so a Maine plan isn't dinged for never mentioning
+        a Massachusetts program). Leave this blank to use that
+        built-in paragraph as-is, or write your own text here to use
+        in its place for this run -- handy for experimenting with the
+        wording without editing code. Whatever you write entirely
+        REPLACES the built-in paragraph; it isn't appended alongside
+        it.
+      </span>
+    </details>
   </details>
 
   <div class="button-row" style="margin-top: 1rem;">

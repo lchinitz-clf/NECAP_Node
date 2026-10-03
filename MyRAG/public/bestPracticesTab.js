@@ -54,8 +54,8 @@
  *     generated yet on this install — handled below as "feature
  *     unavailable," not a hard error).
  *   - POST /query/stream with { workspaceId, bestPracticesFilter:
- *     {hazards: string[], states?: string[]}, attributesPerCall }
- *     reuses the EXACT SAME
+ *     {hazards: string[], states?: string[], jurisdictionGuidance?: string},
+ *     attributesPerCall } reuses the EXACT SAME
  *     comparison engine Rubric Control's idealTopicId path already
  *     runs through server-side (see buildBestPracticesTopic() in
  *     index.js) — this file just has to speak the same ndjson stream
@@ -66,7 +66,7 @@
  */
 
 (function () {
-  let hazardSelect, stateSelect, attributesPerCallInput;
+  let hazardSelect, stateSelect, attributesPerCallInput, jurisdictionGuidanceInput;
   let compareBtn, stopBtn;
   let statusEl, progressWrap, progressBar, errorEl;
   let resultWrap, resultSummaryEl, resultsBody;
@@ -232,6 +232,23 @@
    */
   function getSelectedValues(select) {
     return Array.from(select.selectedOptions || []).map((opt) => opt.value).filter(Boolean);
+  }
+
+  /**
+   * Reads the "Jurisdiction guidance override" textarea -- parallel to
+   * Rubric Control's own "Comparison instruction (optional)" textarea
+   * (see #rubricCompareInstruction in index.html/script.js): blank
+   * means "use BEST_PRACTICES_JURISDICTION_GUIDANCE, the built-in
+   * default," so this returns undefined in that case (same convention
+   * getChatModel() above already uses) rather than '', so the request
+   * body omits `jurisdictionGuidance` entirely instead of sending an
+   * empty string that would mean something different server-side. See
+   * that constant's own doc comment in index.js for the full picture.
+   * @returns {string|undefined}
+   */
+  function getJurisdictionGuidanceOverride() {
+    const value = jurisdictionGuidanceInput && jurisdictionGuidanceInput.value.trim();
+    return value || undefined;
   }
 
   /** Hides whatever entry's full text is currently shown in the detail panel. */
@@ -563,6 +580,7 @@
       return;
     }
     const states = getSelectedValues(stateSelect);
+    const jurisdictionGuidance = getJurisdictionGuidanceOverride();
 
     const rawAttributesPerCall = parseInt(attributesPerCallInput.value, 10);
     const attributesPerCall = Number.isFinite(rawAttributesPerCall) && rawAttributesPerCall > 0
@@ -588,7 +606,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          bestPracticesFilter: { hazards, states },
+          bestPracticesFilter: { hazards, states, jurisdictionGuidance },
           attributesPerCall,
           chatModel: getChatModel(),
         }),
@@ -651,7 +669,12 @@
       resultSummaryEl.textContent =
         `Hazard${hazards.length === 1 ? '' : 's'}: ${hazards.join(', ')}` +
         (states.length ? `, State${states.length === 1 ? '' : 's'}: ${states.join(', ')}` : ' (all states)') +
-        ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against "${workspaceId}".`;
+        ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against "${workspaceId}".` +
+        // Confirms the override actually took effect for THIS run --
+        // without this, the only way to tell would be reading the
+        // (not normally visible) prompt itself -- see this tab's own
+        // doc comment above on why the actual prompt isn't shown.
+        (jurisdictionGuidance ? ' Using a custom jurisdiction guidance override for this run.' : '');
     } catch (err) {
       if (err.name === 'AbortError') {
         statusEl.textContent = `Stopped after ${rowsRendered} entr${rowsRendered === 1 ? 'y' : 'ies'}.`;
@@ -736,6 +759,7 @@
     hazardSelect = document.getElementById('bpHazard');
     stateSelect = document.getElementById('bpState');
     attributesPerCallInput = document.getElementById('bpAttributesPerCall');
+    jurisdictionGuidanceInput = document.getElementById('bpJurisdictionGuidance');
     compareBtn = document.getElementById('bpCompareBtn');
     stopBtn = document.getElementById('bpStopBtn');
     statusEl = document.getElementById('bpStatus');

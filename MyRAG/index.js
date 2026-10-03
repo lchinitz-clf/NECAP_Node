@@ -1173,6 +1173,20 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
 // below, or a hand-edited, multi-paragraph defaultCompareInstruction
 // from idealProposals.json tuned over time via Rubric Control; this
 // paragraph reads sensibly appended after either one unchanged.
+//
+// This hardcoded value is only the DEFAULT, not the only option: the
+// Best Practices Comparison tab has its own "Jurisdiction guidance
+// override" textarea (see bpJurisdictionGuidance in index.html and
+// getJurisdictionGuidanceOverride() in bestPracticesTab.js) that
+// replaces this constant wholesale, for that run only, when it isn't
+// left blank — see buildBestPracticesTopic()'s jurisdictionGuidanceOverride
+// parameter just below. Parallel in spirit to Rubric Control's own
+// per-topic compareInstruction override (blank means "use the
+// built-in default," anything typed in replaces it), but deliberately
+// NOT persisted to idealProposals.json the way that one is — this is
+// meant for quickly trying out different wording without editing code
+// or restarting the server, so it's just sent fresh with whatever
+// request triggered that run.
 const BEST_PRACTICES_JURISDICTION_GUIDANCE =
   "Each attribute below describes a real-world initiative from a specific state, which may be different " +
   "from the state the material above describes. Do not penalize the material for failing to mention that " +
@@ -1224,6 +1238,18 @@ const BEST_PRACTICES_JURISDICTION_GUIDANCE =
  * @param {string[]} [states] - omit or pass an empty array to match
  *   every state that has an entry for one of the selected hazards.
  *   More than one is matched as an OR, same as hazards.
+ * @param {string} [jurisdictionGuidanceOverride] - replaces
+ *   BEST_PRACTICES_JURISDICTION_GUIDANCE wholesale when it's a
+ *   non-blank string -- see that constant's own doc comment just above
+ *   it for the parallel to Rubric Control's per-topic compareInstruction
+ *   override (resolveInstructionText()'s same "blank means use the
+ *   built-in default" convention, just for this one paragraph rather
+ *   than the whole instruction, and never persisted to
+ *   idealProposals.json the way a topic's own override is -- sent
+ *   fresh with each run from the Best Practices tab's own textarea,
+ *   specifically so it's quick to try out different wording without
+ *   editing code or restarting the server). Blank/omitted uses the
+ *   built-in paragraph unchanged, same as always.
  * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string}}
  * @throws {Error} whatever loadBestPracticeAttributes()/
  *   filterBestPracticeAttributes() throw (a malformed bestPractices.json,
@@ -1231,14 +1257,16 @@ const BEST_PRACTICES_JURISDICTION_GUIDANCE =
  *   HTTP response, same pattern the idealTopicId resolution right below
  *   this function already follows.
  */
-function buildBestPracticesTopic(hazards, states) {
+function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride) {
   const allAttributes = loadBestPracticeAttributes();
   const attributes = filterBestPracticeAttributes(allAttributes, { hazards, states });
 
   const { defaultCompareInstruction } = loadTopics();
   const baseCompareInstruction =
     resolveInstructionText(defaultCompareInstruction) || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
-  const compareInstruction = `${baseCompareInstruction}\n\n${BEST_PRACTICES_JURISDICTION_GUIDANCE}`;
+  const jurisdictionGuidance =
+    (jurisdictionGuidanceOverride && jurisdictionGuidanceOverride.trim()) || BEST_PRACTICES_JURISDICTION_GUIDANCE;
+  const compareInstruction = `${baseCompareInstruction}\n\n${jurisdictionGuidance}`;
 
   // Label is purely descriptive (shown in the UI's run summary and in
   // the exported report's "Ideal-proposal topic" row -- see
@@ -1298,8 +1326,11 @@ app.post('/query', async (req, res) => {
     // filterBestPracticeAttributes() in src/bestPracticesFilter.js) —
     // one or more of each, matched as an OR, per the multi-select
     // Hazard/State controls on the Best Practices Comparison tab.
+    // `jurisdictionGuidance`, if present and non-blank, overrides
+    // BEST_PRACTICES_JURISDICTION_GUIDANCE for this run only — see that
+    // constant's own doc comment above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
@@ -1586,10 +1617,11 @@ app.post('/query/stream', async (req, res) => {
     }
     if (!topic) return res.status(400).json({ error: `Unknown ideal-proposal topic id: "${idealTopicId}"` });
   } else if (bestPracticesFilter && Array.isArray(bestPracticesFilter.hazards) && bestPracticesFilter.hazards.length > 0) {
-    // `hazards`/`states` are arrays, matched as an OR -- see the
-    // matching comment on /query above.
+    // `hazards`/`states` are arrays, matched as an OR -- and
+    // `jurisdictionGuidance` is this run's optional override -- see
+    // the matching comment on /query above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
