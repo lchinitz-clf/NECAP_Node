@@ -23,12 +23,40 @@ body {
    absolutely so it floats over the page rather than pushing content
    down (same absolute-positioning approach as details.tip's popover
    below). See initTabs() in script.js for the open/close and
-   tab-switching logic. */
+   tab-switching logic.
+
+   `position: sticky` (not `fixed`) keeps the hamburger menu reachable
+   without scrolling back to the top of a long tab, while staying the
+   simplest possible fix: sticky keeps the header in its normal spot
+   in the page's own flow (so it's still centered and the same width
+   as the rest of the page, with no extra positioning math) until the
+   page scrolls past it, at which point it locks to the top of the
+   viewport instead of scrolling out of view. `position: fixed` would
+   take it out of flow entirely -- it would need its own width/
+   centering rules to match body's max-width/margin below, and
+   padding added back further down the page so fixed content doesn't
+   start out hidden underneath it. An explicit background is needed
+   either way (sticky or fixed) since this now visually overlaps
+   whatever scrolls underneath it, rather than always having empty
+   page margin above it the way it did before.
+
+   z-index: 40 only has to clear ordinary page content (which never
+   sets z-index, so it's effectively 0) -- it's well below
+   .modal-backdrop's z-index: 100 further down this file, so a modal
+   (e.g. the delete-workspace confirmation) still correctly layers on
+   top of this header, not under it. */
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #fff;
+  padding: 0.6rem 0;
+  margin: 0 0 0.25rem;
+  border-bottom: 1px solid var(--border);
 }
 .tab-menu { position: relative; flex-shrink: 0; }
 .tab-menu-btn {
