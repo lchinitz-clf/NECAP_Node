@@ -54,22 +54,25 @@
  *     generated yet on this install — handled below as "feature
  *     unavailable," not a hard error).
  *   - POST /query/stream with { workspaceId, bestPracticesFilter:
- *     {hazards: string[], states?: string[], jurisdictionGuidance?: string},
- *     attributesPerCall } reuses the EXACT SAME
- *     comparison engine Rubric Control's idealTopicId path already
+ *     {hazards: string[], states?: string[], jurisdictionGuidance?: string,
+ *     analysisGuidance?: string}, attributesPerCall } reuses the EXACT
+ *     SAME comparison engine Rubric Control's idealTopicId path already
  *     runs through server-side (see buildBestPracticesTopic() in
  *     index.js) — this file just has to speak the same ndjson stream
  *     protocol /query/stream always speaks: a "sources" event per
- *     batch, then a "batch-done" event per batch (carrying that
- *     batch's {name, proposal, resultText, category} records), then
- *     one final "done" event, or an "error" event at any point.
+ *     batch, "token" events as the model's raw answer streams in (see
+ *     the "Raw answer" box, #bpAnswer/#bpAnswerDetails in index.html),
+ *     then a "batch-done" event per batch (carrying that batch's
+ *     {name, proposal, resultText, category} records), then one final
+ *     "done" event, or an "error" event at any point.
  */
 
 (function () {
-  let hazardSelect, stateSelect, attributesPerCallInput, jurisdictionGuidanceInput;
+  let hazardSelect, stateSelect, attributesPerCallInput, jurisdictionGuidanceInput, analysisGuidanceInput;
   let compareBtn, stopBtn;
-  let statusEl, progressWrap, progressBar, errorEl;
+  let statusEl, progressWrap, progressBar, errorEl, elapsedTimeEl;
   let resultWrap, resultSummaryEl, resultsBody;
+  let answerDetailsEl, answerEl;
   let chatModelNoteEl;
   let downloadCsvBtn, downloadHtmlBtn;
   let previewCountEl, showFullListBtn, previewListEl, previewDetailEl;
@@ -90,6 +93,19 @@
   // for a Best Practices run specifically.
   let runStartedAt = null;
   let lastElapsedMs = null;
+  // Live-updating timer handle -- same mechanism as script.js's
+  // queryTimerHandle: a setInterval started alongside runStartedAt
+  // above, re-rendering elapsedTimeEl every tick via the shared
+  // formatElapsedMs() global (reportHtml.js), stopped and replaced with
+  // the final elapsed time once the run settles (completed, stopped, or
+  // errored -- see runComparison()'s finally block below).
+  let runTimerHandle = null;
+  // Whether any 'token' event has arrived yet for the run in progress --
+  // same purpose as script.js's gotAnyToken: if the stream never sends
+  // one (e.g. the "no documents embedded yet" short-circuit), the raw
+  // answer box falls back to finalEvent.answer instead of staying
+  // empty. Reset at the start of every run.
+  let gotAnyToken = false;
 
   // Every matching Best Practices attribute object from the most
   // recent POST /best-practices/preview response (see refreshPreview()
@@ -248,6 +264,19 @@
    */
   function getJurisdictionGuidanceOverride() {
     const value = jurisdictionGuidanceInput && jurisdictionGuidanceInput.value.trim();
+    return value || undefined;
+  }
+
+  /**
+   * Reads the "Analysis guidance override" textarea -- same convention
+   * as getJurisdictionGuidanceOverride() just above, but for
+   * BEST_PRACTICES_ANALYSIS_GUIDANCE in index.js instead: blank means
+   * "use the built-in default," so this returns undefined in that case
+   * rather than ''.
+   * @returns {string|undefined}
+   */
+  function getAnalysisGuidanceOverride() {
+    const value = analysisGuidanceInput && analysisGuidanceInput.value.trim();
     return value || undefined;
   }
 
@@ -581,6 +610,7 @@
     }
     const states = getSelectedValues(stateSelect);
     const jurisdictionGuidance = getJurisdictionGuidanceOverride();
+    const analysisGuidance = getAnalysisGuidanceOverride();
 
     const rawAttributesPerCall = parseInt(attributesPerCallInput.value, 10);
     const attributesPerCall = Number.isFinite(rawAttributesPerCall) && rawAttributesPerCall > 0
@@ -592,12 +622,24 @@
     rowsRendered = 0;
     latestBatches = [];
     lastElapsedMs = null;
+    gotAnyToken = false;
     resultWrap.style.display = 'none';
     resultSummaryEl.textContent = '';
+    answerEl.textContent = '';
+    answerDetailsEl.style.display = 'none';
     statusEl.textContent = 'Starting...';
     setRunning(true);
 
     runStartedAt = performance.now();
+    // Live-updating timer -- mirrors script.js's own queryStartTime/
+    // queryTimerHandle pattern (see elapsedTimeEl's own declaration
+    // above): ticks every 100ms using the shared formatElapsedMs()
+    // global from reportHtml.js, stopped in the finally block below
+    // once the run settles.
+    elapsedTimeEl.textContent = formatElapsedMs(0);
+    runTimerHandle = setInterval(() => {
+      elapsedTimeEl.textContent = formatElapsedMs(performance.now() - runStartedAt);
+    }, 100);
     abortController = new AbortController();
 
     try {
@@ -606,7 +648,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          bestPracticesFilter: { hazards, states, jurisdictionGuidance },
+          bestPracticesFilter: { hazards, states, jurisdictionGuidance, analysisGuidance },
           attributesPerCall,
           chatModel: getChatModel(),
         }),
@@ -643,6 +685,24 @@
 
           if (event.type === 'sources') {
             statusEl.textContent = `Batch ${event.batchIndex + 1} of ${event.totalBatches}: retrieved, asking the model...`;
+            // Same separator convention as script.js's own answerEl
+            // handling: inserted right before a second-or-later batch's
+            // tokens start arriving, so each batch's raw text is
+            // visually set apart instead of running straight into the
+            // previous batch's.
+            if (event.batchIndex > 0 && answerEl.textContent) {
+              answerEl.textContent += '\n\n———\n\n';
+            }
+          } else if (event.type === 'token') {
+            // Live "typing" effect for the raw, unparsed model output --
+            // mirrors script.js's own #answer handling (see that file's
+            // 'token' branch). This is what lets a thin-looking result
+            // (e.g. a verdict and a quote but no real analysis) be
+            // checked against what the model actually wrote, rather
+            // than only the best-effort parse in the table below.
+            gotAnyToken = true;
+            answerDetailsEl.style.display = '';
+            answerEl.textContent += event.text;
           } else if (event.type === 'batch-done') {
             statusEl.textContent = `Batch ${event.batchIndex + 1} of ${event.totalBatches} done.`;
             latestBatches.push({
@@ -664,17 +724,26 @@
       if (!finalEvent) throw new Error('Server closed the connection before finishing.');
       if (finalEvent.type === 'error') throw new Error(finalEvent.error);
 
+      // Covers the same "no documents embedded yet" short-circuit
+      // script.js's own answerEl handling guards against: "done" fires
+      // with a ready-made answer and no tokens were ever streamed.
+      if (!gotAnyToken && finalEvent.answer) {
+        answerEl.textContent = finalEvent.answer;
+        answerDetailsEl.style.display = '';
+      }
+
       lastElapsedMs = performance.now() - runStartedAt;
       statusEl.textContent = `Done -- ${rowsRendered} entr${rowsRendered === 1 ? 'y' : 'ies'} compared across ${finalEvent.totalBatches} batch${finalEvent.totalBatches === 1 ? '' : 'es'}.`;
       resultSummaryEl.textContent =
         `Hazard${hazards.length === 1 ? '' : 's'}: ${hazards.join(', ')}` +
         (states.length ? `, State${states.length === 1 ? '' : 's'}: ${states.join(', ')}` : ' (all states)') +
         ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against "${workspaceId}".` +
-        // Confirms the override actually took effect for THIS run --
+        // Confirms each override actually took effect for THIS run --
         // without this, the only way to tell would be reading the
         // (not normally visible) prompt itself -- see this tab's own
         // doc comment above on why the actual prompt isn't shown.
-        (jurisdictionGuidance ? ' Using a custom jurisdiction guidance override for this run.' : '');
+        (jurisdictionGuidance ? ' Using a custom jurisdiction guidance override for this run.' : '') +
+        (analysisGuidance ? ' Using a custom analysis guidance override for this run.' : '');
     } catch (err) {
       if (err.name === 'AbortError') {
         statusEl.textContent = `Stopped after ${rowsRendered} entr${rowsRendered === 1 ? 'y' : 'ies'}.`;
@@ -683,6 +752,15 @@
         statusEl.textContent = '';
       }
     } finally {
+      clearInterval(runTimerHandle);
+      runTimerHandle = null;
+      // Mirrors script.js's own finally block: recomputed from
+      // runStartedAt rather than reusing lastElapsedMs, so the
+      // displayed time is correct even on an error/abort path above
+      // that returns before lastElapsedMs is ever set.
+      const finalElapsedMs = performance.now() - runStartedAt;
+      elapsedTimeEl.textContent = formatElapsedMs(finalElapsedMs);
+      lastElapsedMs = finalElapsedMs;
       setRunning(false);
       abortController = null;
     }
@@ -760,12 +838,16 @@
     stateSelect = document.getElementById('bpState');
     attributesPerCallInput = document.getElementById('bpAttributesPerCall');
     jurisdictionGuidanceInput = document.getElementById('bpJurisdictionGuidance');
+    analysisGuidanceInput = document.getElementById('bpAnalysisGuidance');
     compareBtn = document.getElementById('bpCompareBtn');
     stopBtn = document.getElementById('bpStopBtn');
     statusEl = document.getElementById('bpStatus');
+    elapsedTimeEl = document.getElementById('bpElapsedTime');
     progressWrap = document.getElementById('bpProgressWrap');
     progressBar = document.getElementById('bpProgressBar');
     errorEl = document.getElementById('bpError');
+    answerDetailsEl = document.getElementById('bpAnswerDetails');
+    answerEl = document.getElementById('bpAnswer');
     resultWrap = document.getElementById('bpResultWrap');
     resultSummaryEl = document.getElementById('bpResultSummary');
     resultsBody = document.getElementById('bpResultsBody');

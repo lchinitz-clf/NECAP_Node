@@ -67,6 +67,24 @@
   margin: 0.25rem 0 0.75rem;
 }
 
+/* Raw-answer box (see #bpAnswerDetails/#bpAnswer in index.html and the
+   'token' event handling in runComparison() in bestPracticesTab.js) --
+   same look as the Query and Response tab's own #answer in style.css
+   (that rule is ID-scoped there, so it doesn't apply to this tab's own
+   #bpAnswer id and has to be repeated here); .section-toggle/
+   details.section-toggle styling itself is NOT id-scoped in style.css,
+   so #bpAnswerDetails already inherits that for free and only needs
+   this box treatment for the text itself. */
+#tabPanel-bestPractices #bpAnswer {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin-bottom: 1rem;
+}
+
 /* The "Chat model: ..." note (see refreshChatModelNote() in
    bestPracticesTab.js) deliberately looks like a status callout, not
    a p.hint -- it's reporting which model is about to run a real

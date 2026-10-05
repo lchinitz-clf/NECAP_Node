@@ -754,9 +754,10 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   // narrower fix covered a word broken at a real hyphen but not one
   // broken anywhere else in the word (exactly the "Ic e" / "re ly"
   // shape above), so it's replaced here by stripping whitespace
-  // unconditionally — which also makes the old hyphen-specific
-  // replace redundant, since removing every space around a hyphen
-  // has the same end result as the old regex intended.
+  // unconditionally. (That old hyphen-specific replace turned out not
+  // to be fully redundant after all, just incomplete in a different
+  // way than first assumed — see the hyphen-stripping addition
+  // further below, which goes one step past it.)
   //
   // Known false-positive risk, accepted deliberately (same tradeoff
   // class as looksLikeContinuation() in structuredText.js): because
@@ -768,9 +769,75 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   // practice than the genuine extraction artifact above, and it's a
   // strict broadening of a risk this function already accepted for the
   // hyphen case specifically — see this function's own doc comment.
+  //
+  // Also strips any synthesized "[Context: ...]" line chunker.js may
+  // have inserted INSIDE the chunk's own text (see
+  // addContextLineIfNeeded() there) — a real, observed case: a single
+  // source block too long to fit in one chunk gets split (wordSplit()
+  // in chunker.js, or an unmerged mid-sentence line wrap — see
+  // looksLikeContinuation()'s doc comment in structuredText.js) with
+  // the cut landing mid-sentence, and the new chunk opened by that
+  // split gets its own context line prepended ahead of the sentence's
+  // remainder, since nothing about where a block happens to get cut
+  // tells addContextLineIfNeeded() it's splitting a sentence rather
+  // than starting a new one. The result is a chunk whose literal text
+  // reads "...continue to keep\n\n[Context: Energy Strategy (CES)]\n\npace
+  // with adopting..." — a completely genuine, contiguous sentence in
+  // the source document, but with this synthesized line's characters
+  // physically sitting in the middle of it, which defeated verbatim
+  // matching even with whitespace already stripped (the bracketed text
+  // itself survives whitespace-only stripping; this is a second,
+  // separate artifact on top of that one). `path` here can contain any
+  // text a document's own headings have (including, in principle, a
+  // literal ")" or other punctuation), so this only needs to match the
+  // fixed "[Context: ...]" wrapper chunker.js always uses, not try to
+  // reconstruct or validate the heading path itself; chunker.js builds
+  // each one as a single line via formatHeadingPath() (no raw newline
+  // in the middle), so excluding "]" and newlines from the inner
+  // class is enough to match exactly one synthesized line at a time
+  // without ever over-matching across two separate ones.
+  //
+  // Also strips every ASCII hyphen ("-"), not just the whitespace
+  // around one — another real, observed PDF-extraction artifact,
+  // distinct from both of the above: pdf-parse preserves the source
+  // PDF's own end-of-line hyphenation marks as literal "-" characters,
+  // e.g. "...up to 18 sto- ries tall." for a page that printed
+  // "sto-" at the end of one line and "ries" at the start of the
+  // next. Once the whitespace around it is stripped (as it already
+  // is, above), that leaves "sto-ries" in the chunk text — one
+  // character off from the real word "stories," which is of course
+  // how a model quoting the same sentence actually writes it, since
+  // "stories" is the correct word and the hyphen was never part of it
+  // to begin with, just a PDF line-wrap artifact. An earlier version
+  // of this function tried to special-case exactly this shape ("sea-
+  // level" -> "sea-level," collapsing the space but keeping the
+  // hyphen) on the theory that the hyphen itself was never the
+  // problem — but that's only true for a GENUINE hyphenated compound
+  // word, where the model's own quote keeps the hyphen too; it's
+  // false for this line-wrap case, where the hyphen itself is exactly
+  // the extraction noise and the real word has none at all. Since a
+  // chunk's raw text alone can't distinguish "sto-ries" (artifact,
+  // hyphen should vanish) from a genuine compound like "well-being"
+  // (real hyphen, should stay) — both are just letters-hyphen-letters
+  // with no surrounding whitespace once the earlier strip above has
+  // already run — the only way to fix the line-wrap case is to strip
+  // hyphens unconditionally, the same blanket approach already taken
+  // for whitespace above. This is harmless for a genuine compound
+  // word specifically because normalize() is applied identically to
+  // both the quote and the chunk text: "well-being" and "wellbeing"
+  // still end up equal to each other either way, so a real compound
+  // word quoted verbatim (hyphen and all) still matches just fine.
+  // Same accepted-risk category as the whitespace-blind matching
+  // above (and explicitly a broadening of the risk already accepted
+  // for the hyphen case specifically) — a fabricated quote that
+  // happens to jam two real hyphen-separated words together could in
+  // principle be misreported as verified, judged far less likely in
+  // practice than this genuine, repeatedly observed extraction
+  // artifact.
   const normalize = (s) => String(s || '')
     .toLowerCase()
-    .replace(/\s+/g, '');
+    .replace(/\[context:[^\]\n]*\]/g, '')
+    .replace(/[\s-]+/g, '');
 
   const rawPieces = splitQuoteOnEllipsis(quote);
   if (rawPieces.length === 0) return null; // e.g. the "quote" was just an ellipsis with nothing else

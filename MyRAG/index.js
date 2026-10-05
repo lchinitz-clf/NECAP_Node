@@ -1187,12 +1187,86 @@ function buildRagMessages(question, matches, materialLabel = 'source material') 
 // meant for quickly trying out different wording without editing code
 // or restarting the server, so it's just sent fresh with whatever
 // request triggered that run.
+//
+// Revised wording (this version) after a real, repeatedly observed
+// failure the FIRST version of this paragraph didn't fully prevent: a
+// model would still write a sentence like "does not mention
+// Massachusetts or its building code" as its OWN stated reason for a
+// Not addressed verdict — exactly the thing the first version's "do
+// not penalize the material for failing to mention that other
+// state... by name" sentence was supposed to rule out. That version
+// was pure prohibition with no alternative procedure attached, which
+// turned out to be a weak defense against the much more concrete,
+// textually salient pull of the benchmark's own state/agency/program
+// name appearing right there in the RUBRIC block a few lines above —
+// a negative instruction several paragraphs removed from the point of
+// generation, competing against a literal proper noun sitting right
+// next to the comparison. This version gives the model a concrete
+// procedure instead of only a prohibition: restate the benchmark in
+// state-neutral terms FIRST (so the thing being compared against is
+// never the original sentence containing the name), then adds a much
+// more targeted, concrete version of the prohibition itself — not
+// "don't penalize for this" but "do not write a sentence that cites
+// this" — aimed directly at the exact leaked sentence shape observed
+// in practice. Confirmed, via the user's own live testing against
+// several real benchmark entries (not just the fake-ollama plumbing
+// stub, which can't validate wording quality at all — see this
+// constant's own override mechanism above for why that distinction
+// matters), to stop that leaked sentence from appearing and to
+// produce a substantively-reasoned verdict (e.g. "Falls short"
+// because the material has two separate codes rather than one shared
+// code, not because it fails to name the benchmark's state) in cases
+// where the first version's wording alone did not.
 const BEST_PRACTICES_JURISDICTION_GUIDANCE =
   "Each attribute below describes a real-world initiative from a specific state, which may be different " +
-  "from the state the material above describes. Do not penalize the material for failing to mention that " +
-  "other state, its agencies, or its specifically-named program by name — a plan from one state will " +
-  "naturally never reference another state's program. Judge only whether the material's own approach is " +
-  "substantively similar in content and intent, regardless of which state is involved.";
+  "from the state the material above describes — that is expected, not a gap: a plan from one state will " +
+  "naturally never name another state's program, agency, or specific law. Before judging, first restate " +
+  "the benchmark attribute silently in your own words WITHOUT using any state name, agency name, or " +
+  "program name — describe only what the program actually does (for example, \"a single building code " +
+  "that applies to every building and includes flood-resistant design requirements,\" not \"the " +
+  "Massachusetts State Building Code\"). Then compare the material above only against that state-neutral " +
+  "restatement, never against the original wording's state, agency, or program names. Do not write any " +
+  "sentence, anywhere in your answer, that cites the material's failure to mention the other state, its " +
+  "agencies, or its program by name as a reason for your verdict — that fact is irrelevant and must never " +
+  "appear in your reasoning. Judge only whether the material's own approach is substantively similar in " +
+  "content and intent to the state-neutral restatement, regardless of which state is involved.";
+
+// Appended after BEST_PRACTICES_JURISDICTION_GUIDANCE as a second,
+// separate paragraph — same "last paragraph of compareInstruction,
+// never spliced into the middle" placement, and same override
+// convention (see that constant's doc comment just above). Added for a
+// different, specifically observed failure mode: a real Best Practices
+// run was coming back with a "matches" verdict and a correctly-cited
+// quote, but no actual analysis — the model's "direct answer" was just
+// a near-verbatim restatement of the benchmark attribute text (the
+// RUBRIC block) instead of a description of what the retrieved
+// material (the PROPOSAL block) itself says. Unlike a hand-authored
+// Rubric Control attribute, which is usually already phrased as a
+// criterion to check for, a Best Practices attribute is a flat
+// declarative sentence describing a real program — there's nothing in
+// that phrasing alone telling the model its job is to describe the
+// PROPOSAL, not echo the RUBRIC. This paragraph says so explicitly.
+//
+// Rephrasing the jurisdiction-guidance paragraph above as an explicit
+// yes/no question was tried first (by hand, via the UI override) and
+// did NOT fix this on its own — the restatement behavior persisted.
+// This paragraph targets the actual mechanism instead: naming the
+// PROPOSAL/RUBRIC markers directly and telling the model plainly not to
+// copy the benchmark back as its own answer.
+//
+// Same override mechanism as BEST_PRACTICES_JURISDICTION_GUIDANCE:
+// optional, ephemeral, UI-only (bpAnalysisGuidance textarea /
+// getAnalysisGuidanceOverride() in bestPracticesTab.js), never
+// persisted to idealProposals.json. This hardcoded paragraph is always
+// the real default; the override exists purely so different wording
+// can be tried out quickly without editing code or restarting the
+// server.
+const BEST_PRACTICES_ANALYSIS_GUIDANCE =
+  "Your direct answer must be a genuine description, in your own words, of what the material between " +
+  "PROPOSAL START and PROPOSAL END above actually says about this topic. Do not copy, quote, or restate " +
+  "the benchmark description given above as if it were your own answer — that description is only what " +
+  "you are comparing against, not something to repeat back. If the plan under review contains nothing " +
+  "relevant, say so plainly; if it does, describe specifically what it says before giving your verdict.";
 
 /**
  * Builds a synthetic "topic" object — same shape getTopic() in
@@ -1250,14 +1324,18 @@ const BEST_PRACTICES_JURISDICTION_GUIDANCE =
  *   specifically so it's quick to try out different wording without
  *   editing code or restarting the server). Blank/omitted uses the
  *   built-in paragraph unchanged, same as always.
- * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string}}
+ * @param {string} [analysisGuidanceOverride] - same convention as
+ *   jurisdictionGuidanceOverride just above, but replaces
+ *   BEST_PRACTICES_ANALYSIS_GUIDANCE instead. Blank/omitted uses that
+ *   built-in paragraph unchanged.
+ * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string, isBestPractices: true}}
  * @throws {Error} whatever loadBestPracticeAttributes()/
  *   filterBestPracticeAttributes() throw (a malformed bestPractices.json,
  *   or no hazards at all) — left for the caller to turn into the right
  *   HTTP response, same pattern the idealTopicId resolution right below
  *   this function already follows.
  */
-function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride) {
+function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride, analysisGuidanceOverride) {
   const allAttributes = loadBestPracticeAttributes();
   const attributes = filterBestPracticeAttributes(allAttributes, { hazards, states });
 
@@ -1266,7 +1344,9 @@ function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride) 
     resolveInstructionText(defaultCompareInstruction) || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
   const jurisdictionGuidance =
     (jurisdictionGuidanceOverride && jurisdictionGuidanceOverride.trim()) || BEST_PRACTICES_JURISDICTION_GUIDANCE;
-  const compareInstruction = `${baseCompareInstruction}\n\n${jurisdictionGuidance}`;
+  const analysisGuidance =
+    (analysisGuidanceOverride && analysisGuidanceOverride.trim()) || BEST_PRACTICES_ANALYSIS_GUIDANCE;
+  const compareInstruction = `${baseCompareInstruction}\n\n${jurisdictionGuidance}\n\n${analysisGuidance}`;
 
   // Label is purely descriptive (shown in the UI's run summary and in
   // the exported report's "Ideal-proposal topic" row -- see
@@ -1281,6 +1361,13 @@ function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride) 
     label: `Best Practices Benchmark (${hazardsLabel}; ${statesLabel})`,
     attributes,
     compareInstruction,
+    // Lets genuinely-shared code (currently just logQueryActivity() in
+    // src/activityLog.js) distinguish this synthetic topic from a real,
+    // hand-authored Rubric Control topic without string-matching on id
+    // (a real topic id in idealProposals.json could coincidentally be
+    // "best-practices" too). getTopic() in idealProposals.js never sets
+    // this field, so it's reliably absent/falsy for every real topic.
+    isBestPractices: true,
   };
 }
 
@@ -1330,7 +1417,7 @@ app.post('/query', async (req, res) => {
     // BEST_PRACTICES_JURISDICTION_GUIDANCE for this run only — see that
     // constant's own doc comment above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
@@ -1621,7 +1708,7 @@ app.post('/query/stream', async (req, res) => {
     // `jurisdictionGuidance` is this run's optional override -- see
     // the matching comment on /query above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });

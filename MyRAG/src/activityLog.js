@@ -2,15 +2,19 @@
  * Append-only audit trail split across TWO separate log files:
  *
  *   logs/activity-YYYY-MM.jsonl - full detail for every query and
- *     ideal-proposal-comparison ("rubric analysis") request: who asked,
- *     when, against which storage area, what was asked, what chat
- *     model actually answered it, and what came back — including
- *     requests that were aborted or failed, not just ones that
- *     completed normally. Written by logQueryActivity() below. See
- *     /query and /query/stream in index.js for the two request paths
- *     that both log through it, and the "Comparing against an ideal
- *     proposal" section of README.md for what a rubric analysis
- *     actually is.
+ *     ideal-proposal-comparison request: who asked, when, against
+ *     which storage area, what was asked, what chat model actually
+ *     answered it, and what came back — including requests that were
+ *     aborted or failed, not just ones that completed normally.
+ *     Logged `type` is one of "query" (plain Q&A, no topic),
+ *     "rubricAnalysis" (a real, hand-authored Rubric Control topic), or
+ *     "bestPracticesAnalysis" (the synthetic topic a Best Practices
+ *     Comparison run builds on the fly — see buildBestPracticesTopic()
+ *     in index.js) — see logQueryActivity() below for exactly how that
+ *     choice is made. Written by logQueryActivity() below. See /query
+ *     and /query/stream in index.js for the two request paths that both
+ *     log through it, and the "Comparing against an ideal proposal"
+ *     section of README.md for what a rubric analysis actually is.
  *
  *   logs/actions-YYYY-MM.jsonl - a terser record of every action that
  *     changes something on disk: uploading/embedding a document,
@@ -161,11 +165,16 @@ function appendActionLog(entry) {
  *   question box, if any. For a plain query this is the whole
  *   question; for a rubric analysis it's optional extra guidance typed
  *   on top of the selected topic (often '', when none was typed).
- * @param {{id: string, label: string}} [params.topic] - when set, this
- *   request is logged as a "rubricAnalysis" entry (with topicId/
- *   topicLabel) instead of a plain "query" entry. Pass the exact topic
- *   object /query and /query/stream already resolved via getTopic() —
- *   this function doesn't re-look it up.
+ * @param {{id: string, label: string, isBestPractices?: boolean}} [params.topic] -
+ *   when set, this request is logged as either a "bestPracticesAnalysis"
+ *   or a "rubricAnalysis" entry (with topicId/topicLabel either way)
+ *   instead of a plain "query" entry — which of the two depends on
+ *   `topic.isBestPractices`: true for the synthetic topic
+ *   buildBestPracticesTopic() in index.js builds for a Best Practices
+ *   Comparison run, falsy (the common case) for a real, hand-authored
+ *   Rubric Control topic resolved via getTopic(), which never sets that
+ *   field. Pass the exact topic object /query and /query/stream already
+ *   resolved — this function doesn't re-look it up.
  * @param {'completed'|'no-documents'|'aborted'|'error'} params.status
  *   - "completed": a real answer was generated and returned.
  *   - "no-documents": the workspace has nothing embedded yet, so the
@@ -206,7 +215,14 @@ function appendActionLog(entry) {
  *   Activity log only — the action log's marker doesn't need it.
  */
 function logQueryActivity({ req, workspaceId, question, topic, status, answer, error, sourceChunkIds, chatModel }) {
-  const type = topic ? 'rubricAnalysis' : 'query';
+  // topic.isBestPractices is only ever set by buildBestPracticesTopic()
+  // in index.js, on the synthetic topic it builds for a Best Practices
+  // Comparison run — never by getTopic() for a real, hand-authored
+  // Rubric Control topic. So this branch leaves every real-Rubric-
+  // Control call exactly as before ('rubricAnalysis'/'query', unchanged)
+  // and only introduces the new 'bestPracticesAnalysis' label for the
+  // one case that used to be mislabeled as 'rubricAnalysis'.
+  const type = topic ? (topic.isBestPractices ? 'bestPracticesAnalysis' : 'rubricAnalysis') : 'query';
 
   appendActivityLog({
     type,

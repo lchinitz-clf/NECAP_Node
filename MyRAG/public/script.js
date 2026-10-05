@@ -77,7 +77,7 @@ async function refreshWorkspaces() {
 // default) — pre-selecting it when it's in the pulled-models list
 // just makes the picker's starting state match what would happen
 // anyway if you left it alone.
-const SERVER_DEFAULT_CHAT_MODEL = 'llama3.1:8b';
+const SERVER_DEFAULT_CHAT_MODEL = 'qwen2.5:14b';
 
 // Model families known to document their OWN preference for a higher
 // "Consistency" (temperature) setting than this app's own default of

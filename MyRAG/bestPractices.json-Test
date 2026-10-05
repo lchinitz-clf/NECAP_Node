@@ -1,0 +1,42 @@
+{
+  "attributes": [
+    {
+      "name": "MA — Massachusetts State Building Code provides a shared, common code for all…",
+      "proposal": "Massachusetts State Building Code provides a shared, common code for all buildings in MA, including with respect to flood-resistant design and construction. Periodically updated, with 10th MSBC effective as of October 2024. There are additional optional extensions for energy which municipalities may adopt. (Stage: Respond, Prepare; Level of commitment: Regulation; Scope: State; Funding: Fully funded by State; Status: Completed.)",
+      "state": "MA",
+      "hazards": [
+        "Coastal Flood",
+        "Riverine Flood",
+        "Stormwater Flood"
+      ],
+      "sectors": [
+        "Damage To Cultural Resources",
+        "Damage To Inland Buildings",
+        "Damage To Coastal Buildings And Ports",
+        "Reduction In State And Municipal Revenues",
+        "Damages To Coastal State And Municipal Buildings And Land",
+        "Damage To Inland State And Municipal Buildings And Land",
+        "Reduction In The Availability Of Affordably Priced Housing",
+        "Economic Losses From Commercial Structure Damage And Business Interruptions",
+        "Damage To Tourist Attraction And Recreation Amenities"
+      ],
+      "commitmentLevels": [
+        "Regulation"
+      ],
+      "scope": [
+        "State"
+      ],
+      "fundingStatus": [
+        "Fully"
+      ],
+      "fundingSource": [
+        "State"
+      ],
+      "status": [
+        "Completed"
+      ],
+      "url": "https://www.mass.gov/handbook/tenth-edition-of-the-ma-state-building-code-780",
+      "notes": null
+    }
+ ]
+}
