@@ -14,7 +14,12 @@
       "attributes": [
         {
           "name": "TestQuestion",
-          "proposal": "Does the plan evaluate compound or cascading hazards, such as flooding combined with power outages, heat combined with poor air quality, or coastal flooding combined with storm surge?",
+          "proposal": "Plan should include complete loss-avoidance studies to better understand the positive impact of completed mitigation work, including the value of open space, forested and conserved land.",
+          "included": true
+        },
+        {
+          "name": "Test Question 2",
+          "proposal": "Plan should develop case studies to showcase replicable pilot projects that reduce community vulnerability and have direct benefits to frontline/impacted communities",
           "included": true
         }
       ],

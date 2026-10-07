@@ -113,6 +113,17 @@
   border-radius: 6px;
 }
 
+/* "Compare against" mode toggle + the rubric picker it reveals (see
+   #bpCompareModeRow/#bpRubricTopicRow in index.html and
+   getCompareMode()/loadRubricTopics() in bestPracticesTab.js) -- same
+   vertical rhythm #bpPreview just below uses. */
+#tabPanel-bestPractices #bpCompareModeRow {
+  margin: 0.6rem 0 1rem;
+}
+#tabPanel-bestPractices #bpRubricTopicRow {
+  margin: 0 0 1rem;
+}
+
 /* Live Hazard/State preview (see refreshPreview()/renderPreview()/
    showPreviewDetail() in bestPracticesTab.js, and POST
    /best-practices/preview in index.js). #bpPreviewCount reuses the

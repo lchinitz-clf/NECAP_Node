@@ -318,7 +318,7 @@ function requireWorkspace(errorEl) {
 
 // ---- Documents-in-workspace list ----
 
-let documentsWrap, documentsEmpty, documentsBody, documentsError;
+let documentsWrap, documentsEmpty, documentsBody, documentsError, documentsExcludedNote;
 let blockLookupDocument, blockLookupIndex, blockLookupBtn, blockLookupError;
 let blockLookupChunks = []; // the currently-selected document's {chunkIndex, id} list, once loaded
 
@@ -346,15 +346,34 @@ async function refreshDocuments() {
 
     if (data.documents.length === 0) {
       documentsEmpty.textContent = `No documents imported into "${id}" yet.`;
+      documentsExcludedNote.style.display = 'none';
       resetBlockLookup();
       return;
     }
 
     documentsEmpty.textContent = '';
+    // Surfaces excluded documents even to someone who never opens this
+    // table's Include column — e.g. the Query tab's own status line
+    // has no equivalent reminder, so a document excluded weeks ago
+    // (by anyone — this is a shared, persisted workspace setting, not
+    // a personal one; see setIncluded()'s own doc comment in
+    // src/documentMeta.js) doesn't silently and invisibly stay missing
+    // from every answer. Only shown at all when at least one document
+    // actually is excluded — the common case (everything included)
+    // shows nothing extra here.
+    const excludedCount = data.documents.filter((doc) => doc.included === false).length;
+    if (excludedCount > 0) {
+      documentsExcludedNote.textContent = `${excludedCount} of ${data.documents.length} document${data.documents.length === 1 ? '' : 's'} excluded from search (unchecked below).`;
+      documentsExcludedNote.style.display = 'block';
+    } else {
+      documentsExcludedNote.style.display = 'none';
+    }
+
     for (const doc of data.documents) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(doc.sourceFile)}</td>
+        <td class="doc-included-cell"></td>
         <td class="doc-description-cell"></td>
         <td>${doc.chunks}</td>
         <td>${doc.numPages != null ? doc.numPages : '—'}</td>
@@ -393,6 +412,26 @@ async function refreshDocuments() {
       // in this file already has.
       descInput.readOnly = currentRole !== 'admin';
       tr.querySelector('.doc-description-cell').appendChild(descInput);
+
+      // Checked by default (doc.included is `true` for any document
+      // with no explicit exclusion, including every brand-new one —
+      // see isDocumentIncluded() in src/documentMeta.js), unchecked
+      // only for a document someone has deliberately excluded. Saved
+      // immediately on change (see the delegated 'change' listener
+      // below), not on a separate explicit save step the way the
+      // description textarea needs one — a checkbox's own click/toggle
+      // already IS the deliberate action here, there's no "still
+      // typing" state to wait out first.
+      const includedCheckbox = document.createElement('input');
+      includedCheckbox.type = 'checkbox';
+      includedCheckbox.className = 'doc-included-checkbox';
+      includedCheckbox.checked = doc.included !== false;
+      includedCheckbox.dataset.source = doc.sourceFile;
+      // Same admin-only editing posture as the description field right
+      // above, and the same "not a security boundary" caveat (see the
+      // doc comment on PUT .../included in index.js).
+      includedCheckbox.disabled = currentRole !== 'admin';
+      tr.querySelector('.doc-included-cell').appendChild(includedCheckbox);
 
       documentsBody.appendChild(tr);
     }
@@ -462,6 +501,66 @@ async function saveDocumentDescription(input) {
     console.warn('Could not save document description:', err);
     input.classList.add('doc-description-error');
     input.title = `Could not save this description: ${err.message}`;
+  }
+}
+
+/**
+ * Saves one document's inclusion flag — called from the delegated
+ * 'change' listener below as soon as a .doc-included-checkbox (see
+ * refreshDocuments()) is toggled. Unlike saveDocumentDescription()
+ * above, there's no "did this actually change" guard to apply first:
+ * a checkbox only ever fires 'change' when its state actually
+ * flipped, so every call here is already a real, deliberate toggle.
+ * @param {HTMLInputElement} checkbox
+ */
+async function saveDocumentIncluded(checkbox) {
+  // Belt-and-suspenders, same posture as saveDocumentDescription()'s
+  // own early-return guard above: the checkbox is already disabled
+  // for anything but 'admin' (see refreshDocuments() and
+  // applyRolePermissions()), which alone already stops this from
+  // ever being reached. Not a security boundary; see the doc comment
+  // on PUT .../included in index.js.
+  if (currentRole !== 'admin') return;
+
+  const sourceFile = checkbox.dataset.source;
+  const workspaceId = getWorkspaceId();
+  if (!workspaceId || !sourceFile) return;
+
+  const wantIncluded = checkbox.checked;
+  checkbox.disabled = true;
+
+  try {
+    const res = await fetch(
+      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}/included`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ included: wantIncluded }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+    checkbox.checked = data.included;
+    checkbox.title = '';
+    // Refreshes the "N of M documents excluded" note and re-renders
+    // the whole table from the server's own now-current state —
+    // simpler than patching just this one row's note count by hand,
+    // and this request is already a full round-trip either way. That
+    // rebuild replaces `checkbox` itself with a fresh node (correctly
+    // re-enabled already), so there's nothing left to re-enable here
+    // on the success path.
+    refreshDocuments();
+  } catch (err) {
+    console.warn('Could not save document inclusion:', err);
+    // Reverts the checkbox to what it was before this click, rather
+    // than leaving it showing a state the server never actually
+    // stored — a silent mismatch here would be worse than a visible
+    // revert, given what this checkbox actually controls (which
+    // documents get searched at all). The table isn't rebuilt on this
+    // path, so this same node needs re-enabling by hand.
+    checkbox.checked = !wantIncluded;
+    checkbox.title = `Could not save this change: ${err.message}`;
+    checkbox.disabled = currentRole !== 'admin';
   }
 }
 
@@ -1393,20 +1492,21 @@ let currentRole = 'admin';
  * to coordinate explicitly.
  *
  * The rubric Save button, and every already-rendered document
- * description field, are handled here directly (disabled/read-only
- * outright) rather than through a CSS rule like everything else,
- * specifically so they stay that way rather than depending on nothing
- * else in the file ever touching `.disabled`/`.readOnly` again — see
- * submitRubricForm()'s and saveDocumentDescription()'s own
+ * description field and Include checkbox, are handled here directly
+ * (disabled/read-only outright) rather than through a CSS rule like
+ * everything else, specifically so they stay that way rather than
+ * depending on nothing else in the file ever touching
+ * `.disabled`/`.readOnly` again — see submitRubricForm()'s,
+ * saveDocumentDescription()'s, and saveDocumentIncluded()'s own
  * early-return guards for the second, independent check that backs
  * each of those up if the attribute is ever bypassed some other way
  * (devtools included — see this function's own "not a security
  * boundary" note above; those guards are about robustness, not
- * security). Re-applying to already-rendered description fields here
- * (rather than only at render time in refreshDocuments()) covers the
- * case where a document list was drawn before this function's first
- * call — GET /auth/me resolving is a network round-trip, so it's
- * entirely possible someone picks a storage area before it finishes.
+ * security). Re-applying to already-rendered fields here (rather than
+ * only at render time in refreshDocuments()) covers the case where a
+ * document list was drawn before this function's first call — GET
+ * /auth/me resolving is a network round-trip, so it's entirely
+ * possible someone picks a storage area before it finishes.
  * @param {'admin'|'readonly'|'queryonly'} role
  */
 function applyRolePermissions(role) {
@@ -1415,6 +1515,9 @@ function applyRolePermissions(role) {
   rubricSaveBtn.disabled = role === 'readonly';
   for (const input of document.querySelectorAll('.doc-description-input')) {
     input.readOnly = role !== 'admin';
+  }
+  for (const checkbox of document.querySelectorAll('.doc-included-checkbox')) {
+    checkbox.disabled = role !== 'admin';
   }
   if (role === 'readonly') document.body.classList.add('role-readonly');
   if (role === 'queryonly') {
@@ -2576,6 +2679,7 @@ function init() {
   documentsEmpty = document.getElementById('documentsEmpty');
   documentsBody = document.getElementById('documentsBody');
   documentsError = document.getElementById('documentsError');
+  documentsExcludedNote = document.getElementById('documentsExcludedNote');
 
   blockLookupDocument = document.getElementById('blockLookupDocument');
   blockLookupIndex = document.getElementById('blockLookupIndex');
@@ -2789,6 +2893,19 @@ function init() {
     const input = e.target.closest('.doc-description-input');
     if (!input) return;
     saveDocumentDescription(input);
+  });
+
+  // Saves a document's Include checkbox the moment it's toggled — see
+  // saveDocumentIncluded()'s own doc comment for why this fires on
+  // 'change' (not 'focusout', the description field's own save
+  // trigger): a checkbox's toggle already IS the deliberate action,
+  // there's no "still typing" state to wait out first. Same delegated-
+  // listener reasoning as every other one here: covers every row,
+  // including ones added by a later refreshDocuments().
+  documentsBody.addEventListener('change', (e) => {
+    const checkbox = e.target.closest('.doc-included-checkbox');
+    if (!checkbox) return;
+    saveDocumentIncluded(checkbox);
   });
 
   // Plain Enter inserts a newline, same as any multi-line textarea —

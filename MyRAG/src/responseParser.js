@@ -188,11 +188,29 @@ function splitIntoListItems(text) {
  * Used as a fallback when splitIntoListItems() above doesn't produce
  * exactly one item per attribute.
  *
+ * A batch of exactly one attribute short-circuits before any of that
+ * name-position slicing runs: the whole answer has nothing else it
+ * could possibly be about, so the whole text is safely that
+ * attribute's segment (this is also the case batching down to 1
+ * makes most reliable, per the module-level caveat). Running the
+ * slicing logic anyway would be actively harmful here, not just
+ * redundant: the model often echoes the attribute's name mid-sentence
+ * as a quoted grammatical object (`The benchmark item "NAME"
+ * involves...`) rather than as a leading label, and slicing to start
+ * at that name's position discards everything before it, including
+ * the sentence's own subject. With only one attribute there's no
+ * second mention to bound against anyway, so skipping the slicing
+ * loses nothing and avoids that failure mode entirely.
+ *
  * @param {string} text
  * @param {Array<{name: string}>} attributes
  * @returns {Array<string|null>} parallel to `attributes`
  */
 function splitByAttributeNames(text, attributes) {
+  if (attributes.length === 1) {
+    return [text.trim()];
+  }
+
   const found = []; // { attrIndex, start }
   let searchFrom = 0;
   for (let i = 0; i < attributes.length; i++) {
@@ -212,23 +230,15 @@ function splitByAttributeNames(text, attributes) {
     segments[attrIndex] = text.slice(start, end).trim();
   }
 
-  // A batch of exactly one attribute has nothing else the answer could
-  // possibly be about, so even if the model never repeated the
-  // attribute's name verbatim, the whole answer is still safely that
-  // attribute's segment. This is the case batching down to 1 makes
-  // most reliable, per the module-level caveat.
-  if (attributes.length === 1 && segments[0] === null) {
-    segments[0] = text.trim();
-  }
-
   return segments;
 }
 
 /**
  * Pulls the category word and the reasoning text out of one
  * attribute's segment. Strips a leading repeat of the attribute's own
- * name (and any bullet/dash marker in front of it) first, so neither
- * leaks into `resultText`.
+ * name (and any bullet/dash marker in front of it, plus a trailing
+ * quote mark if the model wrapped that repeated name in quotes) first,
+ * so neither leaks into `resultText`.
  *
  * @param {string|null} segment
  * @param {string} attributeName
@@ -241,11 +251,48 @@ function extractCategoryAndResult(segment, attributeName) {
   if (!segment) return { category: '', resultText: '' };
 
   let text = segment.replace(/^[\s\-*•]+/, '').replace(/^\d+[.)]\s*/, '');
-  const nameMatch = findNameFlexible(text, attributeName, 0);
-  if (nameMatch && nameMatch.index === 0) {
-    text = text.slice(nameMatch.length);
+  // A repeated name counts as a leading label even with one opening
+  // quote mark (straight " or curly “) directly in front of it and
+  // nothing else — e.g. a segment that starts `"<name>" involves...`
+  // with no subject/preamble before the quote at all. Without this,
+  // the name-match-at-0 check just below would miss it (the quote
+  // character, not the name, sits at index 0), leaving the name AND
+  // its stray trailing quote stuck onto the front of resultText.
+  const leadingQuote = text.match(/^["“]/);
+  const searchFrom = leadingQuote ? leadingQuote[0].length : 0;
+  const nameMatch = findNameFlexible(text, attributeName, searchFrom);
+  if (nameMatch && nameMatch.index === searchFrom) {
+    text = text.slice(nameMatch.index + nameMatch.length);
   }
-  text = text.replace(/^[\s:\-–—]+/, '');
+  // Includes a trailing quote mark (straight " or curly closing ”) in
+  // what gets stripped here, not just whitespace/colon/dash -- a real,
+  // observed case: a model introducing its answer as `"<name>"
+  // involves...`, or (for a MULTI-attribute batch) as `The benchmark
+  // item "<name>" involves...` where splitByAttributeNames() above
+  // slices that segment starting AT the matched name, not before it,
+  // so "The benchmark item \"" was never part of this segment to begin
+  // with. Either way, the matching CLOSING quote immediately after the
+  // name is still sitting right here once the name itself is sliced off
+  // just above. Left unstripped, it became a stray leading `"` on the
+  // front of resultText -- e.g. `" involves conducting studies...` --
+  // which then wasn't recognized as "leading junk" by anything
+  // downstream either, so it rendered straight to the screen. Quoting
+  // an attribute's own name back like this is a natural, common way for
+  // a model to introduce its answer (more common here than in a plain
+  // Rubric Control run, since a Best Practices benchmark entry's name
+  // is often quotable, self-contained text rather than a short id/
+  // label), so this is a real-world shape worth handling generically
+  // rather than a one-off.
+  //
+  // Note that for a SINGLE-attribute batch, splitByAttributeNames()
+  // never slices at all (it hands back the whole, unsliced text) --
+  // see that function's own doc comment for why -- so a genuine
+  // subject/preamble before a quoted name (`The benchmark item
+  // "<name>" involves...`) is preserved rather than being mistaken for
+  // a leading label: the name-match-at-`searchFrom` check above only
+  // fires when the name is truly at the front (give or take one
+  // opening quote), not merely present somewhere in the text.
+  text = text.replace(/^[\s:\-–—"”]+/, '');
 
   let best = null;
   for (const { label, re } of CATEGORY_PATTERNS) {
@@ -442,14 +489,29 @@ function extractQuotesAndCitations(text) {
  * see resolveCitation()'s doc comment for why) plus a ✓/⚠ marker.
  * Returns '' for a "none"-shaped match (nothing to show), which
  * spliceVerifiedQuotes() below relies on to know when to skip one.
+ *
+ * A rubric-comparison run's verified quote always resolves to a
+ * synthetic match carrying `attributeName` (see buildRubricMatches()
+ * in src/idealProposals.js), and the citation reads that name instead
+ * of a plain chunk number in that case — "[Test Rubric, chunk 0]"
+ * tells a person reading the result nothing useful (0 is just that
+ * attribute's position in the rubric's own list), where "[Test
+ * Rubric — rubric item: "<name>"]" tells them exactly which rubric
+ * item the quote actually matched. An ordinary document-chunk
+ * citation never has `attributeName` at all, so it keeps the original
+ * "[sourceFile, chunk N]" form unchanged.
  * @param {{quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null}} match
- * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [matches]
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string, attributeName?: string}>} [matches]
  * @returns {string}
  */
 function renderQuoteMatch(match, matches) {
   if (!match.quote) return '';
   const resolved = resolveCitation(match.quote, matches, match.claimedSourceFile, match.claimedChunkIndex);
-  const citation = resolved && resolved.verified ? ` [${resolved.sourceFile}, chunk ${resolved.chunkIndex}]` : '';
+  const citation = resolved && resolved.verified
+    ? (resolved.attributeName
+      ? ` [${resolved.sourceFile} — rubric item: "${resolved.attributeName}"]`
+      : ` [${resolved.sourceFile}, chunk ${resolved.chunkIndex}]`)
+    : '';
   const verifyNote = resolved && resolved.verified ? ' ✓ quote verified'
     : resolved && resolved.verified === false ? ' ⚠ quote NOT found verbatim in any retrieved chunk'
     : '';
@@ -720,12 +782,16 @@ function chunkContainsOrderedPieces(haystack, pieces) {
  *   when the same quoted text happens to appear in more than one
  *   retrieved chunk.
  * @param {string|null} [claimedChunkIndex]
- * @returns {{verified: true, sourceFile: string, chunkIndex: number}|{verified: false}|null}
+ * @returns {{verified: true, sourceFile: string, chunkIndex: number, attributeName: string|undefined}|{verified: false}|null}
  *   null if there was no quote to check at all (the model wrote
  *   "none," or nothing matched the quote format); `{verified: false}`
  *   if a quote was given but its text doesn't appear verbatim in any
  *   retrieved chunk (fabricated or paraphrased); otherwise the real
- *   [sourceFile, chunkIndex] the quote actually came from.
+ *   [sourceFile, chunkIndex] the quote actually came from, plus
+ *   `attributeName` carried straight through from the matched record
+ *   when it has one (only a rubric-comparison run's synthetic matches
+ *   do — see buildRubricMatches() in src/idealProposals.js — so this
+ *   is `undefined` for every ordinary retrieved-chunk citation).
  */
 function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
@@ -860,7 +926,7 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
     : null;
   const chosen = claimed || candidates[0];
 
-  return { verified: true, sourceFile: chosen.sourceFile, chunkIndex: chosen.chunkIndex };
+  return { verified: true, sourceFile: chosen.sourceFile, chunkIndex: chosen.chunkIndex, attributeName: chosen.attributeName };
 }
 
 /**

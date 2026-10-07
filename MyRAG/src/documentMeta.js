@@ -15,10 +15,19 @@
  * deleteDescription() below, called when the document itself is
  * removed.
  *
- * Shape on disk: `{ "<sourceFile>": { "description": "..." }, ... }` —
+ * Shape on disk: `{ "<sourceFile>": { "description": "...", "included": false }, ... }` —
  * one small object per sourceFile rather than a bare string, so a
- * later per-document field (if one ever comes up) doesn't need a
- * schema migration.
+ * later per-document field doesn't need a schema migration (exactly
+ * what let `included` get added here later with no migration at
+ * all). `included` follows the same "only the exception is stored"
+ * minimalism as `description`: it's only ever written as the literal
+ * `false`, and only for a document someone has explicitly excluded —
+ * a document with no entry here at all, or an entry with no
+ * `included` key, is included by default (see isDocumentIncluded()
+ * below). That default matters for more than just "the common case
+ * stays a no-op write": it's also what makes a brand-new document
+ * (just embedded, never had an entry here) start out included with
+ * zero code needed to say so.
  *
  * Same "plain JSON file you can open yourself" philosophy store.js's
  * own doc comment describes, and the same workspaceId validation
@@ -101,11 +110,82 @@ function setDescription(workspaceId, sourceFile, description) {
 }
 
 /**
- * Removes a document's metadata entirely. Called from DELETE
+ * Whether a document counts as included in retrieval — true unless an
+ * entry explicitly says otherwise, so a document with no entry at all
+ * (the common case, and always true for a just-embedded document) and
+ * one with an entry that only ever set a description are both
+ * included by default. Same "missing means true" convention
+ * isAttributeIncluded() in src/idealProposals.js already uses for a
+ * Rubric Control attribute's own Include checkbox.
+ * @param {{included?: boolean}|undefined} entry
+ * @returns {boolean}
+ */
+function isDocumentIncluded(entry) {
+  return !entry || entry.included !== false;
+}
+
+/**
+ * Every document explicitly excluded (unchecked) in this workspace —
+ * for GET /workspaces/:workspaceId/documents to report each
+ * document's current state, and for hybridSearch() in
+ * src/hybridSearch.js to actually filter retrieval by. Only documents
+ * with a real, explicit exclusion come back here, not a Set of every
+ * OTHER document's sourceFile — same "absence means default" shape
+ * getAllDescriptions() above already follows, and the right shape for
+ * a caller that just wants to test `excluded.has(sourceFile)` either
+ * way.
+ * @param {string} workspaceId
+ * @returns {Set<string>} excluded sourceFiles
+ */
+function getExcludedSourceFiles(workspaceId) {
+  const meta = loadMeta(workspaceId);
+  const excluded = new Set();
+  for (const [sourceFile, entry] of Object.entries(meta)) {
+    if (!isDocumentIncluded(entry)) excluded.add(sourceFile);
+  }
+  return excluded;
+}
+
+/**
+ * Sets, or — given `true`, the default — clears, one document's
+ * inclusion flag. Mirrors setDescription()'s own shape: only a real
+ * exclusion is ever actually written (`{ included: false }`),
+ * clearing it back out entirely once a document is re-included rather
+ * than leaving a redundant `included: true` sitting in the file
+ * forever. Preserves whatever description entry already exists for
+ * this sourceFile either way, since the two fields share one entry
+ * per the module doc comment above.
+ * @param {string} workspaceId
+ * @param {string} sourceFile
+ * @param {boolean} included
+ * @returns {boolean} the included state actually stored
+ */
+function setIncluded(workspaceId, sourceFile, included) {
+  const meta = loadMeta(workspaceId);
+  const wantIncluded = included !== false; // anything but an explicit false means "included"
+
+  if (wantIncluded) {
+    if (meta[sourceFile]) {
+      delete meta[sourceFile].included;
+      if (Object.keys(meta[sourceFile]).length === 0) delete meta[sourceFile];
+    }
+  } else {
+    meta[sourceFile] = { ...meta[sourceFile], included: false };
+  }
+
+  saveMeta(workspaceId, meta);
+  return wantIncluded;
+}
+
+/**
+ * Removes a document's metadata entirely — both its description AND
+ * its inclusion flag. Called from DELETE
  * /workspaces/:workspaceId/documents/:sourceFile in index.js right
  * after the document's chunks are removed, so a later document that
  * happens to reuse the same filename never inherits a stale
- * description left over from whatever used to be there.
+ * description, or a stale exclusion, left over from whatever used to
+ * be there — it starts fresh, included by default, same as any other
+ * brand-new document.
  * @param {string} workspaceId
  * @param {string} sourceFile
  */
@@ -117,4 +197,11 @@ function deleteDescription(workspaceId, sourceFile) {
   }
 }
 
-module.exports = { getAllDescriptions, setDescription, deleteDescription };
+module.exports = {
+  getAllDescriptions,
+  setDescription,
+  deleteDescription,
+  isDocumentIncluded,
+  getExcludedSourceFiles,
+  setIncluded,
+};

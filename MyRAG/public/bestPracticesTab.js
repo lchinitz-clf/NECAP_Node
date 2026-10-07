@@ -65,10 +65,26 @@
  *     then a "batch-done" event per batch (carrying that batch's
  *     {name, proposal, resultText, category} records), then one final
  *     "done" event, or an "error" event at any point.
+ *   - "Compare against" mode (see #bpCompareModeRow/#bpRubricTopicRow
+ *     in index.html): "workspace" (the default, described just above)
+ *     sends `workspaceId` exactly as before. "rubric" instead sends
+ *     `compareAgainstRubricId` (a Rubric Control topic id, from a new
+ *     GET /ideal-proposals-backed dropdown this file populates itself
+ *     — see loadRubricTopics() below) and OMITS `workspaceId`
+ *     entirely — that mode never touches a workspace at all, since the
+ *     selected rubric's own attributes are compared against directly,
+ *     with no retrieval step (see buildRubricMatches() in
+ *     src/idealProposals.js). Every other field (bestPracticesFilter,
+ *     attributesPerCall, chatModel) is sent exactly the same either
+ *     way; the stream protocol is identical too, the only visible
+ *     difference being that a rubric-mode run's "sources" events show
+ *     the selected rubric's own attributes (one per "chunk") instead
+ *     of retrieved document chunks.
  */
 
 (function () {
   let hazardSelect, stateSelect, attributesPerCallInput, jurisdictionGuidanceInput, analysisGuidanceInput;
+  let compareModeWorkspaceRadio, compareModeRubricRadio, rubricTopicRow, rubricTopicSelect;
   let compareBtn, stopBtn;
   let statusEl, progressWrap, progressBar, errorEl, elapsedTimeEl;
   let resultWrap, resultSummaryEl, resultsBody;
@@ -212,6 +228,114 @@
       : 'ⓘ Chat model: not yet loaded (set on the Query and Response tab) — using the server default for now.';
   }
 
+  /**
+   * Which "document" this tab is currently set to compare the Best
+   * Practices subset against — 'workspace' (the original behavior,
+   * also the default) or 'rubric' (see #bpCompareModeRow in
+   * index.html). Falls back to 'workspace' if the radio itself isn't
+   * found for some reason, same defensive convention the rest of this
+   * file's DOM lookups use.
+   * @returns {'workspace'|'rubric'}
+   */
+  function getCompareMode() {
+    return compareModeRubricRadio && compareModeRubricRadio.checked ? 'rubric' : 'workspace';
+  }
+
+  /** @returns {string} the selected #bpRubricTopic option's value, or '' if none. */
+  function getRubricTopicId() {
+    return rubricTopicSelect ? rubricTopicSelect.value : '';
+  }
+
+  /**
+   * The selected rubric's plain label (not the "label — description"
+   * combined display text) — same dataset.label convention
+   * refreshIdealTopics() in script.js uses for its own #idealTopic
+   * dropdown, so a report header reads "Offshore Wind" rather than the
+   * longer combined option text. Returns `id` itself as a last-resort
+   * fallback (e.g. if the option list hasn't loaded yet for some
+   * reason) rather than an empty string, so a report never shows a
+   * blank "compared against rubric: " line.
+   * @param {string} id
+   * @returns {string}
+   */
+  function getRubricTopicLabel(id) {
+    if (!rubricTopicSelect || !id) return id || '';
+    const opt = Array.from(rubricTopicSelect.options).find((o) => o.value === id);
+    return (opt && (opt.dataset.label || opt.textContent)) || id;
+  }
+
+  /**
+   * Shows/hides the rubric picker depending on the current "Compare
+   * against" selection — called on init and on every radio 'change'.
+   * Never touches the Hazard/State preview or anything else; those
+   * apply identically to both modes.
+   */
+  function updateCompareModeVisibility() {
+    if (!rubricTopicRow) return;
+    rubricTopicRow.style.display = getCompareMode() === 'rubric' ? '' : 'none';
+  }
+
+  /**
+   * Populates #bpRubricTopic from GET /ideal-proposals — the exact same
+   * endpoint/response shape refreshIdealTopics() in script.js already
+   * reads for the Query and Response tab's own #idealTopic dropdown
+   * (see that function's own doc comment for the response shape), just
+   * rendered into this tab's own select instead, per this file's
+   * isolation policy (see this file's own top-of-file doc comment). An
+   * empty topic list is a normal state (nobody's added a rubric in
+   * Rubric Control yet) — shown as a disabled explanatory option, same
+   * spirit as loadFilters()'s own "(none available)" handling above,
+   * rather than an error.
+   */
+  async function loadRubricTopics() {
+    if (!rubricTopicSelect) return;
+    rubricTopicSelect.innerHTML = '<option value="" disabled selected>Loading rubrics...</option>';
+    try {
+      const res = await fetch('/ideal-proposals');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load rubric topics');
+
+      const topics = data.topics || [];
+      const previousValue = rubricTopicSelect.value;
+      rubricTopicSelect.innerHTML = '';
+
+      if (topics.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.disabled = true;
+        opt.selected = true;
+        opt.textContent = '(no rubrics saved yet -- add one in Rubric Control)';
+        rubricTopicSelect.appendChild(opt);
+        return;
+      }
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.textContent = 'Select a rubric...';
+      rubricTopicSelect.appendChild(placeholder);
+
+      for (const topic of topics) {
+        const opt = document.createElement('option');
+        opt.value = topic.id;
+        opt.textContent = topic.description ? `${topic.label} — ${topic.description}` : topic.label;
+        opt.dataset.label = topic.label;
+        rubricTopicSelect.appendChild(opt);
+      }
+
+      // Preserve whatever was selected across a refresh (e.g. switching
+      // to this tab again later in the session) -- same courtesy
+      // refreshIdealTopics() in script.js gives its own dropdown. Falls
+      // back to the placeholder (still selected from above) if the
+      // previously-selected rubric no longer exists.
+      const stillExists = Array.from(rubricTopicSelect.options).some((o) => o.value === previousValue);
+      if (previousValue && stillExists) rubricTopicSelect.value = previousValue;
+      else placeholder.selected = true;
+    } catch (err) {
+      rubricTopicSelect.innerHTML = `<option value="" disabled selected>(failed to load: ${err.message})</option>`;
+    }
+  }
+
   function showError(message) {
     errorEl.textContent = message;
     errorEl.style.display = message ? 'block' : 'none';
@@ -223,6 +347,9 @@
     hazardSelect.disabled = running;
     stateSelect.disabled = running;
     attributesPerCallInput.disabled = running;
+    if (compareModeWorkspaceRadio) compareModeWorkspaceRadio.disabled = running;
+    if (compareModeRubricRadio) compareModeRubricRadio.disabled = running;
+    if (rubricTopicSelect) rubricTopicSelect.disabled = running;
     progressWrap.style.display = running ? '' : 'none';
     // Exporting mid-run would just export whatever's accumulated so
     // far, frozen at a moment that's about to change — simplest to
@@ -597,10 +724,26 @@
    * queryWithStream()).
    */
   async function runComparison() {
-    const workspaceId = getWorkspaceId();
-    if (!workspaceId) {
-      showError('Enter or pick a storage area name above first.');
-      return;
+    // Exactly one of these two ends up set below, matching whichever
+    // "Compare against" mode is selected -- see getCompareMode()'s own
+    // doc comment. Declared here (rather than inline in the fetch body
+    // below) so the validation checks right below can return early
+    // without duplicating which field they're validating.
+    const compareMode = getCompareMode();
+    let workspaceId = '';
+    let rubricTopicId = '';
+    if (compareMode === 'rubric') {
+      rubricTopicId = getRubricTopicId();
+      if (!rubricTopicId) {
+        showError('Pick a rubric to compare against first.');
+        return;
+      }
+    } else {
+      workspaceId = getWorkspaceId();
+      if (!workspaceId) {
+        showError('Enter or pick a storage area name above first.');
+        return;
+      }
     }
 
     const hazards = getSelectedValues(hazardSelect);
@@ -647,7 +790,13 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workspaceId,
+          // Exactly one of these two is actually sent -- see this
+          // function's own validation above and getCompareMode()'s doc
+          // comment. 'rubric' mode omits workspaceId entirely rather
+          // than sending an empty string, since the server treats its
+          // mere presence as "validate/require a workspace" (see
+          // /query/stream in index.js).
+          ...(compareMode === 'rubric' ? { compareAgainstRubricId: rubricTopicId } : { workspaceId }),
           bestPracticesFilter: { hazards, states, jurisdictionGuidance, analysisGuidance },
           attributesPerCall,
           chatModel: getChatModel(),
@@ -734,10 +883,13 @@
 
       lastElapsedMs = performance.now() - runStartedAt;
       statusEl.textContent = `Done -- ${rowsRendered} entr${rowsRendered === 1 ? 'y' : 'ies'} compared across ${finalEvent.totalBatches} batch${finalEvent.totalBatches === 1 ? '' : 'es'}.`;
+      const comparedAgainstText = compareMode === 'rubric'
+        ? `the rubric "${getRubricTopicLabel(rubricTopicId)}"`
+        : `"${workspaceId}"`;
       resultSummaryEl.textContent =
         `Hazard${hazards.length === 1 ? '' : 's'}: ${hazards.join(', ')}` +
         (states.length ? `, State${states.length === 1 ? '' : 's'}: ${states.join(', ')}` : ' (all states)') +
-        ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against "${workspaceId}".` +
+        ` -- ${rowsRendered} benchmark entr${rowsRendered === 1 ? 'y' : 'ies'} compared against ${comparedAgainstText}.` +
         // Confirms each override actually took effect for THIS run --
         // without this, the only way to tell would be reading the
         // (not normally visible) prompt itself -- see this tab's own
@@ -782,7 +934,12 @@
    * still labeled "Ideal-proposal topic" either way (that label lives
    * in the shared report builder, used by three call sites, so it's
    * not changed here), but the VALUE shown next to it is always
-   * accurate for what actually ran.
+   * accurate for what actually ran. `workspaceId`/`rubricLabel` are
+   * mutually exclusive, matching getCompareMode() -- a rubric-mode
+   * export has no workspace at all (no "Workspace" row in the report),
+   * and gets a new "Compared against rubric" row instead (see
+   * `rubricLabel` in buildAttributeResultsHtml()'s own doc comment in
+   * reportHtml.js).
    * @returns {Object}
    */
   function buildExportMeta() {
@@ -793,8 +950,10 @@
       ? rawAttributesPerCall
       : undefined;
     const appNameEl = document.getElementById('appNameHeading');
+    const compareMode = getCompareMode();
     return {
-      workspaceId: getWorkspaceId() || undefined,
+      workspaceId: compareMode === 'rubric' ? undefined : (getWorkspaceId() || undefined),
+      rubricLabel: compareMode === 'rubric' ? getRubricTopicLabel(getRubricTopicId()) : undefined,
       topicLabel: hazards.length
         ? `Best Practices — ${hazards.join(', ')}${states.length ? ` (${states.join(', ')})` : ' (all states)'}`
         : undefined,
@@ -805,6 +964,25 @@
     };
   }
 
+  /**
+   * A short, filesystem-safe-ish base name for the two downloads below
+   * -- the workspace name in workspace mode (unchanged from before),
+   * or the selected rubric's id in rubric mode (its id rather than its
+   * label, since a label can contain spaces/punctuation a label alone
+   * would make for an awkward filename; same 'results' fallback either
+   * mode uses if nothing is actually selected, which shouldn't happen
+   * in practice since both export buttons are disabled until a run has
+   * produced at least one record).
+   * @returns {string}
+   */
+  function getExportFileBase() {
+    if (getCompareMode() === 'rubric') {
+      const id = getRubricTopicId();
+      return id ? `rubric-${id}` : 'results';
+    }
+    return getWorkspaceId() || 'results';
+  }
+
   function downloadCsv() {
     if (!latestBatches.some((b) => b.records && b.records.length)) return;
     const csv = buildAttributeResultsCsv(latestBatches);
@@ -812,7 +990,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${getWorkspaceId() || 'results'}-best-practices.csv`;
+    a.download = `${getExportFileBase()}-best-practices.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -826,7 +1004,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${getWorkspaceId() || 'results'}-best-practices.html`;
+    a.download = `${getExportFileBase()}-best-practices.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -839,6 +1017,10 @@
     attributesPerCallInput = document.getElementById('bpAttributesPerCall');
     jurisdictionGuidanceInput = document.getElementById('bpJurisdictionGuidance');
     analysisGuidanceInput = document.getElementById('bpAnalysisGuidance');
+    compareModeWorkspaceRadio = document.getElementById('bpCompareModeWorkspace');
+    compareModeRubricRadio = document.getElementById('bpCompareModeRubric');
+    rubricTopicRow = document.getElementById('bpRubricTopicRow');
+    rubricTopicSelect = document.getElementById('bpRubricTopic');
     compareBtn = document.getElementById('bpCompareBtn');
     stopBtn = document.getElementById('bpStopBtn');
     statusEl = document.getElementById('bpStatus');
@@ -882,6 +1064,14 @@
 
     loadFilters();
 
+    // "Compare against" mode toggle (see getCompareMode()'s own doc
+    // comment above): shows/hides the rubric picker, and loads its
+    // options the first time this tab initializes.
+    if (compareModeWorkspaceRadio) compareModeWorkspaceRadio.addEventListener('change', updateCompareModeVisibility);
+    if (compareModeRubricRadio) compareModeRubricRadio.addEventListener('change', updateCompareModeVisibility);
+    updateCompareModeVisibility();
+    loadRubricTopics();
+
     // Keep the "Chat model: ..." note in sync with the Query and
     // Response tab's #chatModel dropdown -- see getChatModel()'s and
     // refreshChatModelNote()'s own doc comments above for why this
@@ -899,6 +1089,12 @@
     const bestPracticesMenuItem = document.querySelector('.tab-menu-item[data-tab="bestPractices"]');
     if (bestPracticesMenuItem) {
       bestPracticesMenuItem.addEventListener('click', refreshChatModelNote);
+      // Rubric Control topics can be created/edited/deleted on their
+      // own tab at any point in the session -- re-fetching the list
+      // every time someone switches to this tab keeps #bpRubricTopic
+      // from showing a stale/deleted rubric, same reasoning as the
+      // chat-model note refresh right above.
+      bestPracticesMenuItem.addEventListener('click', loadRubricTopics);
     }
   }
 

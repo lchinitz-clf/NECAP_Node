@@ -267,7 +267,24 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
   // `[Source: file, chunk N]` citation tag closely enough for a weak
   // model to cite the marker itself by mistake (see buildRagMessages()'
   // own doc comment for the real failure this caused before that fix).
-  const rubricBlock = `RUBRIC START\n${attributeLines}\nRUBRIC END`;
+  // The wrapper word itself is normally "RUBRIC" -- but when `topic` is
+  // the synthetic Best Practices subset (topic.isBestPractices, set
+  // only by buildBestPracticesTopic() in index.js) AND this comparison
+  // is being run against a saved Rubric Control topic's own attributes
+  // (see buildRubricMatches() below and its use in index.js's /query
+  // and /query/stream), buildRagMessages() in index.js ALSO wraps that
+  // second, literal rubric's text in its own START/END-marked block.
+  // Two blocks both called "RUBRIC" in the same prompt would be
+  // genuinely ambiguous -- not just a cosmetic naming clash -- so this
+  // one is called "BENCHMARK" instead whenever the topic in play is the
+  // Best Practices subset, which is a more accurate word for it anyway
+  // (these are real-world benchmark entries, not a hand-authored
+  // rubric). A hand-authored Rubric Control topic compared against
+  // workspace documents (today's main comparison mode) never sets
+  // isBestPractices, so it keeps saying "RUBRIC" exactly as before --
+  // this rename is scoped to the one case that actually needs it.
+  const wrapperWord = topic.isBestPractices ? 'BENCHMARK' : 'RUBRIC';
+  const rubricBlock = `${wrapperWord} START\n${attributeLines}\n${wrapperWord} END`;
 
   // A separate, code-generated guard against a real failure mode seen
   // in practice even with a single-attribute batch (attributesPerCall
@@ -288,10 +305,18 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
   // a model says about other attributes after its real answer, so
   // this is a second layer on top of that safety net, not a
   // replacement for it.
+  // Same reasoning as wrapperWord above: "rubric item" here is generic
+  // English for "entry in the list I'm being asked about," not a
+  // literal reference to the markers -- but once a run can ALSO involve
+  // a second, literal rubric (the material being checked, not the
+  // thing being asked about), using the word "benchmark" instead for
+  // that case keeps the two unmistakably separate rather than relying
+  // on a reader (human or model) to infer which "rubric" is meant.
+  const itemWord = topic.isBestPractices ? 'benchmark item' : 'rubric item';
   const attributeNames = attributes.map((a) => `"${a.name}"`).join(', ');
   const scopeGuard = attributes.length === 1
-    ? `You are being asked about exactly one attribute right now: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or rubric item — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related. Respond only about ${attributeNames} and nothing else.`
-    : `You are being asked about exactly these attributes right now, and no others: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or rubric item — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related.`;
+    ? `You are being asked about exactly one attribute right now: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related. Respond only about ${attributeNames} and nothing else.`
+    : `You are being asked about exactly these attributes right now, and no others: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related.`;
 
   const parts = [
     `An ideal ${topic.label} proposal has the following attributes:`,
@@ -458,6 +483,86 @@ function getIncludedAttributes(topic) {
   return attributes.filter(isAttributeIncluded);
 }
 
+/**
+ * Turns a Rubric Control topic's own attributes into a synthetic
+ * `matches` array — the same shape hybridSearch() returns in
+ * src/hybridSearch.js ({id, sourceFile, chunkIndex, text, score}) — so
+ * that buildRagMessages()/parseComparisonAnswer()/resolveCitation() in
+ * index.js and src/responseParser.js can all run completely unchanged
+ * when what's being compared against is a saved rubric's own attribute
+ * list instead of a workspace's retrieved chunks. Built for the Best
+ * Practices Comparison tab's "compare against a rubric" mode (see
+ * index.js's /query and /query/stream): there, `topic` (in the sense
+ * those routes already use the word) is the hazard/state-filtered Best
+ * Practices subset — the thing being asked about — and this function's
+ * return value stands in for `matches` — the material being checked —
+ * built from a DIFFERENT, separately selected Rubric Control topic
+ * instead of a hybridSearch() call. No embedding or retrieval happens
+ * anywhere in that path; every attribute of the selected rubric is
+ * simply handed over, every time, in full.
+ *
+ * Deliberately filtered through getIncludedAttributes() above, same as
+ * every other consumer of a topic's attributes — an attribute someone
+ * excluded from Rubric Control's own analyses (e.g. a draft entry not
+ * ready to be judged against yet) shouldn't silently count as a
+ * possible match here either.
+ *
+ * `sourceFile` is the rubric topic's own label and `chunkIndex` is the
+ * attribute's position in its (already-filtered) attribute list — the
+ * same role a real chunk's sourceFile/chunkIndex play, so a model's
+ * "[Source: X, chunk N]" citation always resolves back to one specific,
+ * real rubric attribute, both for a person reading the result and for
+ * resolveCitation()'s own verbatim-quote check in
+ * src/responseParser.js. `text` combines the attribute's name and its
+ * proposal text (unlike composeRetrievalQuery() above, which
+ * deliberately omits `name` from what gets EMBEDDED for retrieval —
+ * see that function's own doc comment for why — there is no retrieval
+ * happening here at all, so that concern doesn't apply; including
+ * `name` just gives the model, and a person reading a cited quote, a
+ * bit more context for what was matched).
+ *
+ * `attributeName` carries that same rubric attribute's name as its own
+ * field too, separate from `text` — a plain document chunk never has
+ * this field at all, so it's the one place resolveCitation()/
+ * renderQuoteMatch() in src/responseParser.js can tell "this verified
+ * quote came from a rubric attribute, and here's its real name" apart
+ * from an ordinary retrieved chunk, where only sourceFile/chunkIndex
+ * (the rubric's own label and the attribute's position) are available
+ * to show. Without it, a verified rubric-mode citation could only ever
+ * read "[Test Rubric, chunk 0]" — technically correct, but "chunk 0"
+ * means nothing to a person reading the result, where the attribute's
+ * actual name does.
+ *
+ * `score` is always 1 — there is no real relevance ranking here, every
+ * included attribute is handed over unconditionally every time, with
+ * no topK cutoff the way hybridSearch() produces. This is a placeholder
+ * only so code that happens to read `m.score` (e.g. the "retry against
+ * the next retrieved band" feature's threshold check in index.js) sees
+ * an ordinary number rather than undefined; that feature is separately
+ * disabled outright whenever this function is in play, since there is
+ * no "next band" to retry against — see index.js's own comment at that
+ * call site.
+ *
+ * @param {{id?: string, label: string, attributes?: Array<{name: string, proposal: string, included?: boolean}>}} topic -
+ *   as returned by getTopic() above — a real, hand-authored Rubric
+ *   Control topic. (Nothing stops a caller from passing a synthetic
+ *   Best Practices topic instead, but there is no reason to — that
+ *   topic already plays the "thing being asked about" role elsewhere
+ *   in the same run.)
+ * @returns {Array<{id: string, sourceFile: string, chunkIndex: number, text: string, score: number, attributeName: string}>}
+ */
+function buildRubricMatches(topic) {
+  const attributes = getIncludedAttributes(topic);
+  return attributes.map((a, i) => ({
+    id: `rubric:${topic.id || topic.label}:${i}`,
+    sourceFile: topic.label,
+    chunkIndex: i,
+    text: `${a.name}: ${a.proposal}`,
+    score: 1,
+    attributeName: a.name,
+  }));
+}
+
 module.exports = {
   loadTopics,
   saveTopics,
@@ -468,6 +573,7 @@ module.exports = {
   batchAttributes,
   isAttributeIncluded,
   getIncludedAttributes,
+  buildRubricMatches,
   resolveInstructionText,
   HARDCODED_FALLBACK_COMPARE_INSTRUCTION,
 };

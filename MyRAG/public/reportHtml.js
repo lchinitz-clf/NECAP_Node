@@ -267,7 +267,14 @@ function formatSettingsChips(meta) {
  * attribute's batch.
  *
  * @param {Array<{sources?: Array<{sourceFile: string, chunkIndex: number}>, records?: Array<{name: string, proposal: string, resultText: string, category: string}>, batchIndex: number, totalBatches?: number, promptTokens?: number, answerTokens?: number, doneReason?: string}>} batches
- * @param {{workspaceId?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
+ * @param {{workspaceId?: string, rubricLabel?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
+ *   `rubricLabel`, when set, renders its own "Compared against rubric"
+ *   row — used by the Best Practices Comparison tab's "compare against
+ *   a rubric" mode (see buildExportMeta() in bestPracticesTab.js),
+ *   where `workspaceId` is deliberately left unset instead (no
+ *   workspace is involved in that mode at all), so the "Workspace" row
+ *   simply doesn't appear for that export. Every other caller leaves
+ *   this unset and keeps showing "Workspace" exactly as before.
  *   `topK` through `attributesPerCall` are the run's Advanced-settings
  *   values, rendered as the "Settings" chip row by formatSettingsChips()
  *   above -- see that function's own doc comment for exactly what each
@@ -301,6 +308,7 @@ function buildAttributeResultsHtml(batches, meta) {
   const generatedAt = new Date().toLocaleString();
   const metaRows = [
     meta.workspaceId ? ['Workspace', escapeHtml(meta.workspaceId)] : null,
+    meta.rubricLabel ? ['Compared against rubric', escapeHtml(meta.rubricLabel)] : null,
     meta.topicLabel ? ['Ideal-proposal topic', escapeHtml(meta.topicLabel)] : null,
     meta.question ? ['Question', escapeHtml(meta.question)] : null,
     meta.chatModel ? ['Model', escapeHtml(meta.chatModel)] : null,

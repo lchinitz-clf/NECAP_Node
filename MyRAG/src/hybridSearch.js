@@ -48,6 +48,20 @@ const RRF_K = 60;
  * @param {number[]} queryVector - already-embedded query, for the vector half
  * @param {string} queryText - the same query's raw text, for the keyword half
  * @param {number} topK
+ * @param {Set<string>} [excludeSourceFiles] - sourceFiles to drop
+ *   before either ranking pass runs at all, not just from the final
+ *   result — see getExcludedSourceFiles() in src/documentMeta.js,
+ *   which is what builds this for every /query and /query/stream
+ *   call site. Filtering this early (rather than, say, ranking
+ *   everything and only dropping excluded records from the final
+ *   slice) matters for the same reason RRF ranks the WHOLE workspace
+ *   before truncating to topK at all (see this function's own doc
+ *   comment above): an excluded document's chunks would otherwise
+ *   still occupy ranking slots a genuinely-included chunk could have
+ *   had instead, silently shrinking the effective topK whenever any
+ *   document is excluded. Omitted (or empty) runs exactly as before
+ *   this parameter existed — every record in the workspace is a
+ *   candidate, same as always.
  * @returns {Array<{id: string, sourceFile: string, chunkIndex: number, text: string, score: number, matchedBy: string[]}>}
  *
  * `score` is deliberately still a plain cosine similarity (0..1),
@@ -71,8 +85,11 @@ const RRF_K = 60;
  * that hybrid search now surfaces but plain vector search, even at a
  * raised topK, would not have.
  */
-function hybridSearch(workspaceId, queryVector, queryText, topK = 5) {
-  const records = loadStore(workspaceId);
+function hybridSearch(workspaceId, queryVector, queryText, topK = 5, excludeSourceFiles) {
+  let records = loadStore(workspaceId);
+  if (excludeSourceFiles && excludeSourceFiles.size > 0) {
+    records = records.filter((r) => !excludeSourceFiles.has(r.sourceFile));
+  }
   if (records.length === 0) return [];
 
   const vectorRanked = records

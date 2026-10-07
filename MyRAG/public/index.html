@@ -132,9 +132,10 @@
     <summary><h2>Documents in this area</h2></summary>
     <div class="section-toggle-body">
       <p class="hint" id="documentsEmpty"></p>
+      <p class="hint" id="documentsExcludedNote" style="display:none;"></p>
       <table>
         <thead>
-          <tr><th>Document</th><th>Description</th><th>Blocks</th><th>Pages</th><th></th></tr>
+          <tr><th>Document</th><th title="Searched by /query and the Best Practices tab's document-comparison mode whenever checked">Include</th><th>Description</th><th>Blocks</th><th>Pages</th><th></th></tr>
         </thead>
         <tbody id="documentsBody"></tbody>
       </table>
@@ -766,14 +767,14 @@
 <section class="card">
   <h2>Best Practices Comparison</h2>
   <p class="hint">
-    Compares the plan embedded in the storage area above against a
-    benchmark set of real-world climate-adaptation initiatives. Pick
-    one or more hazards (and, optionally, one or more states) below;
-    every benchmark entry matching ANY selected hazard -- and, if any
-    states are picked, also matching ANY selected state -- is run
-    through the same per-attribute comparison Rubric Control uses,
-    just sourced from the Best Practices dataset instead of a
-    hand-written rubric.
+    Compares a benchmark set of real-world climate-adaptation
+    initiatives against either the plan embedded in the storage area
+    above, or a saved rubric's own attributes -- pick which one just
+    below. Pick one or more hazards (and, optionally, one or more
+    states) further down; every benchmark entry matching ANY selected
+    hazard -- and, if any states are picked, also matching ANY selected
+    state -- is run through the same per-attribute comparison Rubric
+    Control uses.
   </p>
 
   <!-- Read-only -- the actual control lives on the Query and Response
@@ -781,6 +782,50 @@
        refreshChatModelNote()/getChatModel() for how this stays in
        sync without duplicating that control here. -->
   <p class="bp-chat-model-note" id="bpChatModelNote"></p>
+
+  <!-- Which "document" to check the Best Practices subset against --
+       the global storage-area's embedded documents (today's original
+       mode, via hybridSearch() server-side) or a saved Rubric Control
+       topic's own attributes, checked directly with no retrieval step
+       at all (see buildRubricMatches() in src/idealProposals.js).
+       Toggling this shows/hides bpRubricTopicRow just below and
+       changes what runComparison() in bestPracticesTab.js sends to
+       POST /query/stream: workspaceId (as always) in "workspace" mode,
+       or compareAgainstRubricId instead in "rubric" mode -- see
+       getCompareMode()/getRubricTopicId() in that file. -->
+  <div id="bpCompareModeRow">
+    <label>Compare against</label>
+    <label style="display:flex; align-items:center; gap:0.4rem; font-weight:400; margin-bottom:0.3rem;">
+      <input type="radio" name="bpCompareMode" id="bpCompareModeWorkspace" value="workspace" checked style="width:auto;" />
+      Workspace documents (the storage area above)
+    </label>
+    <label style="display:flex; align-items:center; gap:0.4rem; font-weight:400;">
+      <input type="radio" name="bpCompareMode" id="bpCompareModeRubric" value="rubric" style="width:auto;" />
+      A saved rubric (Rubric Control)
+    </label>
+    <p class="hint">
+      Workspace documents checks each matching benchmark entry against
+      the plan embedded in the storage area above, same as always. A
+      saved rubric instead asks, for each matching benchmark entry,
+      whether the rubric you pick below already has an item that
+      substantially covers it -- useful for checking a rubric's own
+      coverage against the benchmark set, with no storage area, topK,
+      or embedding model involved at all for this mode.
+    </p>
+  </div>
+
+  <div id="bpRubricTopicRow" style="display:none;">
+    <label for="bpRubricTopic">Rubric to compare against</label>
+    <select id="bpRubricTopic">
+      <option value="" disabled selected>Loading rubrics...</option>
+    </select>
+    <p class="hint" id="bpRubricTopicHint">
+      From Rubric Control. Each matching benchmark entry below is
+      checked directly against this rubric's own attributes -- the
+      whole rubric is handed to the model every time, not retrieved
+      piece by piece the way workspace documents are.
+    </p>
+  </div>
 
   <!-- Both multi-select (shift-click or ctrl/cmd-click to pick more
        than one -- see getSelectedValues() in bestPracticesTab.js for

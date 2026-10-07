@@ -213,8 +213,19 @@ function appendActionLog(entry) {
  *   chat call was ever actually reached (e.g. "no-documents", or an
  *   error/abort before the first chat() call resolved a model).
  *   Activity log only — the action log's marker doesn't need it.
+ * @param {string} [params.compareAgainstRubricId] - set only for a Best
+ *   Practices Comparison run that compared against a saved Rubric
+ *   Control topic instead of workspace documents (see
+ *   buildRubricMatches() in src/idealProposals.js and its use in
+ *   index.js's /query and /query/stream). Logged as-is in both files so
+ *   this one run type can still be told apart from an ordinary
+ *   'bestPracticesAnalysis' run (against workspace documents) without
+ *   having to infer it from `workspaceId` being absent. Omitted
+ *   entirely for every other call — including an ordinary
+ *   'bestPracticesAnalysis' run — so old log lines and this new field's
+ *   absence both read the same way: "not a rubric-comparison run."
  */
-function logQueryActivity({ req, workspaceId, question, topic, status, answer, error, sourceChunkIds, chatModel }) {
+function logQueryActivity({ req, workspaceId, question, topic, status, answer, error, sourceChunkIds, chatModel, compareAgainstRubricId }) {
   // topic.isBestPractices is only ever set by buildBestPracticesTopic()
   // in index.js, on the synthetic topic it builds for a Best Practices
   // Comparison run — never by getTopic() for a real, hand-authored
@@ -230,6 +241,7 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
     ip: req.ip,
     workspaceId,
     ...(topic ? { topicId: topic.id, topicLabel: topic.label } : {}),
+    ...(compareAgainstRubricId ? { compareAgainstRubricId } : {}),
     question: question || '',
     status,
     ...(chatModel ? { chatModel } : {}),
@@ -244,6 +256,7 @@ function logQueryActivity({ req, workspaceId, question, topic, status, answer, e
     ip: req.ip,
     workspaceId,
     ...(topic ? { topicId: topic.id } : {}),
+    ...(compareAgainstRubricId ? { compareAgainstRubricId } : {}),
     success: status === 'completed' || status === 'no-documents',
     ...(error ? { error } : {}),
   });

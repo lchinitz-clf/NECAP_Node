@@ -29,13 +29,13 @@ const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = requi
 const { hybridSearch } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
-const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes, resolveInstructionText, HARDCODED_FALLBACK_COMPARE_INSTRUCTION } = require('./src/idealProposals');
+const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes, buildRubricMatches, resolveInstructionText, HARDCODED_FALLBACK_COMPARE_INSTRUCTION } = require('./src/idealProposals');
 const { loadBestPracticeAttributes } = require('./src/bestPractices');
 const { filterBestPracticeAttributes, listDistinctHazards, listDistinctStates } = require('./src/bestPracticesFilter');
 const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank, verifyQuotesInPlace } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
-const { getAllDescriptions, setDescription, deleteDescription } = require('./src/documentMeta');
+const { getAllDescriptions, setDescription, deleteDescription, getExcludedSourceFiles, setIncluded } = require('./src/documentMeta');
 const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
 const { basicAuth, resolveRole } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
@@ -517,6 +517,14 @@ app.get('/workspaces/:workspaceId/documents', (req, res) => {
 
   try {
     const descriptions = getAllDescriptions(workspaceId);
+    // Same join-at-the-edge shape as `description` below: `included`
+    // also lives in documentMeta.json (see getExcludedSourceFiles()'s
+    // own doc comment there), merged in here rather than carried
+    // inside listDocuments() itself. A document with no explicit
+    // exclusion — which includes every brand-new document, since
+    // nothing writes an entry here at embed time — correctly comes
+    // back `included: true` simply by not being in this Set at all.
+    const excludedSourceFiles = getExcludedSourceFiles(workspaceId);
     // documentMeta.json lives separately from store.json specifically
     // so it survives a rebuild/re-embed (see documentMeta.js) — merged
     // in here rather than carried inside listDocuments() itself, same
@@ -525,6 +533,7 @@ app.get('/workspaces/:workspaceId/documents', (req, res) => {
     const documents = listDocuments(workspaceId).map((doc) => ({
       ...doc,
       description: descriptions[doc.sourceFile] || '',
+      included: !excludedSourceFiles.has(doc.sourceFile),
     }));
     const totalChunks = documents.reduce((sum, d) => sum + d.chunks, 0);
     res.json({ workspaceId, documents, totalChunks });
@@ -572,6 +581,50 @@ app.put('/workspaces/:workspaceId/documents/:sourceFile/description', (req, res)
   } catch (err) {
     console.error(err);
     logAction({ req, type: 'documentDescriptionUpdate', workspaceId, success: false, error: err.message, details: { sourceFile } });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /workspaces/:workspaceId/documents/:sourceFile/included
+ *
+ * Sets, or (given `true`, the default) clears, one document's
+ * inclusion flag — whether its chunks are candidates for retrieval at
+ * all in this workspace's /query and /query/stream runs (see
+ * getExcludedSourceFiles() in src/documentMeta.js and its use in
+ * hybridSearch() in src/hybridSearch.js). Modeled directly on the
+ * `.../description` route just above: same per-document URL shape,
+ * same persisted-in-documentMeta.json storage, same role posture (see
+ * that route's own doc comment for the "not actually a security
+ * boundary" caveat — the browser UI only shows this checkbox as
+ * editable for the `admin` role, same as the description field, but
+ * nothing here enforces that server-side).
+ *
+ * This is deliberately a per-workspace, shared setting, not a
+ * per-user one — the same shape a saved Rubric Control topic's own
+ * attribute-level Include checkboxes already have (anyone who opens
+ * that topic sees, and is bound by, whatever its checkboxes are
+ * currently set to). A document someone excludes here is excluded for
+ * every person who queries this workspace afterward, not just the
+ * person who unchecked it.
+ */
+app.put('/workspaces/:workspaceId/documents/:sourceFile/included', (req, res) => {
+  const { workspaceId, sourceFile } = req.params;
+  const wsErr = workspaceIdError(workspaceId);
+  if (wsErr) return res.status(400).json({ error: wsErr });
+
+  const { included } = req.body;
+  if (typeof included !== 'boolean') {
+    return res.status(400).json({ error: '"included" must be a boolean.' });
+  }
+
+  try {
+    const saved = setIncluded(workspaceId, sourceFile, included);
+    logAction({ req, type: 'documentIncludedUpdate', workspaceId, success: true, details: { sourceFile, included: saved } });
+    res.json({ workspaceId, sourceFile, included: saved });
+  } catch (err) {
+    console.error(err);
+    logAction({ req, type: 'documentIncludedUpdate', workspaceId, success: false, error: err.message, details: { sourceFile } });
     res.status(500).json({ error: err.message });
   }
 });
@@ -1268,6 +1321,64 @@ const BEST_PRACTICES_ANALYSIS_GUIDANCE =
   "you are comparing against, not something to repeat back. If the plan under review contains nothing " +
   "relevant, say so plainly; if it does, describe specifically what it says before giving your verdict.";
 
+// The "compare a Best Practices subset against a saved rubric" mode's
+// own pair of guidance paragraphs — parallel in role to
+// BEST_PRACTICES_JURISDICTION_GUIDANCE/BEST_PRACTICES_ANALYSIS_GUIDANCE
+// just above, but reworded for a different "material" than those two
+// assume. Those two are written for the ORIGINAL Best Practices mode,
+// where the thing being checked is a submitted plan's actual document
+// text (retrieved chunks, wrapped in a PROPOSAL START/END block by
+// buildRagMessages() in index.js) — language like "the plan under
+// review" and "the material... says about this topic" doesn't fit a
+// RUBRIC UNDER REVIEW block (buildRubricMatches() in src/idealProposals.js,
+// wrapped by buildRagMessages() the same way), which is a flat list of
+// named, already-general criteria, not a narrative document.
+//
+// The underlying problem BEST_PRACTICES_JURISDICTION_GUIDANCE solves is
+// still just as real here, confirmed directly by the person building
+// this feature: Best Practices benchmark entries are written as one
+// real state's actual program and routinely name that state outright,
+// while Rubric Control topics are written generically on purpose (no
+// state, agency, or program named) — so without this guidance, a model
+// would still be tempted to mark a rubric "Not addressed" purely
+// because it never names the benchmark's state, which is exactly
+// backwards: a generic rubric item was never GOING to name any state,
+// so that's not evidence of anything. The same "restate the benchmark
+// in state-neutral terms first, then compare only against that
+// restatement, and never cite the absent name as a reason" mechanism
+// is kept for that reason — see BEST_PRACTICES_JURISDICTION_GUIDANCE's
+// own doc comment above for the fuller history of why that specific
+// mechanism (not just a blanket "don't penalize this" prohibition) is
+// what actually worked in practice.
+const BEST_PRACTICES_RUBRIC_JURISDICTION_GUIDANCE =
+  "Each benchmark item below describes a real-world initiative from a specific state. The rubric under " +
+  "review, by contrast, is written as a set of general criteria and will never name a specific state, " +
+  "agency, or program — that is expected, not a gap: a generic rubric item was never going to name any " +
+  "one state's program. Before judging, first restate the benchmark item silently in your own words " +
+  "WITHOUT using any state name, agency name, or program name — describe only what the program actually " +
+  "does (for example, \"a single building code that applies to every building and includes flood-resistant " +
+  "design requirements,\" not \"the Massachusetts State Building Code\"). Then compare the rubric under " +
+  "review only against that state-neutral restatement, never against the original wording's state, agency, " +
+  "or program names. Do not write any sentence, anywhere in your answer, that cites the rubric's failure to " +
+  "mention a state, agency, or program by name as a reason for your verdict — that fact is irrelevant and " +
+  "must never appear in your reasoning. Judge only whether the rubric under review contains an item whose " +
+  "substance is similar in content and intent to the state-neutral restatement, regardless of which state " +
+  "the benchmark item involves.";
+
+// Parallel to BEST_PRACTICES_ANALYSIS_GUIDANCE above, reworded for the
+// RUBRIC UNDER REVIEW block instead of a PROPOSAL block of retrieved
+// document text — same underlying failure mode this guards against
+// (the model's "direct answer" turning into a near-verbatim restatement
+// of the benchmark item instead of genuinely describing what it found),
+// just phrased for "does the rubric have a matching item" rather than
+// "what does the submitted plan say."
+const BEST_PRACTICES_RUBRIC_ANALYSIS_GUIDANCE =
+  "Your direct answer must identify whether any item in the rubric between RUBRIC UNDER REVIEW START and " +
+  "RUBRIC UNDER REVIEW END above is substantially similar to this benchmark item, and if so, name that " +
+  "rubric item and describe specifically what it says. Do not copy, quote, or restate the benchmark item's " +
+  "own description as if it were your own answer — that description is only what you are comparing " +
+  "against, not something to repeat back. If no item in the rubric addresses this concept, say so plainly.";
+
 /**
  * Builds a synthetic "topic" object — same shape getTopic() in
  * idealProposals.js returns (id, label, attributes, resolved
@@ -1326,8 +1437,21 @@ const BEST_PRACTICES_ANALYSIS_GUIDANCE =
  *   built-in paragraph unchanged, same as always.
  * @param {string} [analysisGuidanceOverride] - same convention as
  *   jurisdictionGuidanceOverride just above, but replaces
- *   BEST_PRACTICES_ANALYSIS_GUIDANCE instead. Blank/omitted uses that
- *   built-in paragraph unchanged.
+ *   BEST_PRACTICES_ANALYSIS_GUIDANCE (or, in rubric-comparison mode,
+ *   BEST_PRACTICES_RUBRIC_ANALYSIS_GUIDANCE) instead. Blank/omitted
+ *   uses that mode's built-in paragraph unchanged.
+ * @param {boolean} [compareAgainstRubric] - false (the original
+ *   behavior, unchanged) picks BEST_PRACTICES_JURISDICTION_GUIDANCE/
+ *   BEST_PRACTICES_ANALYSIS_GUIDANCE as the built-in defaults — the
+ *   pair written for comparing against a submitted plan's actual
+ *   document text. true picks BEST_PRACTICES_RUBRIC_JURISDICTION_GUIDANCE/
+ *   BEST_PRACTICES_RUBRIC_ANALYSIS_GUIDANCE instead — the pair reworded
+ *   for comparing against a saved Rubric Control topic's own attributes
+ *   (see buildRubricMatches() in src/idealProposals.js and its use in
+ *   /query and /query/stream below). Either way, jurisdictionGuidanceOverride/
+ *   analysisGuidanceOverride above — when non-blank — still replace
+ *   whichever pair this flag selected, exactly as before; this flag
+ *   only changes which paragraph is used as the DEFAULT.
  * @returns {{id: string, label: string, attributes: Array<Object>, compareInstruction: string, isBestPractices: true}}
  * @throws {Error} whatever loadBestPracticeAttributes()/
  *   filterBestPracticeAttributes() throw (a malformed bestPractices.json,
@@ -1335,17 +1459,23 @@ const BEST_PRACTICES_ANALYSIS_GUIDANCE =
  *   HTTP response, same pattern the idealTopicId resolution right below
  *   this function already follows.
  */
-function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride, analysisGuidanceOverride) {
+function buildBestPracticesTopic(hazards, states, jurisdictionGuidanceOverride, analysisGuidanceOverride, compareAgainstRubric) {
   const allAttributes = loadBestPracticeAttributes();
   const attributes = filterBestPracticeAttributes(allAttributes, { hazards, states });
 
   const { defaultCompareInstruction } = loadTopics();
   const baseCompareInstruction =
     resolveInstructionText(defaultCompareInstruction) || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
+  const defaultJurisdictionGuidance = compareAgainstRubric
+    ? BEST_PRACTICES_RUBRIC_JURISDICTION_GUIDANCE
+    : BEST_PRACTICES_JURISDICTION_GUIDANCE;
+  const defaultAnalysisGuidance = compareAgainstRubric
+    ? BEST_PRACTICES_RUBRIC_ANALYSIS_GUIDANCE
+    : BEST_PRACTICES_ANALYSIS_GUIDANCE;
   const jurisdictionGuidance =
-    (jurisdictionGuidanceOverride && jurisdictionGuidanceOverride.trim()) || BEST_PRACTICES_JURISDICTION_GUIDANCE;
+    (jurisdictionGuidanceOverride && jurisdictionGuidanceOverride.trim()) || defaultJurisdictionGuidance;
   const analysisGuidance =
-    (analysisGuidanceOverride && analysisGuidanceOverride.trim()) || BEST_PRACTICES_ANALYSIS_GUIDANCE;
+    (analysisGuidanceOverride && analysisGuidanceOverride.trim()) || defaultAnalysisGuidance;
   const compareInstruction = `${baseCompareInstruction}\n\n${jurisdictionGuidance}\n\n${analysisGuidance}`;
 
   // Label is purely descriptive (shown in the UI's run summary and in
@@ -1386,8 +1516,14 @@ function sourcesSummary(matches) {
 }
 
 app.post('/query', async (req, res) => {
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, think, attributesPerCall } = req.body;
-  const wsErr = workspaceIdError(workspaceId);
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, compareAgainstRubricId, think, attributesPerCall } = req.body;
+  // A rubric-comparison run (see compareAgainstRubricId below) never
+  // touches a workspace at all — no document retrieval happens, so
+  // there's nothing a workspaceId would even be used for — so the
+  // normally-required workspaceId check is skipped entirely in that
+  // one case rather than asking the Best Practices tab to send a fake
+  // placeholder value just to satisfy it.
+  const wsErr = compareAgainstRubricId ? null : workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
   // Resolving idealTopicId can throw (a malformed idealProposals.json)
@@ -1414,10 +1550,11 @@ app.post('/query', async (req, res) => {
     // one or more of each, matched as an OR, per the multi-select
     // Hazard/State controls on the Best Practices Comparison tab.
     // `jurisdictionGuidance`, if present and non-blank, overrides
-    // BEST_PRACTICES_JURISDICTION_GUIDANCE for this run only — see that
-    // constant's own doc comment above.
+    // whichever of BEST_PRACTICES_JURISDICTION_GUIDANCE/
+    // BEST_PRACTICES_RUBRIC_JURISDICTION_GUIDANCE applies for this run
+    // — see buildBestPracticesTopic()'s own doc comment above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance, Boolean(compareAgainstRubricId));
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
@@ -1435,6 +1572,44 @@ app.post('/query', async (req, res) => {
   if (!question && !topic) {
     return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic, or a Best Practices hazard, to compare against)' });
   }
+
+  // Resolves the SECOND topic a rubric-comparison run needs — not the
+  // thing being asked about (that's `topic` above, e.g. the Best
+  // Practices subset), but the material being checked against it: a
+  // saved Rubric Control topic's own attributes, turned into a
+  // synthetic `matches` array by buildRubricMatches() in
+  // src/idealProposals.js so the rest of this route (buildRagMessages(),
+  // parseComparisonAnswer(), quote verification) can treat it exactly
+  // like a batch of retrieved chunks, with no retrieval ever actually
+  // happening. Resolved once, up front, since (unlike a real
+  // hybridSearch() result) it doesn't depend on which attribute batch
+  // is currently being asked about — the whole rubric is handed over
+  // every time.
+  let rubricMatches = null;
+  if (compareAgainstRubricId) {
+    let rubricTopic;
+    try {
+      rubricTopic = getTopic(compareAgainstRubricId);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
+    }
+    if (!rubricTopic) return res.status(400).json({ error: `Unknown rubric topic id: "${compareAgainstRubricId}"` });
+    rubricMatches = buildRubricMatches(rubricTopic);
+    if (rubricMatches.length === 0) {
+      return res.status(400).json({ error: `The rubric "${rubricTopic.label}" has no (included) attributes to compare against.` });
+    }
+  }
+
+  // Every real hybridSearch() call below filters against this same
+  // excluded-document set (see getExcludedSourceFiles()'s own doc
+  // comment in src/documentMeta.js) — resolved once, up front, same
+  // "doesn't depend on which attribute batch is running" reasoning as
+  // rubricMatches above. Never actually used when rubricMatches is
+  // set (that mode never calls hybridSearch() at all), and workspaceId
+  // may not even be a real one in that case (see wsErr above) — so
+  // this is skipped entirely rather than resolved unconditionally.
+  const excludedSourceFiles = rubricMatches ? new Set() : getExcludedSourceFiles(workspaceId);
 
   // `batches` is what makes the "attributes per call" Advanced setting
   // work: a topic's attributes get split into one or more chunks (see
@@ -1486,38 +1661,72 @@ app.post('/query', async (req, res) => {
       // narrows that to just this batch's attributes.
       const effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
 
-      // Retrieval uses a DIFFERENT, shorter text — see
-      // composeRetrievalQuery()'s doc comment in src/idealProposals.js
-      // for why: embedding the full instructional composeComparisonQuestion()
-      // text (in place of a bare, focused query) was pulling in
-      // topically-adjacent-but-irrelevant chunks, since that text is
-      // mostly boilerplate shared across every attribute rather than
-      // this attribute's own specific subject matter.
-      const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
-      retrievalQueries.push(retrievalQuery);
+      // Rubric-comparison mode (rubricMatches set above) skips
+      // retrieval entirely: there's no larger pool to search down to
+      // topK the way workspace documents have, so the SAME fixed
+      // rubricMatches array is reused for every batch, no embed()/
+      // hybridSearch() call happens, and retrievalQueries is left
+      // untouched for this batch (nothing was actually embedded, so
+      // there's nothing meaningful to show in the UI's retrieval-query
+      // display for it).
+      let matches;
+      if (rubricMatches) {
+        matches = rubricMatches;
+      } else {
+        // Retrieval uses a DIFFERENT, shorter text — see
+        // composeRetrievalQuery()'s doc comment in src/idealProposals.js
+        // for why: embedding the full instructional composeComparisonQuestion()
+        // text (in place of a bare, focused query) was pulling in
+        // topically-adjacent-but-irrelevant chunks, since that text is
+        // mostly boilerplate shared across every attribute rather than
+        // this attribute's own specific subject matter.
+        const retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
+        retrievalQueries.push(retrievalQuery);
 
-      const queryVector = await embed(retrievalQuery, embedModel);
-      // hybridSearch() fuses cosine-similarity vector search with BM25
-      // keyword search (see its doc comment in src/hybridSearch.js) —
-      // this is what lets an exact-phrase query like "inland flooding"
-      // still find a chunk containing that phrase even when its
-      // embedding similarity alone wouldn't have ranked it highly
-      // enough to make a plain vector topK.
-      const matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK);
+        const queryVector = await embed(retrievalQuery, embedModel);
+        // hybridSearch() fuses cosine-similarity vector search with BM25
+        // keyword search (see its doc comment in src/hybridSearch.js) —
+        // this is what lets an exact-phrase query like "inland flooding"
+        // still find a chunk containing that phrase even when its
+        // embedding similarity alone wouldn't have ranked it highly
+        // enough to make a plain vector topK.
+        matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK, excludedSourceFiles);
+      }
 
       if (matches.length === 0) {
-        // Every batch would hit this same empty workspace, so there's
-        // no point continuing the loop — short-circuit the whole
-        // request exactly like the single-pass version did.
-        const noDocsAnswer = `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`;
-        logQueryActivity({ req, workspaceId, question, topic, status: 'no-documents', answer: noDocsAnswer });
+        // Every batch would hit this same empty-after-filtering
+        // workspace, so there's no point continuing the loop —
+        // short-circuit the whole request exactly like the
+        // single-pass version did. (Can't happen in rubric-comparison
+        // mode -- rubricMatches.length was already checked above
+        // before this loop ever started.) Distinguishes "genuinely no
+        // documents embedded" from "documents exist here, but every
+        // one of them is currently excluded" — the latter is a
+        // workspace-configuration state someone chose on purpose (see
+        // the Documents tab's Include checkboxes), not the same
+        // problem as an empty workspace, and deserves its own message
+        // rather than the misleading suggestion to go run /embed.
+        const totalDocCount = listDocuments(workspaceId).length;
+        const noDocsAnswer = totalDocCount === 0
+          ? `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`
+          : `Every document in workspace "${workspaceId}" is currently excluded from search (see the Documents tab's Include checkboxes).`;
+        logQueryActivity({ req, workspaceId, question, topic, compareAgainstRubricId, status: 'no-documents', answer: noDocsAnswer });
         return res.json({
           answer: noDocsAnswer,
           sources: [],
         });
       }
 
-      const messages = buildRagMessages(effectiveQuestion, matches, topic ? 'proposal' : undefined);
+      // materialLabel drives both the wrapper text buildRagMessages()
+      // puts around `matches` below AND (via composeComparisonQuestion()
+      // in src/idealProposals.js) whether that block is called "RUBRIC"
+      // or "BENCHMARK" -- see that function's own doc comment. "rubric
+      // under review" is deliberately distinct wording from "proposal"
+      // so a run that folds BOTH a benchmark block and a rubric block
+      // into the same prompt never has two sections that could be
+      // confused for each other.
+      const materialLabel = rubricMatches ? 'rubric under review' : (topic ? 'proposal' : undefined);
+      const messages = buildRagMessages(effectiveQuestion, matches, materialLabel);
       // doneReason ("stop" vs "length") is Ollama's own account of why
       // generation ended — see the long comment on chat()'s return value
       // in ollamaClient.js. Passed straight through here rather than
@@ -1561,6 +1770,7 @@ app.post('/query', async (req, res) => {
       workspaceId,
       question,
       topic,
+      compareAgainstRubricId,
       status: 'completed',
       answer: combinedAnswer,
       sourceChunkIds: [...new Set(allSources.map((s) => s.id))],
@@ -1599,6 +1809,7 @@ app.post('/query', async (req, res) => {
       workspaceId,
       question,
       topic,
+      compareAgainstRubricId,
       status: 'error',
       error: err.message,
       answer: combinedAnswer,
@@ -1686,8 +1897,11 @@ app.post('/query/stream', async (req, res) => {
   // independent measurement isn't worth the complexity of somehow
   // threading the client's own number back in after the fact.
   const requestStartedAt = Date.now();
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
-  const wsErr = workspaceIdError(workspaceId);
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, compareAgainstRubricId, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
+  // See the matching comment on /query above -- a rubric-comparison run
+  // never touches a workspace, so the usual workspaceId requirement is
+  // skipped for it.
+  const wsErr = compareAgainstRubricId ? null : workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
 
   // Same topic-resolution rules as /query above — kept before anything
@@ -1708,7 +1922,7 @@ app.post('/query/stream', async (req, res) => {
     // `jurisdictionGuidance` is this run's optional override -- see
     // the matching comment on /query above.
     try {
-      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance);
+      topic = buildBestPracticesTopic(bestPracticesFilter.hazards, bestPracticesFilter.states, bestPracticesFilter.jurisdictionGuidance, bestPracticesFilter.analysisGuidance, Boolean(compareAgainstRubricId));
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: `Could not load bestPractices.json: ${err.message}` });
@@ -1726,6 +1940,35 @@ app.post('/query/stream', async (req, res) => {
   if (!question && !topic) {
     return res.status(400).json({ error: 'question is required (or select an ideal-proposal topic, or a Best Practices hazard, to compare against)' });
   }
+
+  // Same second-topic resolution as /query above -- the saved Rubric
+  // Control topic being checked against, turned into a synthetic
+  // `matches` array via buildRubricMatches() in src/idealProposals.js.
+  // Resolved once, before anything streams, for the same reason the
+  // idealTopicId/bestPracticesFilter resolution above is: a bad id or a
+  // broken idealProposals.json should come back as a clean HTTP error,
+  // not a stream event.
+  let rubricMatches = null;
+  if (compareAgainstRubricId) {
+    let rubricTopic;
+    try {
+      rubricTopic = getTopic(compareAgainstRubricId);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: `Could not load idealProposals.json: ${err.message}` });
+    }
+    if (!rubricTopic) return res.status(400).json({ error: `Unknown rubric topic id: "${compareAgainstRubricId}"` });
+    rubricMatches = buildRubricMatches(rubricTopic);
+    if (rubricMatches.length === 0) {
+      return res.status(400).json({ error: `The rubric "${rubricTopic.label}" has no (included) attributes to compare against.` });
+    }
+  }
+
+  // Same resolve-once-up-front reasoning as /query above — every real
+  // hybridSearch() call in this route (firstMatches below, each later
+  // batch's own retrieval, and the "retry against a wider band" pass)
+  // filters against this same excluded-document set.
+  const excludedSourceFiles = rubricMatches ? new Set() : getExcludedSourceFiles(workspaceId);
 
   // See the long comment on batchAttributes() in src/idealProposals.js
   // and on /query above — same batching, just streamed per batch here
@@ -1776,27 +2019,38 @@ app.post('/query/stream', async (req, res) => {
   // retrieval deliberately embeds a shorter, more focused text than
   // firstQuestion above (which is what the chat model actually sees) —
   // embedding firstQuestion's full instructional boilerplate was
-  // pulling in topically-adjacent-but-irrelevant chunks.
-  const firstRetrievalQuery = topic ? composeRetrievalQuery(topic, question, batches[0]) : firstQuestion;
+  // pulling in topically-adjacent-but-irrelevant chunks. `null` in
+  // rubric-comparison mode: nothing is actually embedded for that mode
+  // (see rubricMatches below), so there is no meaningful retrieval-query
+  // text to show.
+  const firstRetrievalQuery = rubricMatches ? null : (topic ? composeRetrievalQuery(topic, question, batches[0]) : firstQuestion);
   let firstMatches;
-  try {
-    const queryVector = await embed(firstRetrievalQuery, embedModel, undefined, controller.signal);
-    // See the matching call in /query above and hybridSearch()'s doc
-    // comment in src/hybridSearch.js — same vector+keyword fusion,
-    // just for this route's first batch.
-    firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK);
-  } catch (err) {
-    if (clientGone) {
-      // Stopped before retrieval even finished — no one to report back
-      // to, but still worth a log entry: the request was genuinely
-      // attempted, and "aborted" is a more accurate record of what
-      // happened than silently dropping it.
-      logQueryActivity({ req, workspaceId, question, topic, status: 'aborted' });
-      return;
+  if (rubricMatches) {
+    // Rubric-comparison mode: no retrieval at all -- the same fixed
+    // rubricMatches array (every included attribute of the selected
+    // Rubric Control topic) stands in for every batch's "matches",
+    // resolved once already, above.
+    firstMatches = rubricMatches;
+  } else {
+    try {
+      const queryVector = await embed(firstRetrievalQuery, embedModel, undefined, controller.signal);
+      // See the matching call in /query above and hybridSearch()'s doc
+      // comment in src/hybridSearch.js — same vector+keyword fusion,
+      // just for this route's first batch.
+      firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK, excludedSourceFiles);
+    } catch (err) {
+      if (clientGone) {
+        // Stopped before retrieval even finished — no one to report back
+        // to, but still worth a log entry: the request was genuinely
+        // attempted, and "aborted" is a more accurate record of what
+        // happened than silently dropping it.
+        logQueryActivity({ req, workspaceId, question, topic, compareAgainstRubricId, status: 'aborted' });
+        return;
+      }
+      console.error(err);
+      logQueryActivity({ req, workspaceId, question, topic, compareAgainstRubricId, status: 'error', error: err.message });
+      return res.status(500).json({ error: err.message });
     }
-    console.error(err);
-    logQueryActivity({ req, workspaceId, question, topic, status: 'error', error: err.message });
-    return res.status(500).json({ error: err.message });
   }
 
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -1804,8 +2058,14 @@ app.post('/query/stream', async (req, res) => {
   const send = (event) => res.write(JSON.stringify(event) + '\n');
 
   if (firstMatches.length === 0) {
-    const noDocsAnswer = `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`;
-    logQueryActivity({ req, workspaceId, question, topic, status: 'no-documents', answer: noDocsAnswer });
+    // See the matching comment on /query above — distinguishes a
+    // genuinely empty workspace from one where every document is
+    // currently excluded from search.
+    const totalDocCount = listDocuments(workspaceId).length;
+    const noDocsAnswer = totalDocCount === 0
+      ? `No documents have been embedded yet in workspace "${workspaceId}". Run /embed first.`
+      : `Every document in workspace "${workspaceId}" is currently excluded from search (see the Documents tab's Include checkboxes).`;
+    logQueryActivity({ req, workspaceId, question, topic, compareAgainstRubricId, status: 'no-documents', answer: noDocsAnswer });
     send({
       type: 'done',
       answer: noDocsAnswer,
@@ -1859,11 +2119,18 @@ app.post('/query/stream', async (req, res) => {
         matches = firstMatches;
         effectiveQuestion = firstQuestion;
         retrievalQuery = firstRetrievalQuery;
+      } else if (rubricMatches) {
+        // Rubric-comparison mode: every batch reuses the same fixed
+        // rubricMatches array -- see the matching branch on /query
+        // above and buildRubricMatches() in src/idealProposals.js.
+        effectiveQuestion = composeComparisonQuestion(topic, question, attributesSubset);
+        retrievalQuery = null;
+        matches = rubricMatches;
       } else {
         effectiveQuestion = topic ? composeComparisonQuestion(topic, question, attributesSubset) : question;
         retrievalQuery = topic ? composeRetrievalQuery(topic, question, attributesSubset) : effectiveQuestion;
         const queryVector = await embed(retrievalQuery, embedModel, undefined, controller.signal);
-        matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK);
+        matches = hybridSearch(workspaceId, queryVector, retrievalQuery, topK, excludedSourceFiles);
       }
 
       // retrievalQuery is included here (not just used internally)
@@ -1886,7 +2153,11 @@ app.post('/query/stream', async (req, res) => {
         continue;
       }
 
-      const messages = buildRagMessages(effectiveQuestion, matches, topic ? 'proposal' : undefined);
+      // See the matching comment on /query above for why "rubric under
+      // review" is its own distinct materialLabel, separate from
+      // "proposal".
+      const materialLabel = rubricMatches ? 'rubric under review' : (topic ? 'proposal' : undefined);
+      const messages = buildRagMessages(effectiveQuestion, matches, materialLabel);
       const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, {
         model: chatModel,
         temperature,
@@ -1965,6 +2236,15 @@ app.post('/query/stream', async (req, res) => {
       const shouldRetry =
         retryNotAddressed &&
         topic &&
+        // Rubric-comparison mode has no "next band" to retry against —
+        // rubricMatches is the SAME fixed, complete list every batch
+        // already saw in full, not a topK-cut sample of a larger pool,
+        // so there is nothing further to widen into. Guarded explicitly
+        // here rather than just relying on matches.every(...) below to
+        // happen to come out false, since rubricMatches' placeholder
+        // `score: 1` (see its own doc comment in src/idealProposals.js)
+        // could otherwise satisfy that check by coincidence.
+        !rubricMatches &&
         records.length > 0 &&
         threshold !== undefined &&
         matches.length > 0 &&
@@ -1980,7 +2260,7 @@ app.post('/query/stream', async (req, res) => {
           // twice as many and slicing off the first half is what
           // isolates ranks topK+1..2*topK, the "next batch," without
           // ever re-showing this batch's own already-tried chunks.
-          const widerMatches = hybridSearch(workspaceId, retryVector, retrievalQuery, topK * 2);
+          const widerMatches = hybridSearch(workspaceId, retryVector, retrievalQuery, topK * 2, excludedSourceFiles);
           const nextBandMatches = widerMatches.slice(topK);
           if (nextBandMatches.length > 0) {
             const retryMessages = buildRagMessages(effectiveQuestion, nextBandMatches, topic ? 'proposal' : undefined);
@@ -2075,6 +2355,7 @@ app.post('/query/stream', async (req, res) => {
         workspaceId,
         question,
         topic,
+        compareAgainstRubricId,
         status: 'completed',
         answer: combinedAnswer,
         sourceChunkIds: [...new Set(allSourceIds)],
@@ -2116,6 +2397,7 @@ app.post('/query/stream', async (req, res) => {
         workspaceId,
         question,
         topic,
+        compareAgainstRubricId,
         status: 'aborted',
         answer: combinedAnswer,
         sourceChunkIds: [...new Set(allSourceIds)],
@@ -2142,6 +2424,7 @@ app.post('/query/stream', async (req, res) => {
         workspaceId,
         question,
         topic,
+        compareAgainstRubricId,
         status: 'aborted',
         answer: loggedAnswer,
         sourceChunkIds: [...new Set(allSourceIds)],
@@ -2155,6 +2438,7 @@ app.post('/query/stream', async (req, res) => {
         workspaceId,
         question,
         topic,
+        compareAgainstRubricId,
         status: 'error',
         error: err.message,
         answer: loggedAnswer,
