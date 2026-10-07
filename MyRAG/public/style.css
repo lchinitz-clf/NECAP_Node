@@ -7,6 +7,16 @@
   --ok-bg: #f0fdf4;
   --low: #b45309;
   --low-bg: #fffbeb;
+  /* Used to make the question textarea and the "compare against ideal
+     proposal" dropdown easier to spot at a glance on the Query and
+     Response tab -- see #question / #idealTopic further down. Blue
+     reads as "primary input" without colliding with the existing
+     green/amber (--ok/--low) verdict colors used elsewhere in the
+     app, or bestPracticesTab.css's own --bp-info blue (#1d4ed8) used
+     for its info banner -- picked one shade lighter here so the two
+     don't look like the same component. */
+  --accent: #3b82f6;
+  --accent-bg: #eff6ff;
 }
 * { box-sizing: border-box; }
 body {
@@ -133,6 +143,29 @@ textarea, input[type="text"], input[type="number"], select {
   background: #fff;
 }
 textarea { resize: vertical; min-height: 4.5rem; }
+
+/* Make the two inputs that start a query/comparison on the Query and
+   Response tab easy to find on a page that's otherwise all neutral
+   grays -- the question textarea gets the strongest treatment since
+   it's the one the user asked to emphasize "especially": a thicker,
+   colored border plus a tinted background, not just a border, so it
+   reads as highlighted even before the user's eye focuses on it. The
+   comparison dropdown gets the same accent color but only as a
+   border (no background tint) -- still clearly flagged as related/
+   important, but visually secondary to the question box above it.
+   Both keep the same border-radius/padding as the plain textarea/
+   select rule above so they don't look like a different component,
+   and the extra 1px of border is absorbed by reducing padding by 1px
+   so the box doesn't shift size/alignment relative to its label. */
+#question {
+  border: 2px solid var(--accent);
+  background: var(--accent-bg);
+  padding: 0.54rem 0.64rem;
+}
+#idealTopic {
+  border: 2px solid var(--accent);
+  padding: 0.54rem 0.64rem;
+}
 
 .row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
 .row > div { flex: 1; min-width: 160px; }

@@ -154,7 +154,7 @@ which picks an extractor by file extension. Anything else is rejected
 before it's read.
 
 `/query` and `/query/stream` both take an optional `chatModel` in the
-body, defaulting to `llama3.1:8b` if omitted — this is what the UI's
+body, defaulting to `qwen2.5:14b` if omitted — this is what the UI's
 "Chat model" dropdown sets per question. There's deliberately no
 equivalent `embedModel` picker anywhere in the UI: every chunk in a
 workspace's store has to come from the same embedding model (different
@@ -166,7 +166,7 @@ similarity scores. See the comment on `embedModel` in
 ## Setup
 
 Requires Node.js (v18+) and a running Ollama with `nomic-embed-text`
-pulled for embeddings, plus at least one chat model (e.g. `llama3.1:8b`
+pulled for embeddings, plus at least one chat model (e.g. `qwen2.5:14b`
 or `llama3.2:3b`) pulled for answering.
 
 ```
@@ -925,7 +925,7 @@ kept running into with AnythingLLM's citations panel, just now fully
 visible since you own the code.
 
 Optional body parameters for `/query`: `topK` (how many chunks to
-retrieve, default 5), `chatModel` (default `llama3.1:8b`), `embedModel`
+retrieve, default 5), `chatModel` (default `qwen2.5:14b`), `embedModel`
 (default `nomic-embed-text`), `temperature` (default 0.2), `maxTokens`
 (caps generation length via Ollama's `num_predict`; omit for no cap,
 the existing default behavior), `numCtx` (sets Ollama's `num_ctx` —
@@ -1113,7 +1113,7 @@ A few deliberate limits worth knowing:
   itself — not a concern with today's direct-connection setup.
 - **`chatModel` is the model that ACTUALLY answered, not just whatever
   was requested.** If a query didn't specify one, this app's own
-  default (`llama3.1:8b`) silently applied — `chatModel` records that
+  default (`qwen2.5:14b`) silently applied — `chatModel` records that
   resolved value either way, so the log never has to be cross-
   referenced against the app's source to know what really ran. Left
   out of the line entirely when no chat call was ever reached at all

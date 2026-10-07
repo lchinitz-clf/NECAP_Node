@@ -1274,14 +1274,19 @@
       "label": "Liz Review",
       "attributes": [
         {
+          "name": "Haz01",
+          "proposal": "What are the major natural hazards relevant to the municipality’s geography and climate conditions.  Provide a list of all identified hazards.",
+          "included": false
+        },
+        {
           "name": "Haz11",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to each hazard?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz11-heat",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to excessive heat events?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz11-heat-people",
@@ -1289,24 +1294,99 @@
           "included": true
         },
         {
+          "name": "Haz11-heat-buildings",
+          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive heat events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-heat-facilities",
+          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive heat events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-heat-acres",
+          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive heat events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-flooding-people",
+          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive flooding events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-flooding-buildings",
+          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive flooding events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-flooding-facilities",
+          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive flooding events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-flooding-acres",
+          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive flooding events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-cold-people",
+          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive cold events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-cold-buildings",
+          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive cold events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-cold-facilities",
+          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive cold events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-cold-acres",
+          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive cold events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-storm-people",
+          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive storm events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-storm-buildings",
+          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive storm events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-storm-facilities",
+          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive storm events?",
+          "included": true
+        },
+        {
+          "name": "Haz11-storm-acres",
+          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive storm events?",
+          "included": true
+        },
+        {
           "name": "Haz11-flood",
           "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to flooding events?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz14",
           "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz46",
           "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
-          "included": true
+          "included": false
         },
         {
           "name": "Haz47",
           "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?",
-          "included": true
+          "included": false
         }
       ],
       "description": "Boston HMP items for which we have a human review",

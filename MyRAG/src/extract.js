@@ -17,6 +17,173 @@ const TurndownService = require('turndown');
 // predictable shape to match rather than several.
 const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
 
+// Minimum fraction of the document's pages a short, repeated line must
+// appear on before it's treated as a running header/footer/watermark
+// and stripped — see stripRepeatingHeaderFooterLines()'s own doc
+// comment below for the full reasoning. Deliberately very high (not
+// just "repeats a few times"): a real running header/footer/watermark
+// is stamped on nearly every page by the document's own page
+// template, so it should clear a 90% bar easily, while a short line
+// that happens to recur in the body text for an unrelated reason would
+// have to be deliberately repeated across almost the entire document
+// to be mistaken for one.
+const HEADER_FOOTER_MIN_PAGE_FRACTION = 0.9;
+
+// A candidate line's word-count ceiling — ordinary sentences and
+// paragraphs essentially never land on their own line this short
+// (that only happens by coincidence at an exact word-wrap boundary,
+// and the 90%-of-pages requirement above rules that out anyway: a
+// coincidental wrap doesn't reproduce the SAME words identically on
+// nearly every page), while a watermark ("DRAFT") or a running footer
+// ("4-90 City of Boston Natural Hazard Mitigation Plan") comfortably
+// fits under it.
+const HEADER_FOOTER_MAX_WORDS = 12;
+
+// Matches a page-number-shaped token — a run of digits, optionally
+// hyphenated/dotted ("4-90", "4.90", "123"), optionally preceded by
+// "Page"/"p." — at the very start or end of a candidate line. Only
+// used to build the REPEAT-COUNTING KEY below, never to change what
+// actually gets deleted from the text: a running footer's only
+// per-page variation is usually its own page number ("4-89 City of
+// Boston..." on one page, "4-90 City of Boston..." on the next), so
+// without normalizing that away first, every single occurrence would
+// look like a distinct, never-repeating line and this whole mechanism
+// would never catch the single most common footer shape there is.
+//
+// `\s*` between the hyphen/dot and the second digit group (not `\d+`
+// directly) for the same reason responseParser.js's quote matcher
+// strips hyphens unconditionally: pdf-parse's own page-number
+// extraction routinely inserts a stray space right after the hyphen
+// ("4- 90", not "4-90" — the exact same artifact class as "sto- ries"
+// documented in resolveCitation()'s hyphen-stripping comment). Without
+// tolerating that space here, "4- 90 City of Boston..." and "4- 91
+// City of Boston..." would each only have their leading "4" consumed,
+// leaving "- 90 city of boston..." / "- 91 city of boston..." behind —
+// which still differ from each other and would never be recognized as
+// the same recurring footer at all.
+const PAGE_NUMBER_TOKEN = '(?:page\\s+|p\\.?\\s*)?\\d+(?:[.\\-\\u2013]\\s*\\d+)?';
+const LEADING_PAGE_NUMBER_RE = new RegExp(`^${PAGE_NUMBER_TOKEN}\\s*`, 'i');
+const TRAILING_PAGE_NUMBER_RE = new RegExp(`\\s*${PAGE_NUMBER_TOKEN}$`, 'i');
+
+/**
+ * Builds the key stripRepeatingHeaderFooterLines() counts occurrences
+ * of — the candidate line's own text, lowercased, with one leading
+ * and/or trailing page-number-shaped token stripped off (see
+ * PAGE_NUMBER_TOKEN above). Two lines whose only difference is the
+ * page number embedded in them collapse to the same key; a line with
+ * no such token is otherwise unchanged apart from trimming/casing.
+ * @param {string} line - already trimmed by the caller.
+ * @returns {string}
+ */
+function headerFooterKey(line) {
+  return line
+    .replace(LEADING_PAGE_NUMBER_RE, '')
+    .replace(TRAILING_PAGE_NUMBER_RE, '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Strips running headers, footers, and watermarks (a page number plus
+ * document title repeated at the bottom of every page, a "DRAFT"
+ * stamp, etc.) from PDF-extracted text before it ever reaches the
+ * chunker — same "clean up pdf-parse's known junk" philosophy as
+ * cleanExtractedText()'s table-of-contents dot-leader cleanup just
+ * below, for a different failure: pdf-parse has no concept of pages
+ * at all (extractPdfText() below gets back one flat string for the
+ * whole document), so when a sentence happens to straddle a page
+ * break in the source PDF, whatever sits in that page's header/footer
+ * gets extracted as if it were ordinary body text, landing mid-
+ * sentence. A real, observed example: "...provide important
+ * flood-storage, water-quality,\nDRAFT\n4-90 City of Boston Natural
+ * Hazard Mitigation Plan\nerosion-control..." — a single, genuinely
+ * contiguous sentence in the source document, with a watermark and a
+ * page footer physically injected into the middle of it by extraction
+ * alone. That broke verbatim quote matching the same way a few other
+ * PDF-extraction artifacts already fixed elsewhere in this app did
+ * (see resolveCitation() in responseParser.js for the whitespace/
+ * hyphen/"[Context: ...]" fixes) — but unlike those, THIS fix belongs
+ * here, at extraction time, rather than in the quote matcher: a page
+ * header's actual text ("City of Boston Natural Hazard Mitigation
+ * Plan") is specific to this one document, with no fixed, safely-
+ * recognizable shape the way this app's own synthesized
+ * "[Context: ...]" marker has — so there's no way to safely strip it
+ * from inside a shared, cross-document quote-matching function.
+ * Removing it here instead, before it ever becomes part of a chunk,
+ * fixes it for retrieval and on-screen chunk display too, not just
+ * quote verification.
+ *
+ * The heuristic: a line qualifies ONLY if it's short (see
+ * HEADER_FOOTER_MAX_WORDS) AND its key (see headerFooterKey() above)
+ * recurs on at least HEADER_FOOTER_MIN_PAGE_FRACTION of the document's
+ * pages. Every matching line is deleted outright — not replaced with
+ * a placeholder — these lines carry no content worth keeping, the
+ * same judgment call cleanExtractedText() already makes for
+ * dot-leaders. Accepted false-positive risk, same category as the
+ * whitespace-/hyphen-blind matching accepted in responseParser.js: a
+ * short line that's genuinely part of the body text, repeated often
+ * enough by coincidence to clear the 90% bar, would also get removed.
+ * Judged acceptable given how high that bar is.
+ *
+ * Only ever reached from extractPdfText() below, with a real
+ * `numPages` from pdf-parse — this is deliberately a no-op (`text`
+ * returned unchanged) whenever `numPages` isn't a positive number,
+ * which also means it's automatically skipped for the .docx/.txt
+ * extractors further down this file: neither has a meaningful "page"
+ * concept (see extractDocxText()'s own doc comment) or this failure
+ * mode to begin with, so neither needs this threading through its own
+ * signature at all.
+ *
+ * @param {string} text - raw pdf-parse output, BEFORE any whitespace
+ *   collapsing — this needs pdf-parse's own one-line-per-visual-line
+ *   structure intact (see structuredText.js's module comment) to tell
+ *   candidate lines apart, so this runs first, ahead of
+ *   cleanExtractedText()'s own dot-leader/whitespace cleanup.
+ * @param {number|null} numPages - from pdf-parse's own page count.
+ * @returns {string}
+ */
+function stripRepeatingHeaderFooterLines(text, numPages) {
+  if (!numPages || numPages < 1) return text;
+
+  const lines = text.split('\n');
+  const counts = new Map(); // header/footer key -> occurrence count
+
+  const isCandidate = (trimmed) => {
+    if (!trimmed) return false;
+    const words = trimmed.split(/\s+/).filter(Boolean).length;
+    return words > 0 && words <= HEADER_FOOTER_MAX_WORDS;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!isCandidate(line)) continue;
+    const key = headerFooterKey(line);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  // A floor of 3 regardless of the 90% fraction: for a 1- or 2-page
+  // document, 90% rounds down to a number a line can't possibly repeat
+  // across in the first place (nothing to repeat against), so this
+  // mechanism naturally never fires for documents that short — exactly
+  // the right outcome, since "running header/footer" isn't a
+  // meaningful concept for a document with barely any pages to run
+  // across.
+  const threshold = Math.max(3, Math.ceil(numPages * HEADER_FOOTER_MIN_PAGE_FRACTION));
+  const keysToStrip = new Set();
+  for (const [key, count] of counts) {
+    if (count >= threshold) keysToStrip.add(key);
+  }
+  if (keysToStrip.size === 0) return text;
+
+  return lines
+    .filter((rawLine) => {
+      const line = rawLine.trim();
+      if (!isCandidate(line)) return true; // never a candidate -- always kept
+      return !keysToStrip.has(headerFooterKey(line));
+    })
+    .join('\n');
+}
+
 /**
  * Cleans up raw extracted text before it ever reaches the chunker.
  *
@@ -65,7 +232,12 @@ function cleanExtractedText(text) {
 async function extractPdfText(filePath) {
   const dataBuffer = fs.readFileSync(filePath);
   const data = await pdfParse(dataBuffer);
-  return { text: cleanExtractedText(data.text), numPages: data.numpages };
+  // Runs BEFORE cleanExtractedText() -- see
+  // stripRepeatingHeaderFooterLines()'s own doc comment above for why
+  // it needs pdf-parse's original one-line-per-visual-line structure
+  // intact.
+  const withoutHeaderFooter = stripRepeatingHeaderFooterLines(data.text, data.numpages);
+  return { text: cleanExtractedText(withoutHeaderFooter), numPages: data.numpages };
 }
 
 /**
@@ -145,5 +317,6 @@ module.exports = {
   extractDocxText,
   extractTxtText,
   cleanExtractedText,
+  stripRepeatingHeaderFooterLines,
   SUPPORTED_EXTENSIONS,
 };

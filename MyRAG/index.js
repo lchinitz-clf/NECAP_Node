@@ -1049,7 +1049,7 @@ app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
 
 /**
  * POST /query
- * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "llama3.1:8b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "numCtx": 8192, "repeatPenalty": 1.3, "idealTopicId": "offshore-wind" }
+ * Body: { "question": "...", "workspaceId": "ma-climate-plan", "topK": 5, "chatModel": "qwen2.5:14b", "embedModel": "nomic-embed-text", "temperature": 0.2, "maxTokens": 500, "numCtx": 8192, "repeatPenalty": 1.3, "idealTopicId": "offshore-wind" }
  *
  * `question` is normally required, but is optional if `idealTopicId`
  * is given — see the "Comparing against an ideal proposal" section in

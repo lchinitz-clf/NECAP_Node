@@ -70,7 +70,7 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *
  * @param {Array<{role: string, content: string}>} messages
  * @param {object} opts
- * @param {string} [opts.model] - e.g. "llama3.1:8b"
+ * @param {string} [opts.model] - e.g. "qwen2.5:14b"
  * @param {number} [opts.temperature]
  * @param {number} [opts.maxTokens] - caps how many tokens the model may
  *   generate, passed through as Ollama's `num_predict`. Left out of the
@@ -178,7 +178,7 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *
  *   `model` is the resolved model name that was ACTUALLY used — either
  *   whatever `opts.model` the caller passed, or, when that was left
- *   unspecified, this function's own default ("llama3.1:8b") — so a
+ *   unspecified, this function's own default ("qwen2.5:14b") — so a
  *   caller that wants to record which model really answered a request
  *   doesn't need to duplicate that default itself.
  *
@@ -194,7 +194,7 @@ async function embed(text, model = 'nomic-embed-text', numCtx = 2048, signal) {
  *   equivalent — a non-streaming call either returns the whole answer
  *   at once or never returns any of it.
  */
-async function chat(messages, { model = 'llama3.1:8b', temperature = 0.2, maxTokens, numCtx, repeatPenalty, onToken, think, onThinking, signal } = {}) {
+async function chat(messages, { model = 'qwen2.5:14b', temperature = 0.2, maxTokens, numCtx, repeatPenalty, onToken, think, onThinking, signal } = {}) {
   const streaming = typeof onToken === 'function';
   const options = { temperature };
   if (maxTokens !== undefined) options.num_predict = maxTokens;
