@@ -599,12 +599,14 @@ tr.batch-summary-row td {
 #rubricDetails .workspace-actions .button-row { margin-bottom: 0.6rem; }
 #rubricAttributesBody td { vertical-align: top; }
 
-/* Attribute row reorder/remove controls — stacked in one narrow
-   column since the table itself is already tight (Name and Ideal
-   proposal both want most of the width). See addRubricAttributeRow()
-   and updateRubricAttributeMoveButtons() in script.js: the up/down
-   pair disables itself at the top/bottom row rather than wrapping
-   around or no-op'ing silently. */
+/* Attribute row reorder/duplicate/remove controls — stacked in one
+   narrow column since the table itself is already tight (Name and
+   Ideal proposal both want most of the width). See
+   addRubricAttributeRow() and updateRubricAttributeMoveButtons() in
+   script.js: the up/down pair disables itself at the top/bottom row
+   rather than wrapping around or no-op'ing silently, and Duplicate
+   inserts its copy immediately after this row rather than at the
+   bottom of the list. */
 .rubric-attr-actions-cell {
   display: flex;
   flex-direction: column;

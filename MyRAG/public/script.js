@@ -1992,27 +1992,40 @@ async function refreshRubricTopics() {
 }
 
 /**
- * Appends one editable attribute row (name + proposal + include
- * checkbox + remove button). Both text fields are <textarea>s rather
- * than single-line <input>s — a name built from several joined
- * spreadsheet columns (see excel_to_json.py's JOIN_SEPARATOR) and
- * especially a proposal's ideal-condition text routinely run well past
- * what a single-line input can show at once, forcing horizontal
- * scrolling inside a tiny box to read or edit the whole thing. A
- * <textarea> wraps instead, showing several lines up front, and can
- * still be dragged taller via its own resize handle (see the CSS) for
- * anything longer than that. `rows` just sets the starting height —
- * normal textarea behavior, not a length limit; nothing about how the
- * value is read (still a single string, still trimmed) or saved
- * changes because of this.
+ * Appends (or inserts, see `insertAfter` below) one editable attribute
+ * row (name + proposal + include checkbox + duplicate/remove buttons).
+ * Both text fields are <textarea>s rather than single-line <input>s —
+ * a name built from several joined spreadsheet columns (see
+ * excel_to_json.py's JOIN_SEPARATOR) and especially a proposal's
+ * ideal-condition text routinely run well past what a single-line
+ * input can show at once, forcing horizontal scrolling inside a tiny
+ * box to read or edit the whole thing. A <textarea> wraps instead,
+ * showing several lines up front, and can still be dragged taller via
+ * its own resize handle (see the CSS) for anything longer than that.
+ * `rows` just sets the starting height — normal textarea behavior,
+ * not a length limit; nothing about how the value is read (still a
+ * single string, still trimmed) or saved changes because of this.
  *
  * `included` defaults to true, matching isAttributeIncluded()'s
  * "missing means true" default in src/idealProposals.js — so both a
  * brand-new row (added via "Add attribute") and a row loaded from an
  * older saved attribute with no `included` field at all start out
  * checked.
+ *
+ * @param {HTMLTableRowElement|null} [insertAfter] - when given, the
+ *   new row is inserted immediately after this existing row instead
+ *   of being appended at the end of the table. This is what makes the
+ *   "Duplicate" button below land its copy right next to the
+ *   original, rather than at the bottom of a possibly-long list the
+ *   way every other caller of this function (every one of which omits
+ *   this argument, appending as before) needs a brand-new blank or
+ *   freshly-loaded row to behave. `insertBefore(tr,
+ *   insertAfter.nextElementSibling)` handles "insertAfter is currently
+ *   the last row" for free: `nextElementSibling` is then `null`, and
+ *   inserting before a `null` reference node is exactly what
+ *   `appendChild` itself does.
  */
-function addRubricAttributeRow(name = '', proposal = '', included = true) {
+function addRubricAttributeRow(name = '', proposal = '', included = true, insertAfter = null) {
   const tr = document.createElement('tr');
 
   const nameTd = document.createElement('td');
@@ -2077,6 +2090,26 @@ function addRubricAttributeRow(name = '', proposal = '', included = true) {
     updateRubricAttributeMoveButtons();
   });
 
+  // Duplicate: a copy of this row, dropped in immediately after it —
+  // the point being to make rearranging a long list less tedious (see
+  // this function's own `insertAfter` doc above): the alternative, for
+  // a user who wants N near-identical attributes next to each other,
+  // is "Add attribute" (which always lands at the very bottom of the
+  // list) followed by N single-step "move up" clicks per row. Reads
+  // nameInput/proposalInput/includedInput's CURRENT live values, not
+  // the `name`/`proposal`/`included` this row was originally
+  // constructed with, so duplicating a row the user has since edited
+  // (but not yet saved) copies what's on screen right now.
+  const duplicateBtn = document.createElement('button');
+  duplicateBtn.type = 'button';
+  duplicateBtn.className = 'btn-secondary rubric-attr-duplicate';
+  duplicateBtn.textContent = 'Duplicate';
+  duplicateBtn.title = 'Duplicate this attribute';
+  duplicateBtn.setAttribute('aria-label', 'Duplicate this attribute');
+  duplicateBtn.addEventListener('click', () => {
+    addRubricAttributeRow(nameInput.value, proposalInput.value, includedInput.checked, tr);
+  });
+
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'btn-remove';
@@ -2088,13 +2121,18 @@ function addRubricAttributeRow(name = '', proposal = '', included = true) {
 
   actionsTd.appendChild(moveUpBtn);
   actionsTd.appendChild(moveDownBtn);
+  actionsTd.appendChild(duplicateBtn);
   actionsTd.appendChild(removeBtn);
 
   tr.appendChild(nameTd);
   tr.appendChild(proposalTd);
   tr.appendChild(includedTd);
   tr.appendChild(actionsTd);
-  rubricAttributesBody.appendChild(tr);
+  if (insertAfter) {
+    rubricAttributesBody.insertBefore(tr, insertAfter.nextElementSibling);
+  } else {
+    rubricAttributesBody.appendChild(tr);
+  }
   updateRubricAttributeMoveButtons();
 }
 
