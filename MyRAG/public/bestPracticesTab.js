@@ -109,6 +109,14 @@
   // for a Best Practices run specifically.
   let runStartedAt = null;
   let lastElapsedMs = null;
+  // Same purpose, and same "captured from the run's own 'done' event,
+  // never re-fetched live" reasoning, as script.js's
+  // lastRunExcludedDocuments — see that variable's own doc comment.
+  // Always empty in 'rubric' compare mode (no workspace is involved
+  // in that mode at all — see /query/stream in index.js), which is
+  // exactly why buildExportMeta() below is fine passing this through
+  // unconditionally rather than branching on compareMode itself.
+  let lastExcludedDocuments = [];
   // Live-updating timer handle -- same mechanism as script.js's
   // queryTimerHandle: a setInterval started alongside runStartedAt
   // above, re-rendering elapsedTimeEl every tick via the shared
@@ -765,6 +773,7 @@
     rowsRendered = 0;
     latestBatches = [];
     lastElapsedMs = null;
+    lastExcludedDocuments = [];
     gotAnyToken = false;
     resultWrap.style.display = 'none';
     resultSummaryEl.textContent = '';
@@ -873,6 +882,9 @@
       if (!finalEvent) throw new Error('Server closed the connection before finishing.');
       if (finalEvent.type === 'error') throw new Error(finalEvent.error);
 
+      // See lastExcludedDocuments's own doc comment above.
+      lastExcludedDocuments = finalEvent.excludedDocuments || [];
+
       // Covers the same "no documents embedded yet" short-circuit
       // script.js's own answerEl handling guards against: "done" fires
       // with a ready-made answer and no tokens were ever streamed.
@@ -961,6 +973,12 @@
       attributesPerCall,
       appName: (appNameEl && appNameEl.textContent.trim()) || undefined,
       elapsedMs: lastElapsedMs != null ? lastElapsedMs : undefined,
+      // Always [] in 'rubric' compare mode (see lastExcludedDocuments's
+      // own doc comment above) — buildAttributeResultsHtml() only ever
+      // renders a row for this when the array is non-empty, so that
+      // mode's export simply shows nothing extra, same as a workspace
+      // run where nothing happens to be excluded.
+      excludedDocuments: lastExcludedDocuments,
     };
   }
 

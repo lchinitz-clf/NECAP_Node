@@ -173,10 +173,19 @@ function getTransporter() {
  *   already finished by the time there'd be anything left to send.
  *   Rendered as the report's "Run time" row (see
  *   public/reportHtml.js) when supplied.
+ * @param {string[]} [params.excludedDocuments] - every sourceFile the
+ *   Documents tab's Include checkboxes excluded for this workspace at
+ *   the moment this request's retrieval ran (see
+ *   getExcludedSourceFiles() in src/documentMeta.js) — the same value
+ *   /query/stream's "done" event sends the browser, passed straight
+ *   through to buildAttributeResultsHtml() so the emailed report shows
+ *   the same "Documents excluded from search" row the browser's own
+ *   "Export HTML" download would. Omitted or empty: no such row, same
+ *   as that function's own default.
  * @returns {Promise<void>} always resolves — see this module's doc
  *   comment for why it never rejects.
  */
-async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, topK, temperature, repeatPenalty, maxTokens, numCtx, think, attributesPerCall, elapsedMs }) {
+async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, topK, temperature, repeatPenalty, maxTokens, numCtx, think, attributesPerCall, elapsedMs, excludedDocuments }) {
   if (!isConfigured) {
     if (!warnedNotConfigured) {
       console.warn(
@@ -238,6 +247,7 @@ async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyE
       think,
       attributesPerCall,
       elapsedMs,
+      excludedDocuments,
       appName: getAppName(),
     });
     const subject = `Rubric analysis finished: ${topicLabel} (${workspaceId})`;

@@ -114,16 +114,41 @@ function headerFooterKey(line) {
  * quote verification.
  *
  * The heuristic: a line qualifies ONLY if it's short (see
- * HEADER_FOOTER_MAX_WORDS) AND its key (see headerFooterKey() above)
- * recurs on at least HEADER_FOOTER_MIN_PAGE_FRACTION of the document's
- * pages. Every matching line is deleted outright — not replaced with
- * a placeholder — these lines carry no content worth keeping, the
- * same judgment call cleanExtractedText() already makes for
- * dot-leaders. Accepted false-positive risk, same category as the
- * whitespace-/hyphen-blind matching accepted in responseParser.js: a
- * short line that's genuinely part of the body text, repeated often
- * enough by coincidence to clear the 90% bar, would also get removed.
- * Judged acceptable given how high that bar is.
+ * HEADER_FOOTER_MAX_WORDS), its key (see headerFooterKey() above) is
+ * NON-EMPTY, AND that key recurs on at least
+ * HEADER_FOOTER_MIN_PAGE_FRACTION of the document's pages. Every
+ * matching line is deleted outright — not replaced with a placeholder
+ * — these lines carry no content worth keeping, the same judgment
+ * call cleanExtractedText() already makes for dot-leaders. Accepted
+ * false-positive risk, same category as the whitespace-/hyphen-blind
+ * matching accepted in responseParser.js: a short line that's
+ * genuinely part of the body text, repeated often enough by
+ * coincidence to clear the 90% bar, would also get removed. Judged
+ * acceptable given how high that bar is.
+ *
+ * The non-empty-key requirement exists to fix a real, observed data
+ * bug: a bare page number with NO other text on its line (a very
+ * common footer style — just "45", nothing else) strips down to an
+ * EMPTY key via headerFooterKey(), since the whole line IS the
+ * page-number token. Every bare-digit-only line in a document
+ * collapses to that same empty key regardless of its actual numeric
+ * value, so without this guard, that key's count trivially clears the
+ * 90% threshold (a real page-number footer recurs on nearly every
+ * page) and EVERY lone-digit line anywhere gets treated as "just a
+ * page number" and deleted — including a stray digit that's genuinely
+ * part of the body text, not a footer at all. That's exactly what
+ * happened to a real document: pdf-parse's page-by-page flattening
+ * split "...more than 280 participants..." so that the leading "2" of
+ * "280" landed alone on its own line right next to the real page-
+ * number footer in the extracted stream; this function then deleted
+ * that "2" as if it were just another page number, silently turning
+ * "280 participants" into "80 participants" in every chunk built from
+ * that text. The tradeoff accepted here: a document whose real footer
+ * truly is a bare page number with zero other text no longer gets
+ * that footer stripped (it has no surrounding template text to
+ * confirm it's a footer rather than stray content), so an occasional
+ * lone page-number digit can now survive into a chunk — judged far
+ * preferable to silently corrupting a real number in the body text.
  *
  * Only ever reached from extractPdfText() below, with a real
  * `numPages` from pdf-parse — this is deliberately a no-op (`text`
@@ -151,7 +176,16 @@ function stripRepeatingHeaderFooterLines(text, numPages) {
   const isCandidate = (trimmed) => {
     if (!trimmed) return false;
     const words = trimmed.split(/\s+/).filter(Boolean).length;
-    return words > 0 && words <= HEADER_FOOTER_MAX_WORDS;
+    if (words === 0 || words > HEADER_FOOTER_MAX_WORDS) return false;
+    // A line that is PURELY a page-number-shaped token (nothing else
+    // on it) has no surrounding template text to confirm it's really
+    // a recurring footer rather than a stray fragment of body content
+    // that happens to sit alone on a line — see this function's own
+    // doc comment above for the real data bug this guards against.
+    // headerFooterKey() strips exactly that token, so an empty result
+    // means the whole line WAS the token.
+    if (headerFooterKey(trimmed) === '') return false;
+    return true;
   };
 
   for (const rawLine of lines) {

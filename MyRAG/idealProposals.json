@@ -33,7 +33,7 @@
         {
           "name": "IF1 - Vulnerability and Risk Assessment - Definitions",
           "proposal": "How does the state define extreme INLAND OR STORMWATER FLOODING in its climate resilience plan?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF2 - Vulnerability and Risk Assessment - Forecasts",
@@ -53,7 +53,7 @@
         {
           "name": "IF5 - Vulnerability and Risk Assessment - Forecasts",
           "proposal": "Does the plan address risks associated with different types of inland flooding?",
-          "included": false
+          "included": true
         },
         {
           "name": "IF6 - Vulnerability and Risk Assessment - Forecasts",
@@ -1396,6 +1396,258 @@
       ],
       "description": "Boston HMP items for which we have a human review",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
+    },
+    {
+      "id": "drought",
+      "label": "Drought",
+      "attributes": [
+        {
+          "name": "EH1 - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "How does the state define extreme heat in its climate resilience plan?",
+          "included": true
+        },
+        {
+          "name": "EH2 - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "What temperature thresholds or heat index values does the plan use?",
+          "included": true
+        },
+        {
+          "name": "EH3 - Vulnerability and Risk Assessment - Human health",
+          "proposal": "What health impacts from extreme heat does the plan highlight?",
+          "included": true
+        },
+        {
+          "name": "EH4 - Vulnerability and Risk Assessment - Infrastructure",
+          "proposal": "How does extreme heat affect transportation, energy systems, or buildings?",
+          "included": true
+        },
+        {
+          "name": "EH5 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan identify the number of projected extreme heat days by mid-century, and how does it compare to current conditions?",
+          "included": true
+        },
+        {
+          "name": "EH6 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan specify which regions or municipalities face the highest projected heat risk?",
+          "included": true
+        },
+        {
+          "name": "EH7 - Vulnerability and Risk Assessment - Human health",
+          "proposal": "How does the plan address risks to outdoor workers, unhoused residents, and people without access to cooling?",
+          "included": true
+        },
+        {
+          "name": "EH8 - Vulnerability and Risk Assessment - Human health",
+          "proposal": "Does the plan discuss compounding impacts of heat with air quality, drought, or wildfire smoke?",
+          "included": true
+        },
+        {
+          "name": "EH9 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan identify specific neighborhoods or census tracts as heat-vulnerable?",
+          "included": true
+        },
+        {
+          "name": "EH10 - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "Does the plan reference wet-bulb temperature thresholds or extreme heat mortality projections?",
+          "included": true
+        },
+        {
+          "name": "EH11 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "Does the plan propose updates to building codes to improve cooling and energy efficiency?",
+          "included": true
+        },
+        {
+          "name": "EH12 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "Does the plan reference state or municipal ordinances related to heat mitigation?",
+          "included": true
+        },
+        {
+          "name": "EH13 - Policy and Regulatory Implementation - Physical Assets",
+          "proposal": "Does the plan propose mandatory cooling standards for rental housing or public buildings?",
+          "included": true
+        },
+        {
+          "name": "EH14 - Policy and Regulatory Implementation - Physical Assets",
+          "proposal": "Does the plan address utility shutoff protections during extreme heat events?",
+          "included": true
+        },
+        {
+          "name": "EH15 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "Does the plan identify regulatory barriers that limit implementation of heat resilience strategies?",
+          "included": true
+        },
+        {
+          "name": "EH16 - Policy and Regulatory Implementation - Human health",
+          "proposal": "Does the plan commit to adopting enforceable heat safety standards for outdoor workers?",
+          "included": true
+        },
+        {
+          "name": "EH17 - Local Capacity Building - Supporting Local Governments",
+          "proposal": "How does the plan support municipalities in developing local heat resilience plans?",
+          "included": true
+        },
+        {
+          "name": "EH18 - Local Capacity Building - Supporting Local Governments",
+          "proposal": "Does the plan provide technical assistance or funding for local heat mitigation projects?",
+          "included": true
+        },
+        {
+          "name": "EH19 - Local Capacity Building - Capacity building",
+          "proposal": "Does the plan outline training or capacity-building programs for local officials, emergency managers, or public health departments?",
+          "included": true
+        },
+        {
+          "name": "EH20 - Local Capacity Building - Community Outreach",
+          "proposal": "Does the plan support community-based organizations in outreach, education, or heat emergency response?",
+          "included": true
+        },
+        {
+          "name": "EH21 - Local Capacity Building - Data",
+          "proposal": "Does the plan encourage local data collection such as heat mapping or vulnerability assessments?",
+          "included": true
+        },
+        {
+          "name": "EH22 - Local Capacity Building - Community Outreach",
+          "proposal": "Does the plan outline public education campaigns about extreme heat risks?",
+          "included": true
+        },
+        {
+          "name": "EH23 - Local Capacity Building - Legal and Regulatory Frameworks",
+          "proposal": "Does the plan require or incentivize municipalities to adopt heat-resilient land-use or zoning policies?",
+          "included": true
+        },
+        {
+          "name": "EH24 - Disaster Response and Preparedness - Emergency Response",
+          "proposal": "What heat emergency response measures does the plan include?",
+          "included": true
+        },
+        {
+          "name": "EH25 - Disaster Response and Preparedness - Emergency Identification",
+          "proposal": "Does the plan describe early warning systems or public communication strategies for heat waves?",
+          "included": true
+        },
+        {
+          "name": "EH26 - Disaster Response and Preparedness - Emergency Response",
+          "proposal": "Does the plan address access to cooling centers, including transportation and extended hours?",
+          "included": true
+        },
+        {
+          "name": "EH27 - Disaster Response and Preparedness - Emergency Response",
+          "proposal": "Does the plan outline protocols for protecting unhoused residents during extreme heat events?",
+          "included": true
+        },
+        {
+          "name": "EH28 - Disaster Response and Preparedness - Coordination",
+          "proposal": "Does the plan coordinate heat response with air quality alerts or wildfire smoke events?",
+          "included": true
+        },
+        {
+          "name": "EH29 - Disaster Response and Preparedness - Emergency Response",
+          "proposal": "Does the plan include surge capacity planning for hospitals and EMS during extreme heat?",
+          "included": true
+        },
+        {
+          "name": "EH30 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+          "proposal": "What strategies does the plan propose to reduce urban heat islands?",
+          "included": true
+        },
+        {
+          "name": "EH31 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+          "proposal": "What long-term cooling infrastructure investments does the plan recommend?",
+          "included": true
+        },
+        {
+          "name": "EH32 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
+          "proposal": "Does the plan commit to expanding tree canopy in historically underserved neighborhoods, and does it set measurable targets?",
+          "included": true
+        },
+        {
+          "name": "EH33 - Adaptation Strategies & Long-Term Actions - System Adaptation",
+          "proposal": "How does the plan integrate heat resilience with decarbonization or electrification goals?",
+          "included": true
+        },
+        {
+          "name": "EH34 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+          "proposal": "Does the plan address backup power for critical facilities such as cooling centers, public housing, and shelters?",
+          "included": true
+        },
+        {
+          "name": "EH35 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
+          "proposal": "Does the plan propose incentives for energy-efficient cooling in vulnerable communities?",
+          "included": true
+        },
+        {
+          "name": "EH36 - Equity & Environmental Justice - Distribution of Impacts",
+          "proposal": "How does the plan address disproportionate heat exposure in low-income communities?",
+          "included": true
+        },
+        {
+          "name": "EH37 - Equity & Environmental Justice - Community Outreach",
+          "proposal": "What community engagement processes does the plan require for designing heat resilience strategies?",
+          "included": true
+        },
+        {
+          "name": "EH38 - Equity & Environmental Justice - Community Outreach",
+          "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents during extreme heat events?",
+          "included": true
+        },
+        {
+          "name": "EH39 - Equity & Environmental Justice - System Adaptation",
+          "proposal": "How does the plan ensure that heat resilience investments do not contribute to displacement or gentrification?",
+          "included": true
+        },
+        {
+          "name": "EH40 - Equity & Environmental Justice - Community Outreach",
+          "proposal": "Does the plan address multilingual or culturally specific communication needs?",
+          "included": true
+        },
+        {
+          "name": "EH41 - Equity & Environmental Justice - Distribution of Impacts",
+          "proposal": "Does the plan commit to prioritizing cooling investments in environmental justice communities?",
+          "included": true
+        },
+        {
+          "name": "EH42 - Accountability & Governance - Roles and Responsibilities",
+          "proposal": "Which agencies are responsible for implementing the state’s extreme heat strategies?",
+          "included": true
+        },
+        {
+          "name": "EH43 - Accountability & Governance - Funding and financing",
+          "proposal": "Does the plan identify funding sources for heat resilience work?",
+          "included": true
+        },
+        {
+          "name": "EH44 - Accountability & Governance - Costs",
+          "proposal": "Does the plan estimate the cost of proposed heat resilience actions?",
+          "included": true
+        },
+        {
+          "name": "EH45 - Accountability & Governance - Funding and financing",
+          "proposal": "Does the plan identify specific funding mechanisms (e.g., bonds, federal grants, utility programs)?",
+          "included": true
+        },
+        {
+          "name": "EH46 - Accountability & Governance - Indicators",
+          "proposal": "What indicators does the plan propose for monitoring long-term heat resilience?",
+          "included": true
+        },
+        {
+          "name": "EH47 - Accountability & Governance - Transparency",
+          "proposal": "Does the plan commit to public reporting or transparency around progress?",
+          "included": true
+        },
+        {
+          "name": "EH48 - Accountability & Governance - Coordination",
+          "proposal": "Does the plan specify how state agencies will coordinate with municipalities, utilities, and community-based organizations?",
+          "included": true
+        },
+        {
+          "name": "EH49 - Accountability & Governance - Indicators",
+          "proposal": "What metrics does the plan propose to track progress on reducing heat-related illness and mortality?",
+          "included": true
+        }
+      ],
+      "description": "Version of drought rubric from Kevin B, 10/7/2026"
     }
   ]
 }

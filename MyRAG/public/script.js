@@ -833,6 +833,20 @@ let queryTimerHandle = null;
 // belong to.
 let lastRunElapsedMs = null;
 
+// Captures, once per run, exactly which documents the Documents tab's
+// Include checkboxes had excluded AT THE TIME this run's retrieval
+// actually happened — see the `excludedDocuments` field on
+// /query/stream's "done" event in index.js. Deliberately read from
+// the server's own response rather than re-fetched from GET
+// /workspaces/:id/documents at export time: someone could flip a
+// checkbox between finishing a run and clicking "Export HTML" later,
+// and the report should describe what this SPECIFIC run actually
+// searched, not whatever the checkboxes happen to say right now.
+// Reset to an empty array at the top of every new run (alongside
+// lastRunElapsedMs), for the same "a stale value from a previous run
+// must never attach to a different run's export" reasoning.
+let lastRunExcludedDocuments = [];
+
 // Holds the AbortController for whichever /query/stream request is
 // currently in flight, or null when none is. stopBtn's click handler
 // (wired up in init()) aborts it; the submit handler creates a fresh
@@ -3258,6 +3272,11 @@ function init() {
       // reset to null at the start of the next one, same lifecycle as
       // latestBatches itself.
       elapsedMs: lastRunElapsedMs != null ? lastRunElapsedMs : undefined,
+      // Same "captured from the run itself, not re-read live" reasoning
+      // as elapsedMs just above — see lastRunExcludedDocuments's own
+      // doc comment for why this has to come from the run's own "done"
+      // event rather than the Documents tab's CURRENT checkbox state.
+      excludedDocuments: lastRunExcludedDocuments,
     };
 
     const html = buildAttributeResultsHtml(latestBatches, meta);
@@ -3292,6 +3311,7 @@ function init() {
     reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
     latestBatches = [];
     lastRunElapsedMs = null;
+    lastRunExcludedDocuments = [];
     attributeResultsBody.innerHTML = '';
     attributeResultsWrap.style.display = 'none';
     // The answer section specifically is forced open for every new
@@ -3529,6 +3549,12 @@ function init() {
           renderAttributeResults(latestBatches, numCtx, threshold);
         }
       }, controller.signal);
+
+      // See lastRunExcludedDocuments's own doc comment above — captured
+      // from the final "done" event regardless of which branch below
+      // actually runs, so it's available to downloadHtmlBtn's export
+      // meta even for the "no documents" case right below.
+      lastRunExcludedDocuments = finalEvent.excludedDocuments || [];
 
       // Covers the "no documents embedded yet" case: "done" fires with
       // a ready-made answer and no sources/tokens were ever streamed.

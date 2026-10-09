@@ -24,6 +24,13 @@
  * on. The module.exports guard at the very bottom is a no-op in the
  * browser (`module` is simply undefined there) and is what makes this
  * requireable from Node.
+ *
+ * KEPT IN SYNC BY HAND with public/reportHtml.js — this is genuinely
+ * the same file in two locations (no bundler, no symlink), not two
+ * independent implementations that happen to look alike. Any edit
+ * here belongs in public/reportHtml.js too, and vice versa; letting
+ * the two drift is exactly the "emailed report quietly falls behind
+ * the browser's own Export HTML" bug this comment exists to prevent.
  */
 
 // Maps src/responseParser.js's five fixed category strings to a badge
@@ -267,7 +274,7 @@ function formatSettingsChips(meta) {
  * attribute's batch.
  *
  * @param {Array<{sources?: Array<{sourceFile: string, chunkIndex: number}>, records?: Array<{name: string, proposal: string, resultText: string, category: string}>, batchIndex: number, totalBatches?: number, promptTokens?: number, answerTokens?: number, doneReason?: string}>} batches
- * @param {{workspaceId?: string, rubricLabel?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
+ * @param {{workspaceId?: string, excludedDocuments?: string[], rubricLabel?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
  *   `rubricLabel`, when set, renders its own "Compared against rubric"
  *   row — used by the Best Practices Comparison tab's "compare against
  *   a rubric" mode (see buildExportMeta() in bestPracticesTab.js),
@@ -275,6 +282,18 @@ function formatSettingsChips(meta) {
  *   workspace is involved in that mode at all), so the "Workspace" row
  *   simply doesn't appear for that export. Every other caller leaves
  *   this unset and keeps showing "Workspace" exactly as before.
+ *   `excludedDocuments` lists every sourceFile the Documents tab's
+ *   Include checkboxes had excluded for THIS specific run (see
+ *   getExcludedSourceFiles() in src/documentMeta.js, and the
+ *   `excludedDocuments` field /query and /query/stream now send back
+ *   for exactly this purpose — never re-fetched from the workspace's
+ *   CURRENT checkbox state, which could have changed since this run
+ *   actually happened). Renders its own "Documents excluded from
+ *   search" row, but only when non-empty — omitted, or an empty array,
+ *   and the row simply doesn't appear, so a comparison that excluded
+ *   nothing (the common case) reports exactly as it did before this
+ *   field existed. Meaningless, and always empty, in rubric-comparison
+ *   mode (no workspace is touched there at all).
  *   `topK` through `attributesPerCall` are the run's Advanced-settings
  *   values, rendered as the "Settings" chip row by formatSettingsChips()
  *   above -- see that function's own doc comment for exactly what each
@@ -308,6 +327,18 @@ function buildAttributeResultsHtml(batches, meta) {
   const generatedAt = new Date().toLocaleString();
   const metaRows = [
     meta.workspaceId ? ['Workspace', escapeHtml(meta.workspaceId)] : null,
+    // Only rendered at all when something was actually excluded -- the
+    // majority case (every document included) adds no row here, same
+    // reasoning the Rubric Control side already gets "for free" (an
+    // excluded rubric attribute is simply never in `meta`/`rows` to
+    // begin with, so there's nothing extra to report there either).
+    // Lists the excluded sourceFiles themselves, not just a count,
+    // since "2 documents were excluded" on its own doesn't tell anyone
+    // reading this report later WHICH two. See `excludedDocuments`'s
+    // own doc comment below for where this value actually comes from.
+    meta.excludedDocuments && meta.excludedDocuments.length > 0
+      ? ['Documents excluded from search', escapeHtml(meta.excludedDocuments.join(', '))]
+      : null,
     meta.rubricLabel ? ['Compared against rubric', escapeHtml(meta.rubricLabel)] : null,
     meta.topicLabel ? ['Ideal-proposal topic', escapeHtml(meta.topicLabel)] : null,
     meta.question ? ['Question', escapeHtml(meta.question)] : null,
