@@ -747,11 +747,30 @@
    * matching entries (see best_practices_to_json.py's "Cross Cutting:
    * 288 entries" stats this feature was sized against) means a run can
    * legitimately take a while, batch by batch.
-   * @param {Array<{name: string, proposal: string, resultText: string, category: string}>} records
-   * @param {Array<{sourceFile: string, chunkIndex: number}>} sources
+   *
+   * Also appends a batch-summary row once this batch's own records are
+   * in, whenever more than one batch is involved -- mirroring the
+   * Query and Response tab's own per-attribute results table
+   * (renderAttributeResults() in script.js) exactly, via the same
+   * formatBatchSummary() global from reportHtml.js (a plain string
+   * formatter, no DOM, already shared between the on-screen table
+   * there and the HTML report -- see its own doc comment). This was
+   * simply missing before: every batch's promptTokens/answerTokens was
+   * already captured in latestBatches for CSV/HTML export, but never
+   * shown anywhere in THIS tab's own grid, only as one combined
+   * average in #bpTokenUsageNote above the table. With this tab's own
+   * default of 1 attribute per call, that meant no way to see, from
+   * the grid itself, which specific entry (if any) actually came close
+   * to -- or got cut off by -- the Request size ceiling; the aggregate
+   * note alone can't say that, the same reasoning renderTokenUsage()'s
+   * own doc comment in script.js gives for why the per-attribute table
+   * there needs its own per-batch rows too.
+   * @param {{records: Array<{name: string, proposal: string, resultText: string, category: string}>, sources: Array<{sourceFile: string, chunkIndex: number}>, batchIndex: number, totalBatches: number, promptTokens?: number, answerTokens?: number, doneReason?: string}} batch
    */
-  function appendRecords(records, sources) {
-    const sourceText = (sources || [])
+  function appendRecords(batch) {
+    const records = batch.records || [];
+    const sources = batch.sources || [];
+    const sourceText = sources
       .map((s) => `${s.sourceFile} #${s.chunkIndex}`)
       .join(', ');
 
@@ -782,6 +801,21 @@
 
       resultsBody.appendChild(tr);
       rowsRendered += 1;
+    }
+
+    // Same "only once there's more than one batch" gating as
+    // renderAttributeResults()'s own showBatchRows -- a single-batch
+    // run already has its one-and-only batch's numbers in
+    // #bpTokenUsageNote above, so a second copy of the same figures
+    // here would be pure repetition, not new information.
+    if (batch.totalBatches > 1 && records.length) {
+      const tr = document.createElement('tr');
+      tr.className = 'batch-summary-row';
+      const td = document.createElement('td');
+      td.colSpan = 4;
+      td.textContent = formatBatchSummary(batch, lastNumCtx);
+      tr.appendChild(td);
+      resultsBody.appendChild(tr);
     }
 
     resultWrap.style.display = rowsRendered > 0 ? '' : 'none';
@@ -1010,7 +1044,10 @@
             answerEl.textContent += event.text;
           } else if (event.type === 'batch-done') {
             statusEl.textContent = `Batch ${event.batchIndex + 1} of ${event.totalBatches} done.`;
-            latestBatches.push({
+            // Same shape appendRecords() now takes directly -- built
+            // once here and passed to both, rather than appendRecords()
+            // re-deriving its own copy from the raw event.
+            const batch = {
               batchIndex: event.batchIndex,
               totalBatches: event.totalBatches,
               records: event.records || [],
@@ -1018,8 +1055,9 @@
               promptTokens: event.promptTokens,
               answerTokens: event.answerTokens,
               doneReason: event.doneReason,
-            });
-            appendRecords(event.records || [], event.sources || []);
+            };
+            latestBatches.push(batch);
+            appendRecords(batch);
           } else if (event.type === 'done' || event.type === 'error') {
             finalEvent = event;
           }

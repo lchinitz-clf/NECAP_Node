@@ -519,11 +519,13 @@ button.chip:hover { background: var(--bg-soft); }
 .chip.score-meets { border-color: #bbf7d0; color: var(--ok); }
 .chip.score-below { border-color: #fde68a; color: var(--low); }
 
-/* One full-width row per batch in the per-attribute results table
-   (only shown once there's more than one batch — see
-   renderAttributeResults() in script.js), reporting that specific
-   batch's own token usage rather than only a combined total, plus a
-   cutoff warning when that batch specifically hit the length limit. */
+/* One full-width row per batch in a per-attribute results table (only
+   shown once there's more than one batch) — used by both the Query
+   and Response tab (see renderAttributeResults() in script.js) and
+   the Best Practices Comparison tab (see appendRecords() in
+   bestPracticesTab.js), reporting that specific batch's own token
+   usage rather than only a combined total, plus a cutoff warning when
+   that batch specifically hit the length limit. */
 tr.batch-summary-row td {
   background: var(--bg-soft);
   color: var(--muted);
