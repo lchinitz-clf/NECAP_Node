@@ -936,6 +936,63 @@
     </details>
   </details>
 
+  <!-- Own email-notification control for this tab -- see
+       #notifyEmailDetails above on the Query and Response tab for the
+       original. That one only ever applied to ITS OWN runs: this
+       tab's own POST /query/stream request never sent notifyEmail/
+       notifyEmailTo at all, so a Best Practices run could never
+       trigger the completion email regardless of what was checked
+       over there. Deliberately a separate checkbox/address pair
+       rather than silently reusing the other tab's (the way
+       #chatModel is reused above) -- unlike a chat-model choice,
+       wanting email notifications for one tab's long runs but not the
+       other's is a perfectly reasonable thing to want, and a shared
+       field with no visible connection to THIS tab would be
+       confusing. See runComparison()/getAdvancedSettings() in
+       bestPracticesTab.js. -->
+  <details class="advanced" id="bpNotifyEmailDetails">
+    <summary>Email notification</summary>
+    <div>
+      <label for="bpNotifyEmail" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+        <input type="checkbox" id="bpNotifyEmail" style="width:auto;" />
+        Email me when this finishes
+      </label>
+      <!-- type="text", not type="email" -- same reasoning as
+           #notifyEmailTo above. -->
+      <input
+        type="text"
+        id="bpNotifyEmailTo"
+        placeholder="you@example.com"
+        autocomplete="email"
+        style="margin-top:0.4rem;"
+      />
+      <p class="error" id="bpNotifyEmailToError" style="display:none;"></p>
+      <p class="hint" id="bpNotifyEmailHint">
+        Sends a summary plus the same HTML report the "Export HTML"
+        button below produces, to whatever address is typed above,
+        once this run finishes. Nothing is sent, and nothing is
+        remembered, if the box is left blank or isn't a valid address
+        — there's no server-side default recipient. Requires this tab
+        to stay open for the whole run: closing it still stops the
+        comparison (same as the Stop button), so nothing gets sent for
+        a run that never finished.
+      </p>
+      <details class="tip">
+        <summary aria-label="More information">&#9432;</summary>
+        <span>
+          The server also needs GMAIL_USER and GMAIL_APP_PASSWORD set in
+          its .env before it can send anything at all, regardless of
+          what address you type here — see README.md. Checking this
+          box with a valid address when that isn't configured is
+          harmless: nothing sends, and a note is logged on the server
+          instead. This is the same server-wide setting the Query and
+          Response tab's own "Email notification" uses — nothing about
+          it needs configuring twice.
+        </span>
+      </details>
+    </div>
+  </details>
+
   <div class="button-row" style="margin-top: 1rem;">
     <button type="button" id="bpCompareBtn" disabled>Compare</button>
     <button type="button" id="bpStopBtn" class="btn-secondary" style="display:none;">Stop</button>
@@ -968,6 +1025,15 @@
 
   <div id="bpResultWrap" style="display:none;">
     <p id="bpResultSummary"></p>
+    <!-- Parallel to the Query and Response tab's own #tokenUsageNote --
+         see renderBpTokenUsage() in bestPracticesTab.js. Was simply
+         never populated before: this tab accumulated promptTokens/
+         answerTokens per batch (see 'batch-done' handling) but never
+         rendered them anywhere, so there was no way to tell from the
+         UI how close a run came to running out of Request size --
+         exactly the blind spot that made a 27B model's blank
+         responses on a large rubric comparison hard to diagnose. -->
+    <p id="bpTokenUsageNote" class="hint"></p>
     <div class="button-row" style="margin: 0 0 0.5rem;">
       <button type="button" id="bpDownloadCsvBtn" class="btn-secondary">Download CSV</button>
       <button type="button" id="bpDownloadHtmlBtn" class="btn-secondary">Export HTML</button>

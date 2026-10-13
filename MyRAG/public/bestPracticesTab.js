@@ -87,11 +87,16 @@
   let compareModeWorkspaceRadio, compareModeRubricRadio, rubricTopicRow, rubricTopicSelect;
   let compareBtn, stopBtn;
   let statusEl, progressWrap, progressBar, errorEl, elapsedTimeEl;
-  let resultWrap, resultSummaryEl, resultsBody;
+  let resultWrap, resultSummaryEl, resultsBody, tokenUsageNoteEl;
   let answerDetailsEl, answerEl;
   let chatModelNoteEl;
   let downloadCsvBtn, downloadHtmlBtn;
   let previewCountEl, showFullListBtn, previewListEl, previewDetailEl;
+  // This tab's own email-notification controls -- see
+  // #bpNotifyEmailDetails's own doc comment in index.html for why
+  // these are separate from (not shared with) the Query and Response
+  // tab's #notifyEmail/#notifyEmailTo.
+  let notifyEmailCheckbox, notifyEmailToInput, notifyEmailToErrorEl;
 
   let abortController = null;
   let rowsRendered = 0;
@@ -109,6 +114,18 @@
   // for a Best Practices run specifically.
   let runStartedAt = null;
   let lastElapsedMs = null;
+  // The Request size (numCtx) actually used for the run currently in
+  // flight (or the most recently finished one) -- captured once, at
+  // the moment the request was sent (see runComparison()'s own
+  // getAdvancedSettings() call below), same "captured from the run
+  // itself, never re-read live" reasoning as lastElapsedMs/
+  // lastExcludedDocuments just above and below: renderBpTokenUsage()
+  // needs the ceiling that request was actually checked against,
+  // which could differ from whatever's currently sitting in the
+  // Request size field if it's been changed since. `undefined` (not
+  // `null`) when the field was left blank for that run, matching
+  // getAdvancedSettings()'s own "blank means no override" convention.
+  let lastNumCtx;
   // Same purpose, and same "captured from the run's own 'done' event,
   // never re-fetched live" reasoning, as script.js's
   // lastRunExcludedDocuments — see that variable's own doc comment.
@@ -234,6 +251,52 @@
     chatModelNoteEl.textContent = model
       ? `ⓘ Chat model: ${model} (set on the Query and Response tab)`
       : 'ⓘ Chat model: not yet loaded (set on the Query and Response tab) — using the server default for now.';
+  }
+
+  /**
+   * Reads the Query and Response tab's Temperature/Repeat penalty/Max
+   * answer length/Request size/Enable thinking Advanced Settings
+   * fields directly -- same reasoning as getChatModel() just above for
+   * why this tab reads shared fields rather than defining its own
+   * copies: re-reading whatever's currently set there means a Best
+   * Practices run always uses the same generation settings you most
+   * recently configured for Query and Response, rather than silently
+   * falling back to Ollama's own bare defaults (most importantly,
+   * num_ctx commonly defaulting to 4096 -- see the Request size
+   * field's own tip text for why that's too small once a rubric's own
+   * instructions are added to the prompt, which is exactly what a
+   * Best-Practices-against-rubric run does with the WHOLE rubric).
+   * Before this function existed, this tab's fetch body never sent
+   * temperature/maxTokens/numCtx/repeatPenalty/think at all, so every
+   * Best Practices run silently used the model's own bare defaults no
+   * matter what Advanced Settings showed.
+   *
+   * Every numeric field follows the exact same "blank or non-numeric
+   * means omit the key entirely, let the server/model's own default
+   * apply" convention script.js's own submit handler and
+   * downloadHtmlBtn handler already use for these same fields (see
+   * either for the long-form reasoning on why, e.g., 0 is a meaningful
+   * temperature that can't fall back via `|| ...`). `think` mirrors
+   * script.js's own convention too: the checkbox checked (the default)
+   * omits `think` entirely so the model's own default applies;
+   * unchecked sends an explicit `false`.
+   * @returns {{temperature: number|undefined, maxTokens: number|undefined, numCtx: number|undefined, repeatPenalty: number|undefined, think: boolean|undefined}}
+   */
+  function getAdvancedSettings() {
+    const readNumeric = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return undefined;
+      const raw = el.value;
+      return raw === '' || Number.isNaN(Number(raw)) ? undefined : Number(raw);
+    };
+    const thinkCheckbox = document.getElementById('thinkEnabled');
+    return {
+      temperature: readNumeric('temperature'),
+      maxTokens: readNumeric('maxTokens'),
+      numCtx: readNumeric('numCtx'),
+      repeatPenalty: readNumeric('repeatPenalty'),
+      think: thinkCheckbox && !thinkCheckbox.checked ? false : undefined,
+    };
   }
 
   /**
@@ -725,6 +788,53 @@
   }
 
   /**
+   * Fills in #bpTokenUsageNote once a run finishes -- same purpose,
+   * same phrasing, and same "used X of your Y-token Request size"
+   * framing as script.js's own renderTokenUsage() for the Query and
+   * Response tab, deliberately reimplemented here rather than called
+   * directly: that function closes over script.js's OWN
+   * #tokenUsageNote element variable, not this tab's #bpTokenUsageNote
+   * one, so calling it from here would overwrite the wrong tab's note
+   * (or, same isolation policy as this whole file's own doc comment
+   * above, require changing script.js just to parameterize an element
+   * it has no other reason to accept).
+   *
+   * Before this existed, this tab accumulated promptTokens/
+   * answerTokens per batch (see 'batch-done' handling in
+   * runComparison() below) but never showed them anywhere -- so there
+   * was no way to tell, from the UI, that a run was running up against
+   * its Request size ceiling. `numCtx` here is `lastNumCtx`, the value
+   * actually used for the run just finished (see getAdvancedSettings()
+   * above), not whatever the Request size field currently shows.
+   * @param {number|undefined} promptTokens
+   * @param {number|undefined} answerTokens
+   * @param {number|undefined} numCtx
+   * @param {number|undefined} totalBatches
+   */
+  function renderBpTokenUsage(promptTokens, answerTokens, numCtx, totalBatches) {
+    if (!tokenUsageNoteEl) return;
+    if (promptTokens === undefined) {
+      tokenUsageNoteEl.textContent = '';
+      return;
+    }
+    const promptText = promptTokens.toLocaleString();
+    const answerText = (answerTokens || 0).toLocaleString();
+
+    if (totalBatches && totalBatches > 1) {
+      const avgPromptText = Math.round(promptTokens / totalBatches).toLocaleString();
+      const avgAnswerText = Math.round((answerTokens || 0) / totalBatches).toLocaleString();
+      tokenUsageNoteEl.textContent = numCtx !== undefined
+        ? `Across ${totalBatches} batches, retrieval averaged ${avgPromptText} of your ${numCtx.toLocaleString()}-token Request size per call (${promptText} total); answers averaged ${avgAnswerText} tokens per call (${answerText} total).`
+        : `Across ${totalBatches} batches, retrieval averaged ${avgPromptText} tokens per call (${promptText} total); answers averaged ${avgAnswerText} tokens per call (${answerText} total).`;
+      return;
+    }
+
+    tokenUsageNoteEl.textContent = numCtx !== undefined
+      ? `Used ${promptText} of your ${numCtx.toLocaleString()}-token Request size for the prompt and retrieved material, plus ${answerText} more for the answer.`
+      : `The prompt and retrieved material used ${promptText} tokens; the answer used ${answerText} more.`;
+  }
+
+  /**
    * Runs one Best Practices comparison end to end: validates the
    * shared workspace field and the Hazard dropdown, then speaks
    * /query/stream's ndjson protocol directly (see this file's own doc
@@ -768,6 +878,32 @@
       ? rawAttributesPerCall
       : 1;
 
+    // Same purpose, same "sent as-is, no separate undefined-means-
+    // leave-alone meaning" treatment, and same up-front validation
+    // (rather than only server-side) as script.js's own submit
+    // handler -- see its own doc comment above the matching check for
+    // why blocking here, before the run even starts, matters: there's
+    // no server-configured fallback recipient, so a bad address
+    // wouldn't be caught until the whole comparison had already run
+    // to completion with nothing to show for the checkbox.
+    const notifyEmail = notifyEmailCheckbox.checked;
+    const notifyEmailTo = notifyEmailToInput.value.trim();
+    if (notifyEmail && !isValidEmailAddress(notifyEmailTo)) {
+      notifyEmailToErrorEl.textContent = notifyEmailTo
+        ? `"${notifyEmailTo}" doesn't look like a valid email address.`
+        : 'Enter an email address, or uncheck "Email me when this finishes".';
+      notifyEmailToErrorEl.style.display = 'block';
+      return;
+    }
+    notifyEmailToErrorEl.style.display = 'none';
+
+    // Captured once, right here, rather than re-read later -- see
+    // lastNumCtx's own doc comment for why renderBpTokenUsage() needs
+    // THIS run's actual value, not whatever the field shows by the
+    // time the run finishes.
+    const advancedSettings = getAdvancedSettings();
+    lastNumCtx = advancedSettings.numCtx;
+
     showError('');
     resultsBody.innerHTML = '';
     rowsRendered = 0;
@@ -777,6 +913,7 @@
     gotAnyToken = false;
     resultWrap.style.display = 'none';
     resultSummaryEl.textContent = '';
+    if (tokenUsageNoteEl) tokenUsageNoteEl.textContent = '';
     answerEl.textContent = '';
     answerDetailsEl.style.display = 'none';
     statusEl.textContent = 'Starting...';
@@ -809,6 +946,16 @@
           bestPracticesFilter: { hazards, states, jurisdictionGuidance, analysisGuidance },
           attributesPerCall,
           chatModel: getChatModel(),
+          // temperature/maxTokens/numCtx/repeatPenalty/think -- see
+          // getAdvancedSettings()'s own doc comment above for why
+          // these are read from the Query and Response tab's fields
+          // and why omitting this spread entirely (as this request
+          // body always did before) silently fell back to the model's
+          // own bare defaults rather than whatever Advanced Settings
+          // actually showed.
+          ...advancedSettings,
+          notifyEmail,
+          notifyEmailTo,
         }),
         signal: abortController.signal,
       });
@@ -884,6 +1031,11 @@
 
       // See lastExcludedDocuments's own doc comment above.
       lastExcludedDocuments = finalEvent.excludedDocuments || [];
+
+      // See renderBpTokenUsage()'s own doc comment above -- lastNumCtx
+      // was captured at the moment THIS run's request was actually
+      // sent, not re-read here.
+      renderBpTokenUsage(finalEvent.promptTokens, finalEvent.answerTokens, lastNumCtx, finalEvent.totalBatches);
 
       // Covers the same "no documents embedded yet" short-circuit
       // script.js's own answerEl handling guards against: "done" fires
@@ -979,6 +1131,17 @@
       // mode's export simply shows nothing extra, same as a workspace
       // run where nothing happens to be excluded.
       excludedDocuments: lastExcludedDocuments,
+      // temperature/maxTokens/numCtx/repeatPenalty/think -- same live
+      // re-read at export time as every other field in this object
+      // (see this function's own doc comment above), via the same
+      // getAdvancedSettings() helper runComparison() uses to build the
+      // actual request. Lets formatSettingsChips()/formatBatchSummary()
+      // in reportHtml.js render the "Settings" row and each batch's
+      // "used X of your Y-token Request size" line for a Best
+      // Practices export, same as they already do for the Query and
+      // Response tab's own export -- neither ever showed up here
+      // before, since this tab never tracked these settings at all.
+      ...getAdvancedSettings(),
     };
   }
 
@@ -1050,6 +1213,7 @@
     answerEl = document.getElementById('bpAnswer');
     resultWrap = document.getElementById('bpResultWrap');
     resultSummaryEl = document.getElementById('bpResultSummary');
+    tokenUsageNoteEl = document.getElementById('bpTokenUsageNote');
     resultsBody = document.getElementById('bpResultsBody');
     chatModelNoteEl = document.getElementById('bpChatModelNote');
     downloadCsvBtn = document.getElementById('bpDownloadCsvBtn');
@@ -1058,6 +1222,9 @@
     showFullListBtn = document.getElementById('bpShowFullListBtn');
     previewListEl = document.getElementById('bpPreviewList');
     previewDetailEl = document.getElementById('bpPreviewDetail');
+    notifyEmailCheckbox = document.getElementById('bpNotifyEmail');
+    notifyEmailToInput = document.getElementById('bpNotifyEmailTo');
+    notifyEmailToErrorEl = document.getElementById('bpNotifyEmailToError');
 
     // Any element missing means this page doesn't have the Best
     // Practices panel at all (e.g. an older index.html) -- bail out
