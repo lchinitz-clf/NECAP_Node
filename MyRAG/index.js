@@ -683,6 +683,14 @@ app.get('/workspaces/:workspaceId/chunks/:chunkId', (req, res) => {
  * An unknown sourceFile isn't an error — it just comes back with an
  * empty `chunks` array, same "read-only summary, no such thing as a
  * 404 for an empty result" philosophy as GET .../documents above.
+ *
+ * Accepts an optional `?filter=` query parameter: when non-empty, only
+ * chunks whose text contains that string are returned (same
+ * case-insensitive, whitespace-blind matching already used for quote
+ * verification — see normalizeForQuoteMatch() in responseParser.js and
+ * listChunksForDocument()'s own doc comment in store.js). This lets
+ * the block dropdown narrow itself to blocks containing specific text
+ * without ever sending full chunk text to the browser up front.
  */
 app.get('/workspaces/:workspaceId/documents/:sourceFile/chunks', (req, res) => {
   const { workspaceId, sourceFile } = req.params;
@@ -690,7 +698,7 @@ app.get('/workspaces/:workspaceId/documents/:sourceFile/chunks', (req, res) => {
   if (wsErr) return res.status(400).json({ error: wsErr });
 
   try {
-    const chunks = listChunksForDocument(workspaceId, sourceFile);
+    const chunks = listChunksForDocument(workspaceId, sourceFile, req.query.filter);
     res.json({ workspaceId, sourceFile, chunks });
   } catch (err) {
     console.error(err);

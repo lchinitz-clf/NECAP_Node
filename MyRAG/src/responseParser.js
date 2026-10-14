@@ -793,6 +793,26 @@ function chunkContainsOrderedPieces(haystack, pieces) {
  *   do — see buildRubricMatches() in src/idealProposals.js — so this
  *   is `undefined` for every ordinary retrieved-chunk citation).
  */
+/**
+ * The exact normalization resolveCitation() below uses to decide
+ * whether a model's quoted text and a chunk's stored text "match":
+ * case-insensitive and whitespace-blind (see the extended doc comment
+ * further below, right above the original inline definition this was
+ * extracted from, for the full rationale — stray mid-word spaces and
+ * line-wrap hyphens introduced by pdf-parse, plus chunker.js's own
+ * synthesized "[Context: ...]" lines). Exported so other features that
+ * want the SAME "does this text appear in this chunk, loosely" check —
+ * e.g. the Documents tab's chunk-text filter in store.js — reuse this
+ * one definition rather than re-implementing (and risking drifting
+ * from) these same rules.
+ */
+function normalizeForQuoteMatch(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\[context:[^\]\n]*\]/g, '')
+    .replace(/[\s-]+/g, '');
+}
+
 function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
 
@@ -900,10 +920,7 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   // principle be misreported as verified, judged far less likely in
   // practice than this genuine, repeatedly observed extraction
   // artifact.
-  const normalize = (s) => String(s || '')
-    .toLowerCase()
-    .replace(/\[context:[^\]\n]*\]/g, '')
-    .replace(/[\s-]+/g, '');
+  const normalize = normalizeForQuoteMatch;
 
   const rawPieces = splitQuoteOnEllipsis(quote);
   if (rawPieces.length === 0) return null; // e.g. the "quote" was just an ellipsis with nothing else
@@ -1205,6 +1222,7 @@ module.exports = {
   spliceVerifiedQuotes,
   verifyQuotesInPlace,
   resolveCitation,
+  normalizeForQuoteMatch,
   hasVerifiedQuote,
   splitQuoteOnEllipsis,
   VERDICT_ORDER,

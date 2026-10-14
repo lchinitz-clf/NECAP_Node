@@ -319,8 +319,9 @@ function requireWorkspace(errorEl) {
 // ---- Documents-in-workspace list ----
 
 let documentsWrap, documentsEmpty, documentsBody, documentsError, documentsExcludedNote;
-let blockLookupDocument, blockLookupIndex, blockLookupBtn, blockLookupError;
+let blockLookupDocument, blockLookupIndex, blockLookupBtn, blockLookupError, blockLookupFilter;
 let blockLookupChunks = []; // the currently-selected document's {chunkIndex, id} list, once loaded
+let blockLookupFilterDebounce = null; // same debounce-on-typing pattern as documentsDebounce below
 
 // Shows what's actually embedded (grouped by source filename) in
 // whatever workspace is currently entered above, with a Remove
@@ -581,10 +582,11 @@ async function saveDocumentIncluded(checkbox) {
 // Blocks column above, the block-view modal); "chunk" stays purely an
 // internal/API word, matching store.js and index.js.
 
-/** Clears both selects back to their empty/disabled starting state. */
+/** Clears both selects (and the text filter) back to their empty/disabled starting state. */
 function resetBlockLookup() {
   blockLookupDocument.innerHTML = '<option value="">Select a document…</option>';
   blockLookupDocument.disabled = true;
+  if (blockLookupFilter) blockLookupFilter.value = '';
   resetBlockLookupIndex();
   blockLookupError.style.display = 'none';
   blockLookupError.textContent = '';
@@ -621,7 +623,22 @@ function populateBlockLookupDocuments(documents) {
   }
 }
 
-/** Loads the block list for one document into the block select. */
+/**
+ * Loads the block list for one document into the block select.
+ *
+ * Also reads the optional text filter (#blockLookupFilter) and sends
+ * it along as a `?filter=` query parameter when non-blank, so the
+ * dropdown only offers block numbers whose text actually contains that
+ * string — matched server-side (see listChunksForDocument() in
+ * store.js) with the same case-insensitive, whitespace-blind rules
+ * already used for citation quote matching. A blank filter sends no
+ * parameter at all, which is exactly today's unfiltered behavior.
+ *
+ * Called both when the document changes (document dropdown's 'change'
+ * listener) and when the filter text changes (debounced 'input'
+ * listener on #blockLookupFilter, wired up in init() below) — either
+ * trigger just re-runs this with whatever's currently selected/typed.
+ */
 async function loadBlockLookupIndex(sourceFile) {
   resetBlockLookupIndex();
   if (!sourceFile) return;
@@ -632,16 +649,21 @@ async function loadBlockLookupIndex(sourceFile) {
   blockLookupIndex.innerHTML = '<option value="">Loading…</option>';
   blockLookupError.style.display = 'none';
 
+  const filterText = blockLookupFilter ? blockLookupFilter.value.trim() : '';
+  const query = filterText ? `?filter=${encodeURIComponent(filterText)}` : '';
+
   try {
     const res = await fetch(
-      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}/chunks`
+      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(sourceFile)}/chunks${query}`
     );
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
 
     blockLookupChunks = data.chunks;
     if (blockLookupChunks.length === 0) {
-      blockLookupIndex.innerHTML = '<option value="">No blocks found</option>';
+      blockLookupIndex.innerHTML = filterText
+        ? '<option value="">No blocks match that text</option>'
+        : '<option value="">No blocks found</option>';
       return;
     }
 
@@ -2737,6 +2759,7 @@ function init() {
   blockLookupIndex = document.getElementById('blockLookupIndex');
   blockLookupBtn = document.getElementById('blockLookupBtn');
   blockLookupError = document.getElementById('blockLookupError');
+  blockLookupFilter = document.getElementById('blockLookupFilter');
 
   deleteWorkspaceBtn = document.getElementById('deleteWorkspaceBtn');
   deleteWorkspaceStatus = document.getElementById('deleteWorkspaceStatus');
@@ -2868,6 +2891,16 @@ function init() {
 
   blockLookupDocument.addEventListener('change', () => {
     loadBlockLookupIndex(blockLookupDocument.value);
+  });
+
+  // Debounced on typing, same pattern as workspaceInput above — avoids
+  // firing a request on every keystroke while someone is still typing
+  // a filter phrase.
+  blockLookupFilter.addEventListener('input', () => {
+    clearTimeout(blockLookupFilterDebounce);
+    blockLookupFilterDebounce = setTimeout(() => {
+      loadBlockLookupIndex(blockLookupDocument.value);
+    }, 400);
   });
 
   blockLookupIndex.addEventListener('change', () => {

@@ -220,6 +220,15 @@ button:disabled { background: #a1a1aa; cursor: default; }
 
 .button-row { display: flex; gap: 0.6rem; align-items: center; }
 
+/* The "look up a block" panel's optional text filter, sitting in its
+   own .button-row next to the "View block" button (see index.html).
+   .button-row itself gives every child a fixed, content-sized width
+   via flex's default (flex: 0 1 auto), which is fine for a button but
+   would leave this text input at its unstyled default size (about 20
+   characters) — too narrow to usefully type a filter phrase into — so
+   it's grown to fill the remaining space instead. */
+#blockLookupFilter { flex: 1 1 auto; min-width: 180px; }
+
 .status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
 .error {
   display: none;

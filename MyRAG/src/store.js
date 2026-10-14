@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { storePath, ensureWorkspaceDir, uploadsDir } = require('./workspace');
+const { normalizeForQuoteMatch } = require('./responseParser');
 
 /**
  * @param {string} workspaceId
@@ -143,13 +144,37 @@ function getChunk(workspaceId, chunkId) {
  * what store.json actually contains (e.g. after a partial delete or a
  * store hand-edited outside this app).
  *
+ * An optional `filterText` narrows the result to only chunks whose
+ * stored `text` contains that string — used by the Documents tab's
+ * "View block" lookup to let a user find a block by content instead of
+ * paging through every index by hand. The comparison deliberately
+ * reuses normalizeForQuoteMatch() from responseParser.js — the exact
+ * same case-insensitive, whitespace-blind normalization already
+ * applied when checking whether a model's quoted text appears in a
+ * chunk (see resolveCitation() there) — rather than a fresh plain
+ * `.includes()`, so this filter tolerates the same real PDF-extraction
+ * artifacts (stray mid-word spaces, line-wrap hyphens) that quote
+ * verification already has to tolerate; a user typing a phrase exactly
+ * as it reads in the source document should find it even if pdf-parse
+ * introduced a stray space or hyphen partway through a word in the
+ * stored chunk. `text` is still never included in the returned shape —
+ * only used internally here to decide which chunks to keep — so this
+ * doesn't change the deliberate bandwidth-conscious design described
+ * above (callers still fetch a specific chunk's full text on demand
+ * via getChunk()).
+ *
  * @param {string} workspaceId
  * @param {string} sourceFile
+ * @param {string} [filterText] - when non-empty, only chunks whose text
+ *   contains this (after normalizeForQuoteMatch()) are returned
  * @returns {Array<{chunkIndex: number, id: string}>}
  */
-function listChunksForDocument(workspaceId, sourceFile) {
+function listChunksForDocument(workspaceId, sourceFile, filterText) {
+  const trimmedFilter = String(filterText || '').trim();
+  const normalizedFilter = trimmedFilter ? normalizeForQuoteMatch(trimmedFilter) : '';
   return loadStore(workspaceId)
     .filter((r) => r.sourceFile === sourceFile)
+    .filter((r) => !normalizedFilter || normalizeForQuoteMatch(r.text).includes(normalizedFilter))
     .map((r) => ({ chunkIndex: r.chunkIndex, id: r.id }))
     .sort((a, b) => a.chunkIndex - b.chunkIndex);
 }

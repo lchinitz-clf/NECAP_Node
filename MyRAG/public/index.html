@@ -161,7 +161,21 @@
             </select>
           </div>
         </div>
-        <button type="button" id="blockLookupBtn" class="btn-secondary" disabled>View block</button>
+        <div class="button-row">
+          <input
+            type="text"
+            id="blockLookupFilter"
+            placeholder="Filter blocks by text (optional)…"
+            aria-label="Filter blocks by text"
+          />
+          <button type="button" id="blockLookupBtn" class="btn-secondary" disabled>View block</button>
+        </div>
+        <p class="hint">
+          Type in the filter to narrow the "Block" list above to only
+          blocks containing that text (case-insensitive,
+          whitespace-blind — same matching used for citation quotes).
+          Leave it blank to see every block.
+        </p>
         <p class="error" id="blockLookupError"></p>
       </div>
 
