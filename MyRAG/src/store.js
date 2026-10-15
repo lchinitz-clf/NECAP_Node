@@ -149,15 +149,21 @@ function getChunk(workspaceId, chunkId) {
  * "View block" lookup to let a user find a block by content instead of
  * paging through every index by hand. The comparison deliberately
  * reuses normalizeForQuoteMatch() from responseParser.js — the exact
- * same case-insensitive, whitespace-blind normalization already
- * applied when checking whether a model's quoted text appears in a
- * chunk (see resolveCitation() there) — rather than a fresh plain
- * `.includes()`, so this filter tolerates the same real PDF-extraction
- * artifacts (stray mid-word spaces, line-wrap hyphens) that quote
- * verification already has to tolerate; a user typing a phrase exactly
- * as it reads in the source document should find it even if pdf-parse
- * introduced a stray space or hyphen partway through a word in the
- * stored chunk. `text` is still never included in the returned shape —
+ * same case-insensitive, whitespace- and punctuation-blind
+ * normalization already applied when checking whether a model's
+ * quoted text appears in a chunk (see resolveCitation() and
+ * normalizeForQuoteMatch()'s own doc comment there) — rather than a
+ * fresh plain `.includes()`, so this filter tolerates the same real
+ * PDF-extraction artifacts (stray mid-word spaces, line-wrap hyphens,
+ * smart vs. straight quotes) that quote verification already has to
+ * tolerate; a user typing a phrase exactly as it reads in the source
+ * document should find it even if pdf-parse introduced a stray space
+ * or hyphen partway through a word in the stored chunk, or the
+ * document used a curly apostrophe the user types as a plain one.
+ * Punctuation touching a digit is still compared exactly (see that
+ * same doc comment), so filtering by a number still distinguishes
+ * e.g. "2.02" from "202". `text` is still never included in the
+ * returned shape —
  * only used internally here to decide which chunks to keep — so this
  * doesn't change the deliberate bandwidth-conscious design described
  * above (callers still fetch a specific chunk's full text on demand

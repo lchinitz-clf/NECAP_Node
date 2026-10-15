@@ -795,131 +795,123 @@ function chunkContainsOrderedPieces(haystack, pieces) {
  */
 /**
  * The exact normalization resolveCitation() below uses to decide
- * whether a model's quoted text and a chunk's stored text "match":
- * case-insensitive and whitespace-blind (see the extended doc comment
- * further below, right above the original inline definition this was
- * extracted from, for the full rationale — stray mid-word spaces and
- * line-wrap hyphens introduced by pdf-parse, plus chunker.js's own
- * synthesized "[Context: ...]" lines). Exported so other features that
- * want the SAME "does this text appear in this chunk, loosely" check —
- * e.g. the Documents tab's chunk-text filter in store.js — reuse this
- * one definition rather than re-implementing (and risking drifting
- * from) these same rules.
+ * whether a model's quoted text and a chunk's stored text "match".
+ * Exported so other features that want the SAME "does this text
+ * appear in this chunk, loosely" check — e.g. the Documents tab's
+ * chunk-text filter in store.js — reuse this one definition rather
+ * than re-implementing (and risking drifting from) these same rules.
+ *
+ * Case-insensitive, whitespace-blind, and punctuation-blind, with one
+ * deliberate exception for punctuation touching a digit. In order:
+ *
+ * 1. Whitespace-BLIND: every whitespace character (space, tab,
+ *    newline) is stripped out entirely, not just collapsed, so two
+ *    strings that agree on every non-whitespace character but
+ *    disagree on exactly where the whitespace falls are treated as
+ *    identical. This exists because of a real, repeatedly observed
+ *    PDF-extraction artifact: pdf-parse occasionally inserts a stray
+ *    space in the middle of an ordinary word, with no relation to
+ *    hyphenation or line wrapping at all — confirmed against real
+ *    chunk text as "Long-te rm" (for "Long-term"), "Ic e" (for "Ice"),
+ *    "re al-ti me" (for "real-time"), "re ly" (for "rely"), and
+ *    "st orm" (for "storm"), all from the same single retrieved
+ *    chunk. A model quoting the same passage naturally writes the
+ *    word the normal way, with no stray space, since that's how the
+ *    word actually reads — so what should be an exact, verbatim quote
+ *    was instead coming back "NOT found verbatim in any retrieved
+ *    chunk" purely because of where pdf-parse happened to split a
+ *    word, not because of anything wrong with the quote.
+ *
+ * 2. "[Context: ...]" marker stripping: also strips any synthesized
+ *    "[Context: ...]" line chunker.js may have inserted INSIDE the
+ *    chunk's own text (see addContextLineIfNeeded() there) — a real,
+ *    observed case: a single source block too long to fit in one
+ *    chunk gets split (wordSplit() in chunker.js, or an unmerged
+ *    mid-sentence line wrap — see looksLikeContinuation()'s doc
+ *    comment in structuredText.js) with the cut landing mid-sentence,
+ *    and the new chunk opened by that split gets its own context line
+ *    prepended ahead of the sentence's remainder, since nothing about
+ *    where a block happens to get cut tells addContextLineIfNeeded()
+ *    it's splitting a sentence rather than starting a new one. The
+ *    result is a chunk whose literal text reads "...continue to
+ *    keep\n\n[Context: Energy Strategy (CES)]\n\npace with
+ *    adopting..." — a completely genuine, contiguous sentence in the
+ *    source document, but with this synthesized line's characters
+ *    physically sitting in the middle of it, which defeated verbatim
+ *    matching even with whitespace already stripped (the bracketed
+ *    text itself survives whitespace-only stripping; this is a
+ *    second, separate artifact on top of that one). This step runs
+ *    BEFORE the punctuation stripping below, while "[", "]" and ":"
+ *    are still literal characters the regex can match — reversing the
+ *    order would destroy the very markers this step looks for.
+ *
+ * 3. Punctuation- and symbol-BLIND, except when touching a digit: strips
+ *    Unicode punctuation (\p{P} — commas, periods, colons, quotes,
+ *    parens, hyphens, bullets like "•") and symbol characters (\p{S} —
+ *    currency signs, other bullet glyphs PDFs use such as "▪"/"◦"),
+ *    but ONLY when that character is not immediately adjacent to a
+ *    digit on either side. Covers two more real, observed gaps beyond
+ *    the whitespace case above:
+ *      - Smart/curly quotes vs. straight ones: source PDFs commonly
+ *        use a typographic apostrophe (’, U+2019) or curly quotes
+ *        (“ ”), while a model reproducing a quote typically retypes
+ *        it with a plain ASCII ' or ". A single such character,
+ *        anywhere in an otherwise-perfect quote, used to fail the
+ *        whole match.
+ *      - Bulleted list items rendered as comma-joined prose: a model
+ *        asked to quote a bulleted list commonly reproduces every
+ *        word in order but swaps each "• " list-item boundary for an
+ *        ordinary ", " the way prose would read — still a genuinely
+ *        verbatim, word-for-word excerpt (optionally truncated early,
+ *        which doesn't itself hurt matching), just restructured
+ *        punctuation at each boundary. Hyphens fold into this same
+ *        general rule rather than being a separate always-strip case
+ *        as before — mechanically the same fix as the line-wrap
+ *        hyphen case this replaces ("...up to 18 sto- ries tall."
+ *        reading as "sto-ries" one character off from "stories"),
+ *        just generalized to any punctuation mark, not only "-".
+ *    The digit exception exists because, unlike ordinary words,
+ *    punctuation around digits is often load-bearing for which real
+ *    number it is: stripping it unconditionally would make "$2,800"
+ *    and "$28.00" (or "Action 2.02" and "202") normalize to the same
+ *    digit string, even though they're different figures/identifiers.
+ *    That would make the matcher confirm a quote that cites a
+ *    DIFFERENT number as "✓ verified" against a chunk's real one — a
+ *    false positive strictly worse than today's "⚠ not found", since
+ *    it actively tells a reviewer a wrong number can be trusted. The
+ *    exception is applied via a single character's immediate left/right
+ *    neighbor, not "sandwiched between digits ignoring whitespace", so
+ *    on the rare edge case where that's ambiguous (e.g. a sentence
+ *    ending right before a number, "page 2. 5 counties...") it leans
+ *    toward KEEPING the punctuation rather than stripping it — the
+ *    same safe-by-default direction as the digit exception itself.
+ *
+ * Known false-positive risk, accepted deliberately for 1 and 3 (same
+ * tradeoff class as looksLikeContinuation() in structuredText.js):
+ * because whitespace and most punctuation no longer mark a boundary at
+ * all once stripped, a FABRICATED quote formed by jamming together
+ * text that was never adjacent in the chunk (e.g. writing "catfish"
+ * when the chunk actually has "...the cat. Fish...") could in
+ * principle be misreported as verified. This is judged far less likely
+ * in practice than the genuine extraction artifacts above, and the
+ * digit exception specifically closes off the one sub-case
+ * (numbers/identifiers) where this risk was judged too costly to
+ * accept — see the reasoning above.
  */
 function normalizeForQuoteMatch(s) {
   return String(s || '')
     .toLowerCase()
     .replace(/\[context:[^\]\n]*\]/g, '')
-    .replace(/[\s-]+/g, '');
+    .replace(/(?<!\d)[\p{P}\p{S}](?!\d)/gu, '')
+    .replace(/\s+/g, '');
 }
 
 function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
   if (!quote || !matches || matches.length === 0) return null;
 
-  // Whitespace-BLIND matching: every whitespace character (space, tab,
-  // newline) is stripped out entirely, not just collapsed, so two
-  // strings that agree on every non-whitespace character but disagree
-  // on exactly where the whitespace falls are treated as identical.
-  // This exists because of a real, repeatedly observed PDF-extraction
-  // artifact: pdf-parse occasionally inserts a stray space in the
-  // middle of an ordinary word, with no relation to hyphenation or line
-  // wrapping at all — confirmed against real chunk text as "Long-te rm"
-  // (for "Long-term"), "Ic e" (for "Ice"), "re al-ti me" (for
-  // "real-time"), "re ly" (for "rely"), and "st orm" (for "storm"), all
-  // from the same single retrieved chunk. A model quoting the same
-  // passage naturally writes the word the normal way, with no stray
-  // space, since that's how the word actually reads — so what should be
-  // an exact, verbatim quote was instead coming back "NOT found
-  // verbatim in any retrieved chunk" purely because of where pdf-parse
-  // happened to split a word, not because of anything wrong with the
-  // quote.
-  //
-  // An earlier version of this function only collapsed repeated
-  // whitespace into one space and separately special-cased a stray
-  // space right after a hyphen ("sea- level" -> "sea-level"). That
-  // narrower fix covered a word broken at a real hyphen but not one
-  // broken anywhere else in the word (exactly the "Ic e" / "re ly"
-  // shape above), so it's replaced here by stripping whitespace
-  // unconditionally. (That old hyphen-specific replace turned out not
-  // to be fully redundant after all, just incomplete in a different
-  // way than first assumed — see the hyphen-stripping addition
-  // further below, which goes one step past it.)
-  //
-  // Known false-positive risk, accepted deliberately (same tradeoff
-  // class as looksLikeContinuation() in structuredText.js): because
-  // whitespace no longer marks a word boundary at all once both sides
-  // are stripped, a FABRICATED quote formed by jamming two real
-  // adjacent words together (e.g. writing "catfish" when the chunk
-  // actually has "...the cat. Fish..." elsewhere) could in principle
-  // be misreported as verified. This is judged far less likely in
-  // practice than the genuine extraction artifact above, and it's a
-  // strict broadening of a risk this function already accepted for the
-  // hyphen case specifically — see this function's own doc comment.
-  //
-  // Also strips any synthesized "[Context: ...]" line chunker.js may
-  // have inserted INSIDE the chunk's own text (see
-  // addContextLineIfNeeded() there) — a real, observed case: a single
-  // source block too long to fit in one chunk gets split (wordSplit()
-  // in chunker.js, or an unmerged mid-sentence line wrap — see
-  // looksLikeContinuation()'s doc comment in structuredText.js) with
-  // the cut landing mid-sentence, and the new chunk opened by that
-  // split gets its own context line prepended ahead of the sentence's
-  // remainder, since nothing about where a block happens to get cut
-  // tells addContextLineIfNeeded() it's splitting a sentence rather
-  // than starting a new one. The result is a chunk whose literal text
-  // reads "...continue to keep\n\n[Context: Energy Strategy (CES)]\n\npace
-  // with adopting..." — a completely genuine, contiguous sentence in
-  // the source document, but with this synthesized line's characters
-  // physically sitting in the middle of it, which defeated verbatim
-  // matching even with whitespace already stripped (the bracketed text
-  // itself survives whitespace-only stripping; this is a second,
-  // separate artifact on top of that one). `path` here can contain any
-  // text a document's own headings have (including, in principle, a
-  // literal ")" or other punctuation), so this only needs to match the
-  // fixed "[Context: ...]" wrapper chunker.js always uses, not try to
-  // reconstruct or validate the heading path itself; chunker.js builds
-  // each one as a single line via formatHeadingPath() (no raw newline
-  // in the middle), so excluding "]" and newlines from the inner
-  // class is enough to match exactly one synthesized line at a time
-  // without ever over-matching across two separate ones.
-  //
-  // Also strips every ASCII hyphen ("-"), not just the whitespace
-  // around one — another real, observed PDF-extraction artifact,
-  // distinct from both of the above: pdf-parse preserves the source
-  // PDF's own end-of-line hyphenation marks as literal "-" characters,
-  // e.g. "...up to 18 sto- ries tall." for a page that printed
-  // "sto-" at the end of one line and "ries" at the start of the
-  // next. Once the whitespace around it is stripped (as it already
-  // is, above), that leaves "sto-ries" in the chunk text — one
-  // character off from the real word "stories," which is of course
-  // how a model quoting the same sentence actually writes it, since
-  // "stories" is the correct word and the hyphen was never part of it
-  // to begin with, just a PDF line-wrap artifact. An earlier version
-  // of this function tried to special-case exactly this shape ("sea-
-  // level" -> "sea-level," collapsing the space but keeping the
-  // hyphen) on the theory that the hyphen itself was never the
-  // problem — but that's only true for a GENUINE hyphenated compound
-  // word, where the model's own quote keeps the hyphen too; it's
-  // false for this line-wrap case, where the hyphen itself is exactly
-  // the extraction noise and the real word has none at all. Since a
-  // chunk's raw text alone can't distinguish "sto-ries" (artifact,
-  // hyphen should vanish) from a genuine compound like "well-being"
-  // (real hyphen, should stay) — both are just letters-hyphen-letters
-  // with no surrounding whitespace once the earlier strip above has
-  // already run — the only way to fix the line-wrap case is to strip
-  // hyphens unconditionally, the same blanket approach already taken
-  // for whitespace above. This is harmless for a genuine compound
-  // word specifically because normalize() is applied identically to
-  // both the quote and the chunk text: "well-being" and "wellbeing"
-  // still end up equal to each other either way, so a real compound
-  // word quoted verbatim (hyphen and all) still matches just fine.
-  // Same accepted-risk category as the whitespace-blind matching
-  // above (and explicitly a broadening of the risk already accepted
-  // for the hyphen case specifically) — a fabricated quote that
-  // happens to jam two real hyphen-separated words together could in
-  // principle be misreported as verified, judged far less likely in
-  // practice than this genuine, repeatedly observed extraction
-  // artifact.
+  // See normalizeForQuoteMatch()'s doc comment above for exactly what
+  // "matches" means here: case-insensitive, whitespace-blind, and
+  // punctuation-blind except around digits.
   const normalize = normalizeForQuoteMatch;
 
   const rawPieces = splitQuoteOnEllipsis(quote);
