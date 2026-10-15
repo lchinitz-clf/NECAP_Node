@@ -818,7 +818,7 @@ async function embedWithProgress(workspaceId, file, maxWords, overlapWords, onEv
 
 let queryForm, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, confidenceNote, tokenUsageNote, retrievalQueryNote;
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
-let thinkCheckbox, reasoningWrap, reasoningEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
+let thinkCheckbox, reasoningWrap, reasoningEl, reasoningSummaryEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
 let retryNotAddressedCheckbox;
 let attributeResultsWrap, attributeResultsBody, downloadCsvBtn, downloadHtmlBtn;
 
@@ -2800,6 +2800,10 @@ function init() {
   notifyEmailToError = document.getElementById('notifyEmailToError');
   reasoningWrap = document.getElementById('reasoningWrap');
   reasoningEl = document.getElementById('reasoningEl');
+  // The <summary> itself, so its label can be rewritten per batch (see
+  // the 'sources' event handler below) without disturbing the
+  // <details> element's own open/closed state.
+  reasoningSummaryEl = reasoningWrap.querySelector('summary');
 
   attributeResultsWrap = document.getElementById('attributeResultsWrap');
   attributeResultsBody = document.getElementById('attributeResultsBody');
@@ -3378,6 +3382,7 @@ function init() {
     lengthNote.textContent = '';
     elapsedTimeEl.textContent = '';
     reasoningEl.textContent = '';
+    reasoningSummaryEl.textContent = 'Show reasoning'; // batch suffix (if any) gets re-added per batch below, once totalBatches is known
     reasoningWrap.style.display = 'none';
     reasoningWrap.open = false; // collapsed by default each new query, regardless of whether it was left open last time
     latestBatches = [];
@@ -3547,6 +3552,25 @@ function init() {
             answerEl.textContent += '\n\n———\n\n';
           }
           addSources(event.sources);
+
+          // Reasoning is handled the OPPOSITE way from the answer text
+          // just above: cleared here at the start of every batch
+          // (including the first) rather than accumulated with a
+          // separator. A multi-batch rubric/best-practices comparison
+          // reuses the same chat model, and therefore the same 'think'
+          // setting, across every batch, so if one batch streams a
+          // reasoning trace the rest typically do too — and those
+          // traces are often substantial on their own, so concatenating
+          // several together (the old behavior) produced one giant,
+          // hard-to-navigate blob spanning unrelated attribute subsets
+          // rather than anything someone could actually read. Showing
+          // only the CURRENT (or, once the run ends, the LAST) batch's
+          // reasoning trades away that history in exchange for the box
+          // staying a readable size and actually describing the batch
+          // it's labeled as — see the relabeled summary text below,
+          // which is what now tells you which batch you're looking at.
+          reasoningEl.textContent = '';
+          reasoningSummaryEl.textContent = `Show reasoning${batchSuffix(event)}`;
 
           // Shows exactly what text was embedded to retrieve this
           // batch's sources — the fastest way to check, directly in
