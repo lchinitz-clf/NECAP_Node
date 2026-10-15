@@ -78,12 +78,12 @@
         {
           "name": "IF9 - Policy and Regulatory Implementation - Zoning",
           "proposal": "Does the plan propose zoning reforms to discourage or prevent development within floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF9A",
           "proposal": "Does the plan offer technical assistance or incentives to municipalities for developing zoning reforms that prevent development in floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF10 - Policy and Regulatory Implementation - Regulatory",
@@ -158,87 +158,87 @@
         {
           "name": "IF22 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
           "proposal": "What strategies will be used to protect or restore floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF22A",
           "proposal": "Does the plan create a program for protecting or restoring floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF22B",
-          "proposal": "Does the plan create regulatory requirements for protecting or restoring floodplains?",
+          "proposal": "The plan shall create regulatory requirements for protecting or restoring floodplains.",
           "included": true
         },
         {
           "name": "IF22C",
           "proposal": "Does the plan fund protecting or restoring floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF22D",
-          "proposal": "In terms of protecting or restoring floodplains, the plan should: create a specific plan, create regulatory requirements, and identify specific funding mechanisms.",
+          "proposal": "In terms of protecting or restoring floodplains, the document shall create a specific plan, should create regulatory requirements, and shall identify specific funding mechanisms.",
           "included": true
         },
         {
           "name": "IF23 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
           "proposal": "What strategies will be used to repair or remove dams at risk of failure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF23A",
           "proposal": "Does the plan create a program for repairing or removing dams at risk of failure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF23B",
           "proposal": "Does the plan create regulatory requirements for repairing or removing dams at risk of failure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF23C",
           "proposal": "Does the plan fund repairing or removing dams at risk of failure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF24 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
           "proposal": "Does the plan create or protect riparian buffers?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF24A",
           "proposal": "Does the plan create a program for protecting riparian buffers?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF24B",
           "proposal": "Does the plan create regulatory requirements for protecting riparian buffers?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF24C",
           "proposal": "Does the plan fund the protection of riparian buffers?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF25 - Adaptation Strategies & Long-Term Actions - Flooding Mitigation",
           "proposal": "Does the plan encourage the use of green infrastructure to reduce runoff?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF25A",
           "proposal": "Does the plan create a program for encouraging the use of green infrastructure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF25B",
           "proposal": "Does the plan create regulatory requirements for the use of green infrastructure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF25C",
           "proposal": "Does the plan fund the increased use of green infrastructure?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF25D",
@@ -248,112 +248,112 @@
         {
           "name": "IF26 - Adaptation Strategies & Long-Term Actions - Buyouts",
           "proposal": "Does the plan offer voluntary buyouts or relocation assistance to people living in floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF26A",
           "proposal": "Does the plan create a program for voluntary buyouts or relocation assistance to people living in floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF26B",
           "proposal": "Does the plan create regulatory requirements for voluntary buyouts or relocation assistance to people living in floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF26C",
           "proposal": "Does the plan fund voluntary buyouts or relocation assistance to people living in floodplains?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF27 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "Does that plan reduce flooding risk by elevating structures, utilities, and roads?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF27A",
           "proposal": "Does the plan create a program for elevating structures, utilities, and roads?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF27B",
           "proposal": "Does the plan create regulatory requirements elevating structures, utilities, and roads?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF27C",
           "proposal": "Does the plan fund the elevation structures, utilities, and roads?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF28 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "Does the plan explicitly address flooding risks to drinking water and wastewater utilities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF28A",
           "proposal": "Does the plan create a program for reducing flooding risks to drinking water and wastewater utilities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF28B",
           "proposal": "Does the plan create regulatory requirements for reducing flooding risks to drinking water and wastewater utilities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF28C",
           "proposal": "Does the plan fund measures to reduce flooding risks to drinking water and wastewater utilities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF29 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "Does the plan address the impact of flooding on combined sewer overflows (CSOs)?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF29A",
           "proposal": "Does the plan create a program for reducing the impact of flooding on combined sewer overflows (CSOs)?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF29B",
           "proposal": "Does the plan create regulatory requirements for reducing the impact of flooding on combined sewer overflows (CSOs)?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF29C",
           "proposal": "Does the plan fund measures to reduce the impact of flooding on combined sewer overflows (CSOs)?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF30 - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "How does the plan address disproportionate risk of flooding in low-income communities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF30A",
           "proposal": "Does the plan ensure equity in funding of measures to reduce the risk of flooding in low-income communities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF30B",
           "proposal": "Does the plan ensure equity in the availability of technical assistance to reduce the risk of flooding in low-income communities?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF31 - Equity & Environmental Justice - Community Outreach",
           "proposal": "What community engagement processes does the plan require for resilience strategies for inland flooding?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF31A",
           "proposal": "Does the plan require ongoing community engagement in advance of future plans for resilience to inland flooding?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF31B",
           "proposal": "Was the community engaged specifically to discuss resilience strategies related to inland or stormwater flooding?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF32 - Equity & Environmental Justice - Community Outreach",
@@ -388,17 +388,17 @@
         {
           "name": "IF38 - Accountability & Governance - Costs",
           "proposal": "Does the plan estimate the cost of proposed inland flooding resilience actions?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF38B",
           "proposal": "What estimates are there for funding requirements?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF38C",
           "proposal": "What estimates are there for funding requirements related to inland flooding or stormwater flooding strategies?",
-          "included": true
+          "included": false
         },
         {
           "name": "IF39 - Accountability & Governance - Funding and financing",
@@ -412,7 +412,7 @@
         }
       ],
       "description": "Policy proposals for inland flooding.",
-      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
       "id": "coastal-resilience",
