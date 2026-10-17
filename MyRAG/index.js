@@ -39,6 +39,7 @@ const { getAllDescriptions, setDescription, deleteDescription, getExcludedSource
 const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
 const { basicAuth, resolveRole } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
+const appLock = require('./src/appLock');
 
 const app = express();
 
@@ -80,12 +81,133 @@ app.get('/health', (req, res) => {
  * This route just hands that back, plus the role it resolves to
  * (resolveRole() in src/basicAuth.js, built from the AUTH_ROLES env
  * var — see that file for the full username->role design and its
- * "no server-side enforcement yet" caveat). No other route changes
- * behavior based on role; this is purely so the page can decide what
- * to show.
+ * "no server-side enforcement yet" caveat). Every route below this
+ * one still follows that caveat EXCEPT POST /lock-status/force-unlock
+ * further down, which is the first real, server-enforced role check
+ * in this app — see its own doc comment for why that one specifically
+ * earned a real boundary rather than staying a UI-only nicety.
  */
 app.get('/auth/me', (req, res) => {
   res.json({ user: req.authUser || null, role: resolveRole(req.authUser) });
+});
+
+/**
+ * The whole-application lock discussed in src/appLock.js's own
+ * top-of-file comment — read that first for WHY this exists. This is
+ * just the HTTP surface: a middleware every locking route below opts
+ * into, plus the two routes that let the browser find out the lock's
+ * state and, for an admin, clear a stuck one.
+ *
+ * `req.authUser` (set by basicAuth() above when Basic Auth is
+ * configured; undefined otherwise) is what gets shown as the lock's
+ * holder. "unknown" is the deliberate fallback for an unauthenticated
+ * deployment — there's no real identity to show in that case, but
+ * "locked by unknown" still correctly communicates "something is
+ * running," which is the whole point.
+ */
+function lockGate(req, res, next) {
+  const result = appLock.tryAcquire(req.authUser || 'unknown');
+  if (!result.ok) {
+    return res.status(409).json({
+      error: `Locked by ${result.status.user} — try again once their query or change finishes.`,
+      lockedBy: result.status.user,
+      since: result.status.since,
+    });
+  }
+
+  // Released on EITHER event below, not just one — 'finish' covers an
+  // ordinary completed response, 'close' covers a client disconnecting
+  // mid-request (same event /query/stream already listens for to
+  // cancel its own in-flight Ollama call on Stop — see that route
+  // further down). Both can fire for the same request, so this guards
+  // against releasing twice with its own flag rather than relying on
+  // appLock.release()'s token check alone to make that safe (it IS
+  // safe either way — release() is idempotent — but this avoids ever
+  // calling it redundantly at all).
+  let released = false;
+  const releaseOnce = () => {
+    if (released) return;
+    released = true;
+    appLock.release(result.token);
+  };
+  res.on('finish', releaseOnce);
+  res.on('close', releaseOnce);
+
+  next();
+}
+
+/**
+ * GET /lock-status/stream
+ *
+ * Server-Sent Events: pushes the current lock status the instant a
+ * tab connects, then again every time it changes, for as long as the
+ * tab stays open. Deliberately NOT a plain polled GET — see this
+ * feature's own design discussion for why SSE was chosen over both
+ * polling (would mean every open tab hitting the server every few
+ * seconds, forever) and a full WebSocket (bidirectional, needs its
+ * own reconnection handling; this only ever needs to push one
+ * direction, so the browser's built-in EventSource — which
+ * reconnects on its own with zero extra code — is the better fit).
+ *
+ * A periodic comment-only heartbeat keeps the connection alive through
+ * any intermediary (proxy, load balancer) that might otherwise time out
+ * a long-idle connection — purely a transport-level nicety; EventSource
+ * would reconnect and recover anyway if one ever got dropped.
+ */
+app.get('/lock-status/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // tells nginx (if this is ever proxied through one) not to buffer this response
+  });
+  res.flushHeaders();
+
+  const send = (status) => {
+    res.write(`data: ${JSON.stringify(status)}\n\n`);
+  };
+  const unsubscribe = appLock.subscribe(send);
+
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
+
+/**
+ * POST /lock-status/force-unlock
+ *
+ * The manual escape hatch for a lock stuck with nothing actually
+ * running behind it — see forceUnlock()'s own doc comment in
+ * src/appLock.js for exactly what this does and does not do (it does
+ * NOT abort whatever request, if any, genuinely still holds the lock;
+ * it only clears the recorded status).
+ *
+ * This is the one route in the app that actually enforces a role
+ * server-side rather than leaving it as a UI-only nicety (contrast
+ * with the "no server-side enforcement yet" caveat on, e.g., PUT
+ * .../included above) — deliberately, because unlike hiding an
+ * editable field, this action can disrupt someone else's genuinely
+ * in-progress work, so it's worth a real boundary rather than relying
+ * on the button simply not being shown to a non-admin.
+ */
+app.post('/lock-status/force-unlock', (req, res) => {
+  if (resolveRole(req.authUser) !== 'admin') {
+    return res.status(403).json({ error: 'Only an admin can force-unlock.' });
+  }
+
+  const result = appLock.forceUnlock();
+  logAction({
+    req,
+    type: 'forceUnlock',
+    success: true,
+    details: { wasLocked: result.wasLocked, previousUser: result.previousUser },
+  });
+  res.json(appLock.getStatus());
 });
 
 /**
@@ -319,7 +441,7 @@ app.get('/ideal-proposals/:topicId', (req, res) => {
  * topic by id (a saved query, a script) keeps working even after its
  * label/description/attributes are edited.
  */
-app.post('/ideal-proposals', (req, res) => {
+app.post('/ideal-proposals', lockGate, (req, res) => {
   const { id, label, description, attributes, compareInstruction } = req.body || {};
 
   if (!isValidTopicId(id)) {
@@ -365,7 +487,7 @@ app.post('/ideal-proposals', (req, res) => {
  * state of that rubric, so a save from it should leave the topic with
  * exactly those attributes, not the union of old and new.
  */
-app.put('/ideal-proposals/:topicId', (req, res) => {
+app.put('/ideal-proposals/:topicId', lockGate, (req, res) => {
   const { topicId } = req.params;
   if (!isValidTopicId(topicId)) return res.status(400).json({ error: 'Invalid topic id' });
 
@@ -403,7 +525,7 @@ app.put('/ideal-proposals/:topicId', (req, res) => {
  * step server-side, same convention as DELETE /workspaces/:workspaceId
  * — the browser UI asks before ever sending this request.
  */
-app.delete('/ideal-proposals/:topicId', (req, res) => {
+app.delete('/ideal-proposals/:topicId', lockGate, (req, res) => {
   const { topicId } = req.params;
   if (!isValidTopicId(topicId)) return res.status(400).json({ error: 'Invalid topic id' });
 
@@ -480,7 +602,7 @@ app.post('/ideal-proposals/xlsx-inspect', (req, res) => {
  * explicit Save, which goes through POST or PUT /ideal-proposals
  * above and always fully replaces whatever attribute list was there.
  */
-app.post('/ideal-proposals/import-xlsx', (req, res) => {
+app.post('/ideal-proposals/import-xlsx', lockGate, (req, res) => {
   uploadXlsx.single('file')(req, res, async (uploadErr) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded (expected form field "file")' });
@@ -564,7 +686,7 @@ app.get('/workspaces/:workspaceId/documents', (req, res) => {
  * doing if this ever needs to be a real boundary rather than a UI
  * nicety.
  */
-app.put('/workspaces/:workspaceId/documents/:sourceFile/description', (req, res) => {
+app.put('/workspaces/:workspaceId/documents/:sourceFile/description', lockGate, (req, res) => {
   const { workspaceId, sourceFile } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -608,7 +730,7 @@ app.put('/workspaces/:workspaceId/documents/:sourceFile/description', (req, res)
  * every person who queries this workspace afterward, not just the
  * person who unchecked it.
  */
-app.put('/workspaces/:workspaceId/documents/:sourceFile/included', (req, res) => {
+app.put('/workspaces/:workspaceId/documents/:sourceFile/included', lockGate, (req, res) => {
   const { workspaceId, sourceFile } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -726,7 +848,7 @@ app.get('/workspaces/:workspaceId/documents/:sourceFile/chunks', (req, res) => {
  * these happened. See the comment on deleteDocument() in store.js for
  * the full reasoning and the path-containment guardrail around it.
  */
-app.delete('/workspaces/:workspaceId/documents/:sourceFile', (req, res) => {
+app.delete('/workspaces/:workspaceId/documents/:sourceFile', lockGate, (req, res) => {
   const { workspaceId, sourceFile } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -766,7 +888,7 @@ app.delete('/workspaces/:workspaceId/documents/:sourceFile', (req, res) => {
  * browser UI asks before ever sending this request, and a script/API
  * caller is expected to have already decided.
  */
-app.delete('/workspaces/:workspaceId', (req, res) => {
+app.delete('/workspaces/:workspaceId', lockGate, (req, res) => {
   const { workspaceId } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -816,7 +938,7 @@ app.delete('/workspaces/:workspaceId', (req, res) => {
  * an error here means the rebuild didn't happen, not that it happened
  * incompletely.
  */
-app.post('/workspaces/:workspaceId/rebuild-index', async (req, res) => {
+app.post('/workspaces/:workspaceId/rebuild-index', lockGate, async (req, res) => {
   const { workspaceId } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -909,7 +1031,7 @@ function parsePositiveIntField(value, fieldName) {
  * embedding it. filePath's extension picks the extractor — see
  * extract.js's SUPPORTED_EXTENSIONS (.pdf, .docx, .txt).
  */
-app.post('/ingest', async (req, res) => {
+app.post('/ingest', lockGate, async (req, res) => {
   const { filePath, maxWords, overlapWords } = req.body;
   if (!filePath) return res.status(400).json({ error: 'filePath is required' });
 
@@ -955,7 +1077,7 @@ app.post('/ingest', async (req, res) => {
  * for a large document. Progress is logged to the server console so
  * you can watch it work.
  */
-app.post('/embed', async (req, res) => {
+app.post('/embed', lockGate, async (req, res) => {
   const { filePath, workspaceId, maxWords, overlapWords, embedModel } = req.body;
   if (!filePath) return res.status(400).json({ error: 'filePath is required' });
   const wsErr = workspaceIdError(workspaceId);
@@ -1053,7 +1175,7 @@ const upload = multer({
  * workspace id, wrong file type, no file attached) still come back as
  * ordinary HTTP error responses, since nothing has been written yet.
  */
-app.post('/workspaces/:workspaceId/upload-and-embed', (req, res) => {
+app.post('/workspaces/:workspaceId/upload-and-embed', lockGate, (req, res) => {
   const { workspaceId } = req.params;
   const wsErr = workspaceIdError(workspaceId);
   if (wsErr) return res.status(400).json({ error: wsErr });
@@ -1523,7 +1645,7 @@ function sourcesSummary(matches) {
   }));
 }
 
-app.post('/query', async (req, res) => {
+app.post('/query', lockGate, async (req, res) => {
   const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, compareAgainstRubricId, think, attributesPerCall } = req.body;
   // A rubric-comparison run (see compareAgainstRubricId below) never
   // touches a workspace at all — no document retrieval happens, so
@@ -1902,7 +2024,7 @@ app.post('/query', async (req, res) => {
  * existed), `totalBatches` is simply 1 and there's exactly one
  * "batch-done" immediately before "done".
  */
-app.post('/query/stream', async (req, res) => {
+app.post('/query/stream', lockGate, async (req, res) => {
   // Server-side stand-in for "the time recorded by the timer" the
   // browser shows next to Ask/Stop (performance.now()-based, purely
   // client-side — see queryStartTime in public/script.js) for the

@@ -412,8 +412,27 @@
     errorEl.style.display = message ? 'block' : 'none';
   }
 
+  // compareBtn.disabled has three independent reasons it might be
+  // true -- no hazards loaded at all, a comparison already running, or
+  // the whole-app lock (see appLock.js/lockGate() in index.js -- this
+  // tab's own POST /query/stream run is gated by it exactly like Query
+  // and Response's) -- tracked as named booleans here and recombined
+  // by refreshCompareBtnDisabled() rather than three separate direct
+  // assignments that could each clobber one another depending on which
+  // ran last. appLockStatus and onLockStatusChange() are script.js
+  // globals (see initLockStatus() there); shared global-script-scope
+  // use, same as buildAttributeResultsHtml()/escapeHtml() already are
+  // across this file and script.js.
+  let noHazardsAvailable = false;
+  let comparisonRunning = false;
+
+  function refreshCompareBtnDisabled() {
+    compareBtn.disabled = noHazardsAvailable || comparisonRunning || appLockStatus.locked;
+  }
+
   function setRunning(running) {
-    compareBtn.disabled = running;
+    comparisonRunning = running;
+    refreshCompareBtnDisabled();
     stopBtn.style.display = running ? '' : 'none';
     hazardSelect.disabled = running;
     stateSelect.disabled = running;
@@ -695,7 +714,8 @@
 
       if (hazards.length === 0) {
         hazardSelect.innerHTML = '<option value="" disabled>(none available)</option>';
-        compareBtn.disabled = true;
+        noHazardsAvailable = true;
+        refreshCompareBtnDisabled();
         previewCountEl.textContent = '';
         showFullListBtn.style.display = 'none';
         previewListEl.style.display = 'none';
@@ -723,7 +743,8 @@
         stateSelect.appendChild(opt);
       }
 
-      compareBtn.disabled = false;
+      noHazardsAvailable = false;
+      refreshCompareBtnDisabled();
       showError('');
       // Nothing is selected yet right after a fresh load, but this
       // still gives the preview area its correct initial message
@@ -732,7 +753,8 @@
       refreshPreview();
     } catch (err) {
       hazardSelect.innerHTML = '<option value="" disabled>(failed to load)</option>';
-      compareBtn.disabled = true;
+      noHazardsAvailable = true;
+      refreshCompareBtnDisabled();
       previewCountEl.textContent = '';
       showFullListBtn.style.display = 'none';
       previewListEl.style.display = 'none';
@@ -1268,6 +1290,12 @@
     // Practices panel at all (e.g. an older index.html) -- bail out
     // quietly rather than throwing on a null lookup above.
     if (!hazardSelect || !compareBtn) return;
+
+    // Keeps compareBtn's lock reason (see refreshCompareBtnDisabled()
+    // above) in sync with every other lock-aware control in the app --
+    // registering immediately pushes the current status too, same as
+    // script.js's own onLockStatusChange() callers.
+    onLockStatusChange(refreshCompareBtnDisabled);
 
     compareBtn.addEventListener('click', runComparison);
     stopBtn.addEventListener('click', stopComparison);

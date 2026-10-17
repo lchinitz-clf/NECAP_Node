@@ -35,6 +35,21 @@
     </div>
   </div>
 
+  <!-- Whole-app lock status: see src/appLock.js's own top-of-file
+       comment for why this exists at all (one shared Ollama server,
+       global rubric/workspace state), and GET /lock-status/stream +
+       POST /lock-status/force-unlock in index.js for how it's pushed
+       and cleared. Deliberately placed and made sticky the same way
+       as the hamburger menu right below it, so it's visible no matter
+       which of Documents/Rubric/Query/etc. is the active tab, not just
+       on whichever tab happens to be the one that locked it.
+       initLockStatus() in script.js owns everything inside this div
+       from here on. -->
+  <div id="lockBanner" class="lock-banner" role="status" aria-live="polite">
+    <span id="lockBannerText" class="lock-banner-text">Checking status…</span>
+    <button type="button" id="forceUnlockBtn" class="lock-banner-force-btn" style="display:none;" title="Clear a stuck lock without waiting for whatever holds it to finish on its own">Force unlock</button>
+  </div>
+
   <!-- Hamburger menu: switches which tab-panel below is visible. See
        initTabs() in script.js — panels are shown/hidden with plain
        display:block/none, never re-rendered or removed from the DOM,

@@ -410,8 +410,9 @@ async function refreshDocuments() {
       // comment on PUT .../description in index.js). `currentRole`
       // defaults to 'admin' until GET /auth/me resolves (see its own
       // doc comment), same fail-open behavior every other role check
-      // in this file already has.
-      descInput.readOnly = currentRole !== 'admin';
+      // in this file already has. Also combines in the whole-app lock
+      // — see shouldDisableDocumentControls()'s own doc comment.
+      descInput.readOnly = shouldDisableDocumentControls();
       tr.querySelector('.doc-description-cell').appendChild(descInput);
 
       // Checked by default (doc.included is `true` for any document
@@ -430,8 +431,9 @@ async function refreshDocuments() {
       includedCheckbox.dataset.source = doc.sourceFile;
       // Same admin-only editing posture as the description field right
       // above, and the same "not a security boundary" caveat (see the
-      // doc comment on PUT .../included in index.js).
-      includedCheckbox.disabled = currentRole !== 'admin';
+      // doc comment on PUT .../included in index.js). Also combines in
+      // the whole-app lock — see shouldDisableDocumentControls().
+      includedCheckbox.disabled = shouldDisableDocumentControls();
       tr.querySelector('.doc-included-cell').appendChild(includedCheckbox);
 
       documentsBody.appendChild(tr);
@@ -561,7 +563,7 @@ async function saveDocumentIncluded(checkbox) {
     // path, so this same node needs re-enabling by hand.
     checkbox.checked = !wantIncluded;
     checkbox.title = `Could not save this change: ${err.message}`;
-    checkbox.disabled = currentRole !== 'admin';
+    checkbox.disabled = shouldDisableDocumentControls();
   }
 }
 
@@ -1548,13 +1550,19 @@ let currentRole = 'admin';
 function applyRolePermissions(role) {
   currentRole = role;
   document.body.classList.remove('role-readonly', 'role-queryonly');
-  rubricSaveBtn.disabled = role === 'readonly';
-  for (const input of document.querySelectorAll('.doc-description-input')) {
-    input.readOnly = role !== 'admin';
-  }
-  for (const checkbox of document.querySelectorAll('.doc-included-checkbox')) {
-    checkbox.disabled = role !== 'admin';
-  }
+  // Re-derives rubricSaveBtn's disabled state, and every document
+  // row's description field / Include checkbox, in one place that
+  // also knows about the whole-app lock — see
+  // refreshAllLockAwareControls()/shouldDisableDocumentControls() in
+  // the "Whole-app lock status" section above for why this isn't a
+  // direct assignment here anymore.
+  rubricSaveBtnReadonly = role === 'readonly';
+  refreshAllLockAwareControls();
+  // The Force unlock button's own visibility also depends on
+  // currentRole (admin only) — see renderLockBanner()'s own doc
+  // comment for why a role change alone has to re-run it too, not
+  // just a lock-status change.
+  if (lockBannerEl) renderLockBanner();
   if (role === 'readonly') document.body.classList.add('role-readonly');
   if (role === 'queryonly') {
     document.body.classList.add('role-queryonly');
@@ -1606,6 +1614,192 @@ async function initRole() {
     // the page in some half-applied state.
     console.warn('Could not look up login role; showing full access.', err);
   }
+}
+
+// ---- Whole-app lock status (see src/appLock.js + lockGate() in
+// index.js for why this exists at all: one shared Ollama server behind
+// this app, and rubric/workspace state that's global rather than
+// per-session) ----
+//
+// GET /lock-status/stream (SSE, not polled -- see that route's own doc
+// comment in index.js for why) pushes {locked, user, since} once the
+// instant a tab connects and again on every change, for as long as
+// that connection stays open. appLockStatus always holds the latest
+// one; onLockStatusChange() lets any other part of this file (the
+// banner itself, and every lock-aware button below) react to it
+// without this section needing to know what any of them are.
+let appLockStatus = { locked: false, user: null, since: null };
+const lockStatusListeners = [];
+
+/**
+ * Registers `fn` to be called with the current appLockStatus right
+ * now (so a listener doesn't have to wait for a change to learn where
+ * things stand -- same "push now, and again on every future change"
+ * contract src/appLock.js's own subscribe() already uses server-side)
+ * and again every time the lock status changes.
+ * @param {(status: {locked: boolean, user: string|null, since: number|null}) => void} fn
+ */
+function onLockStatusChange(fn) {
+  lockStatusListeners.push(fn);
+  fn(appLockStatus);
+}
+
+function setLockStatus(status) {
+  appLockStatus = status;
+  for (const fn of lockStatusListeners.slice()) fn(appLockStatus);
+}
+
+/**
+ * Whether a document's description field / Include checkbox should be
+ * non-interactive right now. Combines the existing role check (see
+ * applyRolePermissions()'s own doc comment for why that, like every
+ * other role-based control in this app so far, is UI-only) with the
+ * whole-app lock: both fields save through a lockGate()-protected
+ * route (PUT .../description, PUT .../included), so neither has any
+ * business being editable while something else holds the lock, same
+ * as the Save/Import/Delete/Rebuild buttons below. Centralized here so
+ * refreshDocuments() (render time), applyRolePermissions() (role
+ * changes), and the lock-status listener (lock changes) all agree,
+ * rather than three separate copies of this OR drifting apart.
+ */
+function shouldDisableDocumentControls() {
+  return currentRole !== 'admin' || appLockStatus.locked;
+}
+
+// Every button below already disables itself for its OWN reason —
+// mid-request, an unchosen file, a readonly role — entirely
+// independently of the lock (see each one's existing true/false
+// assignment elsewhere in this file). The lock adds one more reason
+// that has nothing to do with whether THIS tab is the one running
+// something: another tab, or another user, holding it blocks these
+// controls just the same. Rather than have the lock-status listener
+// reach in and stomp a `.disabled` value some other code just set (a
+// race that would depend on which one happened to run last), each
+// button tracks its own "busy" reason in a named boolean here and
+// recomputes `.disabled` by OR-ing it with appLockStatus.locked
+// whenever either one changes — the same combinator pattern
+// bestPracticesTab.js's own refreshCompareBtnDisabled() uses for
+// compareBtn's three independent reasons.
+let submitBtnBusy = false;
+let embedSubmitBtnBusy = false;
+let deleteWorkspaceBtnBusy = false;
+let rebuildIndexBtnBusy = false;
+let rubricSaveBtnBusy = false;
+let rubricSaveBtnReadonly = false;
+let rubricXlsxImportBtnBusy = false;
+
+function refreshSubmitBtnDisabled() {
+  submitBtn.disabled = submitBtnBusy || appLockStatus.locked;
+}
+function refreshEmbedSubmitBtnDisabled() {
+  embedSubmitBtn.disabled = embedSubmitBtnBusy || appLockStatus.locked;
+}
+function refreshDeleteWorkspaceBtnDisabled() {
+  deleteWorkspaceBtn.disabled = deleteWorkspaceBtnBusy || appLockStatus.locked;
+}
+function refreshRebuildIndexBtnDisabled() {
+  rebuildIndexBtn.disabled = rebuildIndexBtnBusy || appLockStatus.locked;
+}
+function refreshRubricSaveBtnDisabled() {
+  rubricSaveBtn.disabled = rubricSaveBtnBusy || rubricSaveBtnReadonly || appLockStatus.locked;
+}
+function refreshRubricXlsxImportBtnDisabled() {
+  rubricXlsxImportBtn.disabled = rubricXlsxImportBtnBusy || appLockStatus.locked;
+}
+
+/**
+ * Re-derives every lock-aware control's disabled state at once —
+ * called whenever the lock status itself changes (the lock-status
+ * listener below), and from applyRolePermissions() whenever the role
+ * changes (since shouldDisableDocumentControls() and
+ * refreshRubricSaveBtnDisabled() both also depend on currentRole).
+ */
+function refreshAllLockAwareControls() {
+  refreshSubmitBtnDisabled();
+  refreshEmbedSubmitBtnDisabled();
+  refreshDeleteWorkspaceBtnDisabled();
+  refreshRebuildIndexBtnDisabled();
+  refreshRubricSaveBtnDisabled();
+  refreshRubricXlsxImportBtnDisabled();
+  for (const input of document.querySelectorAll('.doc-description-input')) {
+    input.readOnly = shouldDisableDocumentControls();
+  }
+  for (const checkbox of document.querySelectorAll('.doc-included-checkbox')) {
+    checkbox.disabled = shouldDisableDocumentControls();
+  }
+}
+
+let lockBannerEl, lockBannerTextEl, forceUnlockBtn;
+
+/**
+ * Reflects appLockStatus into #lockBanner — called immediately on
+ * registration and again on every change (see onLockStatusChange()
+ * above), and also from applyRolePermissions() whenever the role
+ * changes, since the Force unlock button's own visibility (admin
+ * only — see POST /lock-status/force-unlock's doc comment in index.js
+ * for why THIS one route is actually server-enforced, unlike
+ * everything else role-gated in this file) depends on currentRole too.
+ */
+function renderLockBanner() {
+  lockBannerEl.classList.remove('available', 'locked');
+  if (appLockStatus.locked) {
+    lockBannerEl.classList.add('locked');
+    lockBannerTextEl.textContent = `Locked by ${appLockStatus.user}`;
+    forceUnlockBtn.style.display = currentRole === 'admin' ? '' : 'none';
+  } else {
+    lockBannerEl.classList.add('available');
+    lockBannerTextEl.textContent = 'Available';
+    forceUnlockBtn.style.display = 'none';
+  }
+}
+
+/**
+ * Opens the one SSE connection this tab needs (EventSource reconnects
+ * on its own after a drop — no retry logic needed here, unlike a
+ * plain polled fetch), and wires up the admin-only Force unlock
+ * button. Called once from init()'s "Initial data loads" section.
+ */
+function initLockStatus() {
+  lockBannerEl = document.getElementById('lockBanner');
+  lockBannerTextEl = document.getElementById('lockBannerText');
+  forceUnlockBtn = document.getElementById('forceUnlockBtn');
+
+  onLockStatusChange(renderLockBanner);
+  onLockStatusChange(refreshAllLockAwareControls);
+
+  forceUnlockBtn.addEventListener('click', async () => {
+    forceUnlockBtn.disabled = true;
+    try {
+      const res = await fetch('/lock-status/force-unlock', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+      // No need to setLockStatus(data) here — the SSE push this
+      // triggers (appLock.forceUnlock()'s own broadcast()) arrives a
+      // moment later and is the one source of truth every open tab
+      // relies on; applying `data` here too would just make this one
+      // tab update twice instead of once.
+    } catch (err) {
+      alert(`Could not force-unlock: ${err.message}`);
+    } finally {
+      forceUnlockBtn.disabled = false;
+    }
+  });
+
+  const lockStream = new EventSource('/lock-status/stream');
+  lockStream.onmessage = (e) => {
+    try {
+      setLockStatus(JSON.parse(e.data));
+    } catch (err) {
+      console.warn('Could not parse a lock-status update:', err);
+    }
+  };
+  // EventSource already retries on its own after a drop, with no
+  // extra code needed here — logging is just visibility into that,
+  // same "fail open, don't break the rest of the page" spirit as
+  // initRole()'s own catch above.
+  lockStream.onerror = (err) => {
+    console.warn('Lock-status stream error (it will retry automatically):', err);
+  };
 }
 
 // ---- Logs tab ----
@@ -2432,7 +2626,8 @@ async function importRubricXlsxAttributes() {
     return;
   }
 
-  rubricXlsxImportBtn.disabled = true;
+  rubricXlsxImportBtnBusy = true;
+  refreshRubricXlsxImportBtnDisabled();
   rubricXlsxStatus.textContent = 'Loading attributes…';
 
   try {
@@ -2462,7 +2657,8 @@ async function importRubricXlsxAttributes() {
     rubricXlsxError.style.display = 'block';
     rubricXlsxStatus.textContent = '';
   } finally {
-    rubricXlsxImportBtn.disabled = false;
+    rubricXlsxImportBtnBusy = false;
+    refreshRubricXlsxImportBtnDisabled();
   }
 }
 
@@ -2534,7 +2730,8 @@ async function submitRubricForm(e) {
     if (!confirmed) return;
   }
 
-  rubricSaveBtn.disabled = true;
+  rubricSaveBtnBusy = true;
+  refreshRubricSaveBtnDisabled();
   rubricFormStatus.textContent = 'Saving…';
 
   try {
@@ -2567,7 +2764,8 @@ async function submitRubricForm(e) {
     rubricFormError.style.display = 'block';
     rubricFormStatus.textContent = '';
   } finally {
-    rubricSaveBtn.disabled = false;
+    rubricSaveBtnBusy = false;
+    refreshRubricSaveBtnDisabled();
   }
 }
 
@@ -2936,6 +3134,20 @@ function init() {
     const workspaceId = getWorkspaceId();
     if (!workspaceId) return;
 
+    // This button isn't proactively greyed out the way the other
+    // lock-aware controls above are — it's rendered per row by
+    // refreshDocuments(), and re-deriving every row's disabled state
+    // on every lock change isn't worth it for a button whose own
+    // route (DELETE .../documents/:sourceFile) would reject it with a
+    // 409 anyway. Catching it here, before the confirm() dialog below,
+    // just avoids showing a delete confirmation right before telling
+    // someone it didn't happen.
+    if (appLockStatus.locked) {
+      documentsError.textContent = `Locked by ${appLockStatus.user} — try again once their query or change finishes.`;
+      documentsError.style.display = 'block';
+      return;
+    }
+
     if (!confirm(
       `Remove "${sourceFile}" from this area?\n\n` +
       `This deletes its blocks from the search index. If it was uploaded ` +
@@ -3025,7 +3237,8 @@ function init() {
       return;
     }
 
-    deleteWorkspaceBtn.disabled = true;
+    deleteWorkspaceBtnBusy = true;
+    refreshDeleteWorkspaceBtnDisabled();
     deleteWorkspaceError.style.display = 'none';
     deleteWorkspaceStatus.textContent = 'Deleting area…';
 
@@ -3045,7 +3258,8 @@ function init() {
       deleteWorkspaceError.textContent = err.message;
       deleteWorkspaceError.style.display = 'block';
     } finally {
-      deleteWorkspaceBtn.disabled = false;
+      deleteWorkspaceBtnBusy = false;
+      refreshDeleteWorkspaceBtnDisabled();
     }
   });
 
@@ -3064,7 +3278,8 @@ function init() {
       return;
     }
 
-    rebuildIndexBtn.disabled = true;
+    rebuildIndexBtnBusy = true;
+    refreshRebuildIndexBtnDisabled();
     rebuildError.style.display = 'none';
     rebuildProgressWrap.style.display = 'block';
     rebuildProgressBar.removeAttribute('value'); // indeterminate until the first file's "start" event arrives
@@ -3093,7 +3308,8 @@ function init() {
       rebuildError.style.display = 'block';
       rebuildProgressWrap.style.display = 'none';
     } finally {
-      rebuildIndexBtn.disabled = false;
+      rebuildIndexBtnBusy = false;
+      refreshRebuildIndexBtnDisabled();
     }
   });
 
@@ -3126,7 +3342,8 @@ function init() {
     const maxWords = readOptionalPositiveInt('maxWords');
     const overlapWords = readOptionalPositiveInt('overlapWords');
 
-    embedSubmitBtn.disabled = true;
+    embedSubmitBtnBusy = true;
+    refreshEmbedSubmitBtnDisabled();
     embedProgressWrap.style.display = 'block';
     embedProgressBar.removeAttribute('value'); // indeterminate until "start" arrives
     embedStatus.textContent = 'Uploading and extracting text…';
@@ -3164,7 +3381,8 @@ function init() {
       embedError.style.display = 'block';
       embedStatus.textContent = '';
     } finally {
-      embedSubmitBtn.disabled = false;
+      embedSubmitBtnBusy = false;
+      refreshEmbedSubmitBtnDisabled();
       embedProgressWrap.style.display = 'none';
     }
   });
@@ -3240,6 +3458,18 @@ function init() {
     const deleteBtn = e.target.closest('.rubric-delete-btn');
     if (deleteBtn) {
       const topicId = deleteBtn.dataset.id;
+
+      // Same reasoning as the document Remove button's own lock check
+      // above: this is a per-row button rendered by
+      // refreshRubricTopics(), caught here rather than proactively
+      // disabled, just to avoid a confirm() dialog immediately
+      // followed by a rejection.
+      if (appLockStatus.locked) {
+        rubricTopicsError.textContent = `Locked by ${appLockStatus.user} — try again once their query or change finishes.`;
+        rubricTopicsError.style.display = 'block';
+        return;
+      }
+
       if (!confirm(`Permanently delete the topic "${topicId}"? This cannot be undone.`)) return;
 
       deleteBtn.disabled = true;
@@ -3490,7 +3720,8 @@ function init() {
       return;
     }
 
-    submitBtn.disabled = true;
+    submitBtnBusy = true;
+    refreshSubmitBtnDisabled();
     stopBtn.disabled = false;
     statusEl.textContent = 'Searching your documents…';
 
@@ -3742,7 +3973,8 @@ function init() {
       }
       queryProgressWrap.style.display = 'none';
     } finally {
-      submitBtn.disabled = false;
+      submitBtnBusy = false;
+      refreshSubmitBtnDisabled();
       stopBtn.disabled = true;
       currentQueryController = null;
       // Stop the live clock and render its final value — runs for
@@ -3783,6 +4015,7 @@ function init() {
 
   applyConfig();
   loadIntroContent();
+  initLockStatus();
   initRole();
   refreshWorkspaces();
   refreshModels();
