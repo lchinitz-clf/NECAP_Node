@@ -264,13 +264,15 @@ function formatSettingsChips(meta) {
  * completion email, for exactly the case a spreadsheet cell handles
  * badly: a long, multi-quote answer per attribute that's hard to read
  * as one undifferentiated block of CSV text. Structure: a header with
- * the run's metadata, a one-glance summary table (attribute →
- * color-coded verdict badge, each linking down to its own section),
- * then a full detail section per attribute with the verdict badge
- * repeated, the criterion/ideal text, the answer with every quote
- * pulled out into its own verified/unverified blockquote (see
- * renderResultTextHtml() above), and the sources retrieved for that
- * attribute's batch.
+ * the run's metadata, a "Score summary" table tallying how many
+ * attributes landed on each verdict (count and % of the total,
+ * omitted entirely when there are no attributes at all), a one-glance
+ * per-attribute summary table (attribute → color-coded verdict badge,
+ * each linking down to its own section), then a full detail section
+ * per attribute with the verdict badge repeated, the criterion/ideal
+ * text, the answer with every quote pulled out into its own
+ * verified/unverified blockquote (see renderResultTextHtml() above),
+ * and the sources retrieved for that attribute's batch.
  *
  * @param {Array<{sources?: Array<{sourceFile: string, chunkIndex: number}>, records?: Array<{name: string, proposal: string, resultText: string, category: string}>, batchIndex: number, totalBatches?: number, promptTokens?: number, answerTokens?: number, doneReason?: string}>} batches
  * @param {{workspaceId?: string, excludedDocuments?: string[], rubricLabel?: string, topicLabel?: string|null, question?: string, chatModel?: string, topK?: number, temperature?: number, repeatPenalty?: number, maxTokens?: number, numCtx?: number, think?: boolean, attributesPerCall?: number, elapsedMs?: number, appName?: string}} meta
@@ -334,6 +336,45 @@ function buildAttributeResultsHtml(batches, meta) {
       rows.push({ ...r, sourceRefs, batch, batchIndex });
     }
   });
+
+  // One tally per verdict, across every attribute in every batch (the
+  // same flattened `rows` the per-attribute Summary table below
+  // already uses) -- so a batched, multi-call run counts each
+  // attribute exactly once no matter how many separate /query/stream
+  // batches it took to grade them all. Order is best-to-worst, the
+  // mirror image of VERDICT_ORDER in src/responseParser.js (that one
+  // runs worst-to-best for its own ranking/comparison purposes; a
+  // report meant to be skimmed reads better starting from the best
+  // outcome), with the empty/unparsed category -- same meaning as
+  // `r.category || 'Unparsed'` in summaryRows just below -- always
+  // last, since it isn't really a verdict at all. A category present
+  // in CATEGORY_PATTERNS/REPORT_BADGE_CLASS but that happened not to
+  // occur in this run (e.g. nothing ever "Exceeds") is simply left out
+  // of the table rather than shown as a 0 row, so the summary only
+  // lists verdicts that actually occurred.
+  const VERDICT_SUMMARY_ORDER = ['Exceeds', 'Matches', 'Unverified match', 'Falls short', 'Not addressed', ''];
+  const verdictCounts = new Map();
+  for (const r of rows) {
+    const key = r.category || '';
+    verdictCounts.set(key, (verdictCounts.get(key) || 0) + 1);
+  }
+  const totalVerdicts = rows.length;
+  // Percentages are independently rounded, so they won't always sum to
+  // exactly 100 (e.g. three equal thirds each round to 33%) -- the
+  // same tradeoff any report showing rounded percentages makes, and
+  // preferable here to either a misleading false precision or a
+  // "100% - the others" fixup that would make one row's percentage
+  // not actually be (its own count / total).
+  const verdictSummaryRows = VERDICT_SUMMARY_ORDER
+    .filter((key) => verdictCounts.has(key))
+    .map((key) => {
+      const count = verdictCounts.get(key);
+      const pct = Math.round((count / totalVerdicts) * 100);
+      const cls = REPORT_BADGE_CLASS[key] || 'badge-neutral';
+      const label = key || 'Unparsed';
+      return `<tr><td><span class="badge ${cls}">${escapeHtml(label)}</span></td><td>${count}</td><td>${pct}%</td></tr>`;
+    })
+    .join('\n');
 
   const generatedAt = new Date().toLocaleString();
   const metaRows = [
@@ -451,6 +492,16 @@ function buildAttributeResultsHtml(batches, meta) {
   <dl class="meta">
     ${metaRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('\n')}
   </dl>
+
+  ${totalVerdicts > 0 ? `
+  <h2>Score summary</h2>
+  <table>
+    <thead><tr><th>Verdict</th><th>Count</th><th>% of ${totalVerdicts}</th></tr></thead>
+    <tbody>
+      ${verdictSummaryRows}
+    </tbody>
+  </table>
+  ` : ''}
 
   <h2>Summary</h2>
   <table>
