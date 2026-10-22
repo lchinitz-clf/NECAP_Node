@@ -323,6 +323,32 @@ let blockLookupDocument, blockLookupIndex, blockLookupBtn, blockLookupError, blo
 let blockLookupChunks = []; // the currently-selected document's {chunkIndex, id} list, once loaded
 let blockLookupFilterDebounce = null; // same debounce-on-typing pattern as documentsDebounce below
 
+let workspaceDocCount;
+
+/**
+ * Shows or hides the "N of M documents included" status next to the
+ * Storage area name label (see index.html's own comment on
+ * #workspaceDocCount). Unlike documentsExcludedNote just below, which
+ * only appears when something is actually excluded, this is meant to
+ * be visible at a glance on every workspace-scoped tab at all times —
+ * by design it shows even the all-included case ("12 of 12
+ * documents included"), since the reassurance that NOTHING is
+ * excluded is exactly what makes a silent exclusion elsewhere
+ * noticeable. Pass no arguments (or anything falsy) to hide it — the
+ * "no workspace chosen yet" / "workspace doesn't exist or has no
+ * documents" / "lookup failed" cases all do this.
+ * @param {number} [includedCount]
+ * @param {number} [totalCount]
+ */
+function setWorkspaceDocCount(includedCount, totalCount) {
+  if (totalCount === undefined) {
+    workspaceDocCount.style.display = 'none';
+    return;
+  }
+  workspaceDocCount.textContent = `${includedCount} of ${totalCount} document${totalCount === 1 ? '' : 's'} included`;
+  workspaceDocCount.style.display = '';
+}
+
 // Shows what's actually embedded (grouped by source filename) in
 // whatever workspace is currently entered above, with a Remove
 // button per document. Also doubles as the easiest way to spot an
@@ -332,6 +358,7 @@ async function refreshDocuments() {
   const id = getWorkspaceId();
   if (!id) {
     documentsWrap.style.display = 'none';
+    setWorkspaceDocCount();
     resetBlockLookup();
     return;
   }
@@ -348,6 +375,7 @@ async function refreshDocuments() {
     if (data.documents.length === 0) {
       documentsEmpty.textContent = `No documents imported into "${id}" yet.`;
       documentsExcludedNote.style.display = 'none';
+      setWorkspaceDocCount(); // nothing to count yet — "0 of 0 included" would read as a glitch, not a status
       resetBlockLookup();
       return;
     }
@@ -369,6 +397,7 @@ async function refreshDocuments() {
     } else {
       documentsExcludedNote.style.display = 'none';
     }
+    setWorkspaceDocCount(data.documents.length - excludedCount, data.documents.length);
 
     for (const doc of data.documents) {
       const tr = document.createElement('tr');
@@ -445,6 +474,7 @@ async function refreshDocuments() {
     // the section rather than showing an error for that.
     console.warn('Could not load documents:', err);
     documentsWrap.style.display = 'none';
+    setWorkspaceDocCount();
     resetBlockLookup();
   }
 }
@@ -870,6 +900,16 @@ let lastRunElapsedMs = null;
 // lastRunElapsedMs), for the same "a stale value from a previous run
 // must never attach to a different run's export" reasoning.
 let lastRunExcludedDocuments = [];
+
+// The complement of lastRunExcludedDocuments above, against the
+// workspace's real embedded document set (see getIncludedSourceFiles()
+// in src/documentMeta.js) — captured and reset the same way, from the
+// same /query/stream "done" event's `includedDocuments` field. This,
+// not lastRunExcludedDocuments, is what the exported report's
+// "Documents included in search" row actually names when something
+// was excluded — see buildAttributeResultsHtml()'s own doc comment in
+// reportHtml.js.
+let lastRunIncludedDocuments = [];
 
 // Holds the AbortController for whichever /query/stream request is
 // currently in flight, or null when none is. stopBtn's click handler
@@ -2911,6 +2951,7 @@ function init() {
   workspaceCard = document.getElementById('workspaceCard');
   workspaceInput = document.getElementById('workspace');
   workspaceList = document.getElementById('workspaceList');
+  workspaceDocCount = document.getElementById('workspaceDocCount');
 
   chatModelSelect = document.getElementById('chatModel');
   chatModelHint = document.getElementById('chatModelHint');
@@ -3582,6 +3623,7 @@ function init() {
       // doc comment for why this has to come from the run's own "done"
       // event rather than the Documents tab's CURRENT checkbox state.
       excludedDocuments: lastRunExcludedDocuments,
+      includedDocuments: lastRunIncludedDocuments,
     };
 
     const html = buildAttributeResultsHtml(latestBatches, meta);
@@ -3618,6 +3660,7 @@ function init() {
     latestBatches = [];
     lastRunElapsedMs = null;
     lastRunExcludedDocuments = [];
+    lastRunIncludedDocuments = [];
     attributeResultsBody.innerHTML = '';
     attributeResultsWrap.style.display = 'none';
     // The answer section specifically is forced open for every new
@@ -3881,6 +3924,7 @@ function init() {
       // actually runs, so it's available to downloadHtmlBtn's export
       // meta even for the "no documents" case right below.
       lastRunExcludedDocuments = finalEvent.excludedDocuments || [];
+      lastRunIncludedDocuments = finalEvent.includedDocuments || [];
 
       // Covers the "no documents embedded yet" case: "done" fires with
       // a ready-made answer and no sources/tokens were ever streamed.

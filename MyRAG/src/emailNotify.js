@@ -177,15 +177,23 @@ function getTransporter() {
  *   Documents tab's Include checkboxes excluded for this workspace at
  *   the moment this request's retrieval ran (see
  *   getExcludedSourceFiles() in src/documentMeta.js) — the same value
- *   /query/stream's "done" event sends the browser, passed straight
- *   through to buildAttributeResultsHtml() so the emailed report shows
- *   the same "Documents excluded from search" row the browser's own
- *   "Export HTML" download would. Omitted or empty: no such row, same
- *   as that function's own default.
+ *   /query/stream's "done" event sends the browser. Passed straight
+ *   through to buildAttributeResultsHtml() alongside
+ *   `includedDocuments` below so the emailed report's "Documents
+ *   included in search" row matches the browser's own "Export HTML"
+ *   download exactly.
+ * @param {string[]} [params.includedDocuments] - the complement of
+ *   `excludedDocuments` above, against the workspace's real embedded
+ *   document set (see getIncludedSourceFiles() in
+ *   src/documentMeta.js) — what the report actually names when
+ *   `excludedDocuments` is non-empty. See buildAttributeResultsHtml()'s
+ *   own doc comment in public/reportHtml.js (required directly from
+ *   here, just below) for the full "all included" vs. "name the
+ *   included ones" rendering logic.
  * @returns {Promise<void>} always resolves — see this module's doc
  *   comment for why it never rejects.
  */
-async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, topK, temperature, repeatPenalty, maxTokens, numCtx, think, attributesPerCall, elapsedMs, excludedDocuments }) {
+async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyEmailTo, batches, chatModel, topK, temperature, repeatPenalty, maxTokens, numCtx, think, attributesPerCall, elapsedMs, excludedDocuments, includedDocuments }) {
   if (!isConfigured) {
     if (!warnedNotConfigured) {
       console.warn(
@@ -248,6 +256,7 @@ async function sendRubricCompletionEmail({ req, workspaceId, topicLabel, notifyE
       attributesPerCall,
       elapsedMs,
       excludedDocuments,
+      includedDocuments,
       appName: getAppName(),
     });
     const subject = `Rubric analysis finished: ${topicLabel} (${workspaceId})`;

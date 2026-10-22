@@ -166,6 +166,15 @@ section.card {
 
 form { display: flex; flex-direction: column; gap: 0.85rem; }
 label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem; }
+/* Puts a short, always-visible status (currently just
+   #workspaceDocCount) on the same line as a <label>, right-aligned,
+   instead of its own paragraph below the field -- see that element's
+   own comment in index.html for why. `label`'s own margin-bottom
+   above still applies to this whole row, so the field below it keeps
+   the same spacing as every other label/input pair. */
+.label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; margin-bottom: 0.3rem; }
+.label-row label { margin-bottom: 0; }
+.workspace-doc-count { font-size: 0.8rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
 textarea, input[type="text"], input[type="number"], select {
   width: 100%;
   font: inherit;

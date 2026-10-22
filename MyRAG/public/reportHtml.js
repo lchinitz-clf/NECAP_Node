@@ -25,12 +25,11 @@
  * browser (`module` is simply undefined there) and is what makes this
  * requireable from Node.
  *
- * KEPT IN SYNC BY HAND with public/reportHtml.js — this is genuinely
- * the same file in two locations (no bundler, no symlink), not two
- * independent implementations that happen to look alike. Any edit
- * here belongs in public/reportHtml.js too, and vice versa; letting
- * the two drift is exactly the "emailed report quietly falls behind
- * the browser's own Export HTML" bug this comment exists to prevent.
+ * This is the single copy of this module. src/emailNotify.js requires
+ * it directly (`require('../public/reportHtml.js')`) rather than
+ * loading a separate server-side copy, so the emailed report and the
+ * browser's own Export HTML always render from the exact same code —
+ * there is nothing else to keep in sync.
  */
 
 // Maps src/responseParser.js's five fixed category strings to a badge
@@ -282,18 +281,30 @@ function formatSettingsChips(meta) {
  *   workspace is involved in that mode at all), so the "Workspace" row
  *   simply doesn't appear for that export. Every other caller leaves
  *   this unset and keeps showing "Workspace" exactly as before.
- *   `excludedDocuments` lists every sourceFile the Documents tab's
- *   Include checkboxes had excluded for THIS specific run (see
- *   getExcludedSourceFiles() in src/documentMeta.js, and the
- *   `excludedDocuments` field /query and /query/stream now send back
- *   for exactly this purpose — never re-fetched from the workspace's
- *   CURRENT checkbox state, which could have changed since this run
- *   actually happened). Renders its own "Documents excluded from
- *   search" row, but only when non-empty — omitted, or an empty array,
- *   and the row simply doesn't appear, so a comparison that excluded
- *   nothing (the common case) reports exactly as it did before this
- *   field existed. Meaningless, and always empty, in rubric-comparison
- *   mode (no workspace is touched there at all).
+ *   `excludedDocuments` and `includedDocuments` are both every
+ *   sourceFile the Documents tab's Include checkboxes had excluded (or
+ *   left included) for THIS specific run (see getExcludedSourceFiles()
+ *   and getIncludedSourceFiles() in src/documentMeta.js, and the same-
+ *   named fields /query and /query/stream now send back for exactly
+ *   this purpose — never re-fetched from the workspace's CURRENT
+ *   checkbox state, which could have changed since this run actually
+ *   happened). Rendered as a "Documents included in search" row
+ *   whenever `workspaceId` is set — deliberately naming what WAS
+ *   searched rather than what wasn't: the typical reason to exclude
+ *   anything here is to focus a run on one or two documents out of a
+ *   much larger set, so "excluded: everything else" would force the
+ *   reader to find the one document that matters by elimination,
+ *   while "included: the-one-that-matters.pdf" says it directly. When
+ *   `excludedDocuments` is empty (the common case — nothing excluded),
+ *   the row just reads "All" rather than repeating every document's
+ *   name for no reason; when it's non-empty, the row names exactly
+ *   `includedDocuments`, which is always `[]` for a workspace someone
+ *   has excluded every document in (a real, if unusual, case — the row
+ *   then reads "none" rather than being left blank). Always empty
+ *   (both fields) in rubric-comparison mode (no workspace is touched
+ *   there at all) — covered by the same `workspaceId`-unset check that
+ *   already hides the "Workspace" row for that mode, so no separate
+ *   guard is needed here.
  *   `topK` through `attributesPerCall` are the run's Advanced-settings
  *   values, rendered as the "Settings" chip row by formatSettingsChips()
  *   above -- see that function's own doc comment for exactly what each
@@ -327,17 +338,20 @@ function buildAttributeResultsHtml(batches, meta) {
   const generatedAt = new Date().toLocaleString();
   const metaRows = [
     meta.workspaceId ? ['Workspace', escapeHtml(meta.workspaceId)] : null,
-    // Only rendered at all when something was actually excluded -- the
-    // majority case (every document included) adds no row here, same
-    // reasoning the Rubric Control side already gets "for free" (an
-    // excluded rubric attribute is simply never in `meta`/`rows` to
-    // begin with, so there's nothing extra to report there either).
-    // Lists the excluded sourceFiles themselves, not just a count,
-    // since "2 documents were excluded" on its own doesn't tell anyone
-    // reading this report later WHICH two. See `excludedDocuments`'s
-    // own doc comment below for where this value actually comes from.
-    meta.excludedDocuments && meta.excludedDocuments.length > 0
-      ? ['Documents excluded from search', escapeHtml(meta.excludedDocuments.join(', '))]
+    // Names what WAS searched, not what wasn't -- see this function's
+    // own doc comment above for the full reasoning. Gated on
+    // `workspaceId` (same as the "Workspace" row just above) rather
+    // than on `excludedDocuments`/`includedDocuments` themselves, so
+    // this appears every time a real workspace was searched -- "All"
+    // in the common, nothing-excluded case -- and never appears at all
+    // in rubric-comparison mode, where neither field means anything.
+    meta.workspaceId
+      ? [
+          'Documents included in search',
+          meta.excludedDocuments && meta.excludedDocuments.length > 0
+            ? escapeHtml((meta.includedDocuments || []).join(', ') || 'none')
+            : 'All',
+        ]
       : null,
     meta.rubricLabel ? ['Compared against rubric', escapeHtml(meta.rubricLabel)] : null,
     meta.topicLabel ? ['Ideal-proposal topic', escapeHtml(meta.topicLabel)] : null,

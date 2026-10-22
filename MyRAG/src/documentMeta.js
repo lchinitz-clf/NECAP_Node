@@ -38,6 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workspaceDir, ensureWorkspaceDir } = require('./workspace');
+const { listDocuments } = require('./store');
 
 /** @param {string} workspaceId @returns {string} */
 function metaPath(workspaceId) {
@@ -147,6 +148,34 @@ function getExcludedSourceFiles(workspaceId) {
 }
 
 /**
+ * Every document actually embedded in this workspace (per store.js's
+ * listDocuments() — the real set of what's searchable, not just
+ * whatever happens to have an entry in documentMeta.json) that is NOT
+ * excluded — the complement of getExcludedSourceFiles() above, against
+ * that real set rather than just the documentMeta.json keys.
+ *
+ * Used by the "Documents included in search" report row (see
+ * buildAttributeResultsHtml() in public/reportHtml.js) once that
+ * row's design shifted from listing what
+ * was EXCLUDED to listing what was actually INCLUDED: the typical use
+ * case here is excluding a document or two to focus a comparison on
+ * the ones that remain, so naming the one or two documents actually
+ * searched is far more useful at a glance than naming everything else
+ * that wasn't — especially once a workspace holds more than a
+ * handful of documents, where "excluded: X, Y" leaves the reader to
+ * infer everything else by elimination.
+ * @param {string} workspaceId
+ * @returns {string[]} included sourceFiles, in the same order
+ *   listDocuments() already returns them (sorted by sourceFile)
+ */
+function getIncludedSourceFiles(workspaceId) {
+  const excluded = getExcludedSourceFiles(workspaceId);
+  return listDocuments(workspaceId)
+    .map((d) => d.sourceFile)
+    .filter((sourceFile) => !excluded.has(sourceFile));
+}
+
+/**
  * Sets, or — given `true`, the default — clears, one document's
  * inclusion flag. Mirrors setDescription()'s own shape: only a real
  * exclusion is ever actually written (`{ included: false }`),
@@ -203,5 +232,6 @@ module.exports = {
   deleteDescription,
   isDocumentIncluded,
   getExcludedSourceFiles,
+  getIncludedSourceFiles,
   setIncluded,
 };

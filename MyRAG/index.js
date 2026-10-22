@@ -35,7 +35,7 @@ const { filterBestPracticeAttributes, listDistinctHazards, listDistinctStates } 
 const { parseComparisonAnswer, RETRY_TRIGGER_VERDICTS, mergeRetryRecord, verdictRank, verifyQuotesInPlace } = require('./src/responseParser');
 const { inspectWorkbook, convertSheetToAttributes } = require('./src/xlsxImport');
 const { logQueryActivity, logAction } = require('./src/activityLog');
-const { getAllDescriptions, setDescription, deleteDescription, getExcludedSourceFiles, setIncluded } = require('./src/documentMeta');
+const { getAllDescriptions, setDescription, deleteDescription, getExcludedSourceFiles, getIncludedSourceFiles, setIncluded } = require('./src/documentMeta');
 const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogEntryAnswer } = require('./src/logViewer');
 const { basicAuth, resolveRole } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
@@ -1740,6 +1740,14 @@ app.post('/query', lockGate, async (req, res) => {
   // may not even be a real one in that case (see wsErr above) — so
   // this is skipped entirely rather than resolved unconditionally.
   const excludedSourceFiles = rubricMatches ? new Set() : getExcludedSourceFiles(workspaceId);
+  // Same guard as excludedSourceFiles just above, same reason: never
+  // actually used (and workspaceId may not even be real) when
+  // rubricMatches is set. See getIncludedSourceFiles()'s own doc
+  // comment in src/documentMeta.js — this is what the "Documents
+  // included in search" report row (buildAttributeResultsHtml() in
+  // public/reportHtml.js) actually names now, rather than the
+  // excluded list.
+  const includedDocuments = rubricMatches ? [] : getIncludedSourceFiles(workspaceId);
 
   // `batches` is what makes the "attributes per call" Advanced setting
   // work: a topic's attributes get split into one or more chunks (see
@@ -1934,14 +1942,23 @@ app.post('/query', lockGate, async (req, res) => {
       // Every sourceFile the Documents tab's Include checkboxes
       // excluded for THIS workspace at the moment this request's
       // retrieval actually ran — see getExcludedSourceFiles() in
-      // src/documentMeta.js. Sent back so the browser's own "Export
-      // HTML" report (see buildAttributeResultsHtml() in
-      // public/reportHtml.js) can say which documents a run actually
-      // searched, without re-fetching the Documents tab's CURRENT
-      // state later and risking a mismatch if a checkbox changed in
-      // between. Always [] in rubric-comparison mode (no workspace is
-      // touched there at all).
+      // src/documentMeta.js. Sent back (alongside includedDocuments
+      // just below) so the browser's own "Export HTML" report (see
+      // buildAttributeResultsHtml() in public/reportHtml.js) can say
+      // which documents a run actually searched, without re-fetching
+      // the Documents tab's CURRENT state later and risking a
+      // mismatch if a checkbox changed in between. Always [] in
+      // rubric-comparison mode (no workspace is touched there at
+      // all). Kept around (rather than just sending includedDocuments
+      // alone) since it's what the report actually keys its "all
+      // included" vs. "name the included ones" wording decision on —
+      // see that function's own doc comment.
       excludedDocuments: [...excludedSourceFiles],
+      // The report's main payload now — see getIncludedSourceFiles()'s
+      // own doc comment in src/documentMeta.js for why this, not the
+      // excluded list above, is what actually gets NAMED in the
+      // report when something was excluded.
+      includedDocuments,
     });
   } catch (err) {
     console.error(err);
@@ -2110,6 +2127,10 @@ app.post('/query/stream', lockGate, async (req, res) => {
   // batch's own retrieval, and the "retry against a wider band" pass)
   // filters against this same excluded-document set.
   const excludedSourceFiles = rubricMatches ? new Set() : getExcludedSourceFiles(workspaceId);
+  // Same guard, same reason, as the /query route above — see
+  // getIncludedSourceFiles()'s own doc comment in
+  // src/documentMeta.js.
+  const includedDocuments = rubricMatches ? [] : getIncludedSourceFiles(workspaceId);
 
   // See the long comment on batchAttributes() in src/idealProposals.js
   // and on /query above — same batching, just streamed per batch here
@@ -2216,6 +2237,7 @@ app.post('/query/stream', lockGate, async (req, res) => {
       // this is sent here too — a caller's "done" handler shouldn't
       // need to special-case the no-documents path to still get this.
       excludedDocuments: [...excludedSourceFiles],
+      includedDocuments,
     });
     return res.end();
   }
@@ -2497,6 +2519,7 @@ app.post('/query/stream', lockGate, async (req, res) => {
         // See the matching field on /query's own final response — same
         // "captured once per request, not per batch" value.
         excludedDocuments: [...excludedSourceFiles],
+        includedDocuments,
       });
       logQueryActivity({
         req,
@@ -2532,6 +2555,7 @@ app.post('/query/stream', lockGate, async (req, res) => {
           attributesPerCall,
           elapsedMs: Date.now() - requestStartedAt,
           excludedDocuments: [...excludedSourceFiles],
+          includedDocuments,
         }).catch((err) => console.error('[query/stream] unexpected error sending completion email:', err));
       }
     } else {

@@ -134,6 +134,13 @@
   // exactly why buildExportMeta() below is fine passing this through
   // unconditionally rather than branching on compareMode itself.
   let lastExcludedDocuments = [];
+  // The complement of lastExcludedDocuments above — same "captured
+  // from the run's own 'done' event" reasoning, same always-empty-in-
+  // 'rubric'-mode behavior. This, not lastExcludedDocuments, is what
+  // the exported report's "Documents included in search" row actually
+  // names when something was excluded — see buildAttributeResultsHtml()'s
+  // own doc comment in reportHtml.js.
+  let lastIncludedDocuments = [];
   // Live-updating timer handle -- same mechanism as script.js's
   // queryTimerHandle: a setInterval started alongside runStartedAt
   // above, re-rendering elapsedTimeEl every tick via the shared
@@ -966,6 +973,7 @@
     latestBatches = [];
     lastElapsedMs = null;
     lastExcludedDocuments = [];
+    lastIncludedDocuments = [];
     gotAnyToken = false;
     resultWrap.style.display = 'none';
     resultSummaryEl.textContent = '';
@@ -1091,6 +1099,7 @@
 
       // See lastExcludedDocuments's own doc comment above.
       lastExcludedDocuments = finalEvent.excludedDocuments || [];
+      lastIncludedDocuments = finalEvent.includedDocuments || [];
 
       // See renderBpTokenUsage()'s own doc comment above -- lastNumCtx
       // was captured at the moment THIS run's request was actually
@@ -1185,12 +1194,15 @@
       attributesPerCall,
       appName: (appNameEl && appNameEl.textContent.trim()) || undefined,
       elapsedMs: lastElapsedMs != null ? lastElapsedMs : undefined,
-      // Always [] in 'rubric' compare mode (see lastExcludedDocuments's
-      // own doc comment above) — buildAttributeResultsHtml() only ever
-      // renders a row for this when the array is non-empty, so that
-      // mode's export simply shows nothing extra, same as a workspace
-      // run where nothing happens to be excluded.
+      // Always [] (both) in 'rubric' compare mode (see
+      // lastExcludedDocuments's own doc comment above) — but that mode
+      // also always leaves `workspaceId` above undefined, which is what
+      // actually keeps buildAttributeResultsHtml() from rendering a
+      // "Documents included in search" row at all for that mode (see
+      // that function's own doc comment), not these two arrays being
+      // empty.
       excludedDocuments: lastExcludedDocuments,
+      includedDocuments: lastIncludedDocuments,
       // temperature/maxTokens/numCtx/repeatPenalty/think -- same live
       // re-read at export time as every other field in this object
       // (see this function's own doc comment above), via the same

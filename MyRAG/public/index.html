@@ -74,7 +74,19 @@
 
 <section class="card" id="workspaceCard">
   <h2>Document storage area</h2>
-  <label for="workspace">Storage area name</label>
+  <!-- The included-document count sits next to the label itself
+       (a flex row), not its own paragraph below -- deliberately, so
+       it's visible at a glance without growing the page. See
+       refreshDocuments() in script.js, which is also what already
+       computes this same count for documentsExcludedNote further
+       down -- #workspaceDocCount is just a second, always-shown,
+       more concise rendering of that same data, visible on every
+       workspace-scoped tab (this card's slot), not only Documents
+       Management. -->
+  <div class="label-row">
+    <label for="workspace">Storage area name</label>
+    <span id="workspaceDocCount" class="workspace-doc-count" style="display:none;"></span>
+  </div>
   <input type="text" id="workspace" list="workspaceList" placeholder="e.g. ma-climate-plan" autocomplete="off" />
   <datalist id="workspaceList"></datalist>
   <p class="hint">
