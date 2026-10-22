@@ -1582,252 +1582,272 @@
       "label": "Drought",
       "attributes": [
         {
-          "name": "EH1 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "How does the state define extreme heat in its climate resilience plan?",
+          "name": "Drgt01 - Accountability & Governance - Coordination",
+          "proposal": "How will state agencies coordinate drought response with municipalities, utilities and community-based organizations?",
           "included": true
         },
         {
-          "name": "EH2 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "What temperature thresholds or heat index values does the plan use?",
+          "name": "Drgt02 - Accountability & Governance - Costs",
+          "proposal": "What is the cost of proposed drought resilience actions?",
           "included": true
         },
         {
-          "name": "EH3 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "What health impacts from extreme heat does the plan highlight?",
+          "name": "Drgt03 - Accountability & Governance - Funding and financing",
+          "proposal": "What is the impact and cost of potential droughts?",
           "included": true
         },
         {
-          "name": "EH4 - Vulnerability and Risk Assessment - Infrastructure",
-          "proposal": "How does extreme heat affect transportation, energy systems, or buildings?",
+          "name": "Drgt04 - Accountability & Governance - Funding and financing",
+          "proposal": "What are specific funding sources and mechanisms for drought resilience?",
           "included": true
         },
         {
-          "name": "EH5 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan identify the number of projected extreme heat days by mid-century, and how does it compare to current conditions?",
+          "name": "Drgt05 - Accountability & Governance - Indicators",
+          "proposal": "What indicators will measure long-term drought resilience (including on human health)?",
           "included": true
         },
         {
-          "name": "EH6 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan specify which regions or municipalities face the highest projected heat risk?",
+          "name": "Drgt06 - Accountability & Governance - Roles and Responsibilities",
+          "proposal": "Which agencies are responsible for implementing the state’s extreme DROUGHT strategies?",
           "included": true
         },
         {
-          "name": "EH7 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "How does the plan address risks to outdoor workers, unhoused residents, and people without access to cooling?",
+          "name": "Drgt07 - Accountability & Governance - Transparency",
+          "proposal": "How will the public learn about progress on drought resilience?",
           "included": true
         },
         {
-          "name": "EH8 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "Does the plan discuss compounding impacts of heat with air quality, drought, or wildfire smoke?",
+          "name": "Drgt08 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What will be done to preserve or restore floodplains?",
           "included": true
         },
         {
-          "name": "EH9 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan identify specific neighborhoods or census tracts as heat-vulnerable?",
+          "name": "Drgt09 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What will be done to preserve or restore wetlands?",
           "included": true
         },
         {
-          "name": "EH10 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "Does the plan reference wet-bulb temperature thresholds or extreme heat mortality projections?",
+          "name": "Drgt10 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "will invasive vegetation be removed and replaced with native plant species?",
           "included": true
         },
         {
-          "name": "EH11 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "Does the plan propose updates to building codes to improve cooling and energy efficiency?",
+          "name": "Drgt11 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What will be done to preserve or create riparian buffers?",
           "included": true
         },
         {
-          "name": "EH12 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "Does the plan reference state or municipal ordinances related to heat mitigation?",
+          "name": "Drgt12 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What measures will be implemented to improve water use in agriculture?",
           "included": true
         },
         {
-          "name": "EH13 - Policy and Regulatory Implementation - Physical Assets",
-          "proposal": "Does the plan propose mandatory cooling standards for rental housing or public buildings?",
+          "name": "Drgt13 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What measures will be used to encourage use of green infrastructre that recharges ground water (like green roofs, permeable pavement)?",
           "included": true
         },
         {
-          "name": "EH14 - Policy and Regulatory Implementation - Physical Assets",
-          "proposal": "Does the plan address utility shutoff protections during extreme heat events?",
+          "name": "Drgt14 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "What measures will be implemented to improve the role of forests in drought management?",
           "included": true
         },
         {
-          "name": "EH15 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "Does the plan identify regulatory barriers that limit implementation of heat resilience strategies?",
+          "name": "Drgt15 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+          "proposal": "How are local drought response plans encouraged?",
           "included": true
         },
         {
-          "name": "EH16 - Policy and Regulatory Implementation - Human health",
-          "proposal": "Does the plan commit to adopting enforceable heat safety standards for outdoor workers?",
+          "name": "Drgt16 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+          "proposal": "How will alternative water sources be encouraged?",
           "included": true
         },
         {
-          "name": "EH17 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "How does the plan support municipalities in developing local heat resilience plans?",
+          "name": "Drgt17 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+          "proposal": "How will the plan encourage water conservation measures?",
           "included": true
         },
         {
-          "name": "EH18 - Local Capacity Building - Supporting Local Governments",
-          "proposal": "Does the plan provide technical assistance or funding for local heat mitigation projects?",
+          "name": "Drgt18 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+          "proposal": "What improvements at water utilities will be funded?",
           "included": true
         },
         {
-          "name": "EH19 - Local Capacity Building - Capacity building",
-          "proposal": "Does the plan outline training or capacity-building programs for local officials, emergency managers, or public health departments?",
+          "name": "Drgt19 - Adaptation Strategies & Long-Term Actions - Infrastructure",
+          "proposal": "What technical assistance will be provided for communities to build resilence into public water supplies.",
           "included": true
         },
         {
-          "name": "EH20 - Local Capacity Building - Community Outreach",
-          "proposal": "Does the plan support community-based organizations in outreach, education, or heat emergency response?",
+          "name": "Drgt20 - Equity & Environmental Justice - Community Outreach",
+          "proposal": "How will communities be engaged in desinging drought resilience strategies?",
           "included": true
         },
         {
-          "name": "EH21 - Local Capacity Building - Data",
-          "proposal": "Does the plan encourage local data collection such as heat mapping or vulnerability assessments?",
+          "name": "Drgt21 - Equity & Environmental Justice - Community Outreach",
+          "proposal": "What barriers will be faced by renters, low-income communities, non-English speakers, or undocumented residents during extreme drought events?",
           "included": true
         },
         {
-          "name": "EH22 - Local Capacity Building - Community Outreach",
-          "proposal": "Does the plan outline public education campaigns about extreme heat risks?",
+          "name": "Drgt22 - Equity & Environmental Justice - Distribution of Impacts",
+          "proposal": "How is the disproportionate impact of drought addressed for low-income communities or environmental justice communities?",
           "included": true
         },
         {
-          "name": "EH23 - Local Capacity Building - Legal and Regulatory Frameworks",
-          "proposal": "Does the plan require or incentivize municipalities to adopt heat-resilient land-use or zoning policies?",
+          "name": "Drgt23 - Equity & Environmental Justice - System Adaptation",
+          "proposal": "how can drought resilience investments avoid displacement or gentrification?",
           "included": true
         },
         {
-          "name": "EH24 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "What heat emergency response measures does the plan include?",
+          "name": "Drgt24 - Local Capacity Building - technical assistance",
+          "proposal": "Does the plan support community-based organizations in outreach, education, or DROUGHT emergency response?",
           "included": true
         },
         {
-          "name": "EH25 - Disaster Response and Preparedness - Emergency Identification",
-          "proposal": "Does the plan describe early warning systems or public communication strategies for heat waves?",
+          "name": "Drgt25 - Local Capacity Building - technical assistance",
+          "proposal": "What public education campaigns around extreme drought risks will occur?",
           "included": true
         },
         {
-          "name": "EH26 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan address access to cooling centers, including transportation and extended hours?",
+          "name": "Drgt26 - Local Capacity Building - technical assistance",
+          "proposal": "Does the plan encourage local data collection such as DROUGHT mapping or vulnerability assessments?",
           "included": true
         },
         {
-          "name": "EH27 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan outline protocols for protecting unhoused residents during extreme heat events?",
+          "name": "Drgt27 - Local Capacity Building - incentives",
+          "proposal": "Does the plan require or incentivize municipalities to adopt DROUGHT-resilient land-use or zoning policies?",
           "included": true
         },
         {
-          "name": "EH28 - Disaster Response and Preparedness - Coordination",
-          "proposal": "Does the plan coordinate heat response with air quality alerts or wildfire smoke events?",
+          "name": "Drgt28 - Local Capacity Building - technical assistance",
+          "proposal": "How are local water supply availability and reliability assessments supported?",
           "included": true
         },
         {
-          "name": "EH29 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan include surge capacity planning for hospitals and EMS during extreme heat?",
+          "name": "Drgt28a - Local Capacity Building - technical assistance",
+          "proposal": "Does the plan require or incentivize municipalities to adopt outdoor water use bylaws?",
           "included": true
         },
         {
-          "name": "EH30 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
-          "proposal": "What strategies does the plan propose to reduce urban heat islands?",
+          "name": "Drgt28b - Local Capacity Building - technical assistance",
+          "proposal": "Does the plan require or incentivize municipalities to develop a local drought management plan?",
           "included": true
         },
         {
-          "name": "EH31 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
-          "proposal": "What long-term cooling infrastructure investments does the plan recommend?",
+          "name": "Drgt28c - Local Capacity Building - technical assistance",
+          "proposal": "Does the plan require or incentivize municipalities to develop water pricing strategies that encourage conservation?",
           "included": true
         },
         {
-          "name": "EH32 - Adaptation Strategies & Long-Term Actions - Heat Reduction",
-          "proposal": "Does the plan commit to expanding tree canopy in historically underserved neighborhoods, and does it set measurable targets?",
+          "name": "Drgt29 - Policy and Regulatory Implementation - Regulatory barriers",
+          "proposal": "Does the plan identify regulatory barriers that limit implementation of DROUGHT resilience strategies?",
           "included": true
         },
         {
-          "name": "EH33 - Adaptation Strategies & Long-Term Actions - System Adaptation",
-          "proposal": "How does the plan integrate heat resilience with decarbonization or electrification goals?",
+          "name": "Drgt30 - Policy and Regulatory Implementation - Local Ordinances",
+          "proposal": "How will water shutoff occur during drought events?",
           "included": true
         },
         {
-          "name": "EH34 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
-          "proposal": "Does the plan address backup power for critical facilities such as cooling centers, public housing, and shelters?",
+          "name": "Drgt31 - Policy and Regulatory Implementation - Building Codes / Zoning",
+          "proposal": "What changes to building codes will occur to require water conservation?",
           "included": true
         },
         {
-          "name": "EH35 - Adaptation Strategies & Long-Term Actions - Heat Mitigation",
-          "proposal": "Does the plan propose incentives for energy-efficient cooling in vulnerable communities?",
+          "name": "Drgt32 - Policy and Regulatory Implementation - Building Codes / Zoning",
+          "proposal": "What changes to building codes will occur to require water reuse?",
           "included": true
         },
         {
-          "name": "EH36 - Equity & Environmental Justice - Distribution of Impacts",
-          "proposal": "How does the plan address disproportionate heat exposure in low-income communities?",
+          "name": "Drgt33 - Policy and Regulatory Implementation - Local Ordinances",
+          "proposal": "Is net zero water use required in new developments?",
           "included": true
         },
         {
-          "name": "EH37 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "What community engagement processes does the plan require for designing heat resilience strategies?",
+          "name": "Drgt34 - Policy and Regulatory Implementation - State guidelines",
+          "proposal": "How will non-essential water use be restricted in times of drought?",
           "included": true
         },
         {
-          "name": "EH38 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "Does the plan identify barriers faced by renters, non-English speakers, or undocumented residents during extreme heat events?",
+          "name": "Drgt35 - Policy and Regulatory Implementation - Stormwater Permitting",
+          "proposal": "What updates to MS4 or other stormwater permits are expected?",
           "included": true
         },
         {
-          "name": "EH39 - Equity & Environmental Justice - System Adaptation",
-          "proposal": "How does the plan ensure that heat resilience investments do not contribute to displacement or gentrification?",
+          "name": "Drgt36 - Policy and Regulatory Implementation - technical assistance",
+          "proposal": "What assistance will be provided to private well owners?",
           "included": true
         },
         {
-          "name": "EH40 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "Does the plan address multilingual or culturally specific communication needs?",
+          "name": "Drgt37 - Policy and Regulatory Implementation - Disclosure",
+          "proposal": "What water use disclosure requirements will be put in place?",
           "included": true
         },
         {
-          "name": "EH41 - Equity & Environmental Justice - Distribution of Impacts",
-          "proposal": "Does the plan commit to prioritizing cooling investments in environmental justice communities?",
+          "name": "Drgt38 - Policy and Regulatory Implementation - incentives",
+          "proposal": "What measures will be implemented to improve industrial and agricultural water use?",
           "included": true
         },
         {
-          "name": "EH42 - Accountability & Governance - Roles and Responsibilities",
-          "proposal": "Which agencies are responsible for implementing the state’s extreme heat strategies?",
+          "name": "Drgt38a - Policy and Regulatory Implementation - Communcations",
+          "proposal": "How will drought conditions and conservation measures be communicated to the public?",
           "included": true
         },
         {
-          "name": "EH43 - Accountability & Governance - Funding and financing",
-          "proposal": "Does the plan identify funding sources for heat resilience work?",
+          "name": "Drgt39 - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "How is extreme drought defined?",
           "included": true
         },
         {
-          "name": "EH44 - Accountability & Governance - Costs",
-          "proposal": "Does the plan estimate the cost of proposed heat resilience actions?",
+          "name": "Drgt40 - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "How is extreme drought measuresd?",
           "included": true
         },
         {
-          "name": "EH45 - Accountability & Governance - Funding and financing",
-          "proposal": "Does the plan identify specific funding mechanisms (e.g., bonds, federal grants, utility programs)?",
+          "name": "Drgt41 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "How many projected extreme drought days are expected by mid-century?",
           "included": true
         },
         {
-          "name": "EH46 - Accountability & Governance - Indicators",
-          "proposal": "What indicators does the plan propose for monitoring long-term heat resilience?",
+          "name": "Drgt42 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Which regions or municipalities or neighborhoods face the highest projected DROUGHT risk?",
           "included": true
         },
         {
-          "name": "EH47 - Accountability & Governance - Transparency",
-          "proposal": "Does the plan commit to public reporting or transparency around progress?",
+          "name": "Drgt42a - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan fund improvements in hydrologic monitoring?",
           "included": true
         },
         {
-          "name": "EH48 - Accountability & Governance - Coordination",
-          "proposal": "Does the plan specify how state agencies will coordinate with municipalities, utilities, and community-based organizations?",
+          "name": "Drgt43 - Vulnerability and Risk Assessment - Human health",
+          "proposal": "What are the health impacts from extreme drought?",
           "included": true
         },
         {
-          "name": "EH49 - Accountability & Governance - Indicators",
-          "proposal": "What metrics does the plan propose to track progress on reducing heat-related illness and mortality?",
+          "name": "Drgt44 - Vulnerability and Risk Assessment - Human health",
+          "proposal": "How do drought impacts compound with air quality issues, flash flooding, extreme heat or wildfire?",
+          "included": true
+        },
+        {
+          "name": "Drgt45 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "How will drought forecasting occur? Will it include indices such as precipitation, groundwater, streamflow and soil moisture?",
+          "included": true
+        },
+        {
+          "name": "Drgt45a - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan create a statewide database on water use and management across sectors?",
+          "included": true
+        },
+        {
+          "name": "Drgt45b - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan assess and map the vulnerability of private and public water supply wells to drought?",
+          "included": true
+        },
+        {
+          "name": "Drgt46 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "how may communities identify signficiant industrial uses of water?",
           "included": true
         }
       ],
-      "description": "Version of drought rubric from Kevin B, 10/7/2026"
+      "description": "Updated version from Liz, 10/21/2026"
     }
   ]
 }
