@@ -246,8 +246,37 @@ function getTopic(id) {
  */
 function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
   const attributes = attributesOverride || topic.attributes || [];
+  // Deliberately NOT `${a.name}: ${a.proposal}` (that was this line's
+  // shape until this comment was added) -- bare proposal text only,
+  // now. This was a conscious decision, not an oversight: an
+  // attribute's `name` can carry category/sub-category language the
+  // `proposal` text itself doesn't -- a real example that prompted
+  // this change was a name ending "... - Nature based solutions"
+  // paired with a proposal that only asked "What measures will be
+  // implemented to improve water use in agriculture?" -- and the chat
+  // model used that extra name-only language when grading, even
+  // though composeRetrievalQuery() below deliberately never searches
+  // for it (see that function's own doc comment for why not). That let
+  // grading hold a proposal accountable to material retrieval was
+  // never even asked to find. Checked first, rather than assumed: this
+  // was only done after confirming (by listing every proposal in the
+  // topic actually hit by this) that no sibling attributes share
+  // generic/duplicate proposal text differentiated only by name --
+  // i.e. this isn't discarding a real distinguishing piece of
+  // information between otherwise-identical rows, just a field that
+  // was never searched for and, in this rubric, wasn't needed to make
+  // each proposal's own ask specific enough to grade on its own.
+  // `name` is still shown everywhere else (results table, report,
+  // CSV) -- this is the ONLY place it's deliberately left out.
+  //
+  // To revert: change the `.map()` below back to
+  //   .map((a) => `- ${a.name}: ${a.proposal}`)
+  // AND see the scopeGuard comment further down in this same
+  // function -- that one also had to change, for the same reason, and
+  // both need to revert together or the name will still leak into the
+  // prompt through scopeGuard alone.
   const attributeLines = attributes
-    .map((a) => `- ${a.name}: ${a.proposal}`)
+    .map((a) => `- ${a.proposal}`)
     .join('\n');
 
   const instruction = topic.compareInstruction || HARDCODED_FALLBACK_COMPARE_INSTRUCTION;
@@ -313,10 +342,42 @@ function composeComparisonQuestion(topic, userQuestion, attributesOverride) {
   // that case keeps the two unmistakably separate rather than relying
   // on a reader (human or model) to infer which "rubric" is meant.
   const itemWord = topic.isBestPractices ? 'benchmark item' : 'rubric item';
-  const attributeNames = attributes.map((a) => `"${a.name}"`).join(', ');
+  // Deliberately no longer quotes a.name here (this used to be
+  // `const attributeNames = attributes.map((a) => \`"${a.name}"\`).join(', ');`,
+  // referenced from both branches below as ${attributeNames}) --
+  // leaving that in place would have silently undone the point of
+  // dropping the name from attributeLines above, since scopeGuard is
+  // folded into the exact same prompt either way, right below
+  // rubricBlock. Points at the RUBRIC START/END landmark instead --
+  // the same "a named landmark beats a positional 'above'" reasoning
+  // the wrapperWord comment above already uses for rubricBlock itself
+  // -- so this still anchors the model to exactly the item(s) actually
+  // in play without naming them.
+  //
+  // Only exercised, and only verified safe, for the single-attribute
+  // case (attributes.length === 1) -- the only one actually in use
+  // today, since "Attributes per call" defaults to, and in practice
+  // stays at, 1. The `else` branch below still runs without error for
+  // more than one attribute, but can no longer single any of them out
+  // by name within that batch, and compareInstruction (see
+  // HARDCODED_FALLBACK_COMPARE_INSTRUCTION above, and very likely
+  // whatever's hand-written in idealProposals.json's own
+  // defaultCompareInstruction) separately asks the model to label each
+  // attribute's answer "by that attribute's name" once more than one
+  // is batched together -- an instruction this change makes
+  // impossible to follow literally, since no attribute is named
+  // anywhere in the prompt once attributes.length > 1 either.
+  // Revisit both of those if "Attributes per call" ever goes above 1
+  // again.
+  //
+  // To revert: restore
+  //   const attributeNames = attributes.map((a) => `"${a.name}"`).join(', ');
+  // and use ${attributeNames} in place of the "listed between ...
+  // START and ... END above" phrase in both branches below (undo this
+  // together with the attributeLines revert above, not on its own).
   const scopeGuard = attributes.length === 1
-    ? `You are being asked about exactly one attribute right now: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related. Respond only about ${attributeNames} and nothing else.`
-    : `You are being asked about exactly these attributes right now, and no others: ${attributeNames}. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related.`;
+    ? `You are being asked about exactly the one ${itemWord} listed between ${wrapperWord} START and ${wrapperWord} END above, and no other. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related. Respond only about that one ${itemWord} and nothing else.`
+    : `You are being asked about exactly the ${attributes.length} ${itemWord}s listed between ${wrapperWord} START and ${wrapperWord} END above, and no others. Do not mention, evaluate, compare against, or speculate about any other attribute or ${itemWord} — not one from a previous question, not one you recognize from the source material's own structure or numbering, and not one from your own general knowledge — even if it seems related.`;
 
   const parts = [
     `An ideal ${topic.label} proposal has the following attributes:`,
