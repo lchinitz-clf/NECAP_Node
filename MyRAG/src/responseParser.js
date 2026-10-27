@@ -83,6 +83,146 @@ const CATEGORY_PATTERNS = [
   { label: 'Matches', re: /matche?s|matched/i },
 ];
 
+// Tier 1 for findBestCategoryMatch() below: each CATEGORY_PATTERNS
+// entry re-wrapped to require an explicit "Verdict" label directly
+// introducing it -- the strongest signal available, since it's the
+// model itself marking which word is the verdict rather than this
+// code inferring it from where the word happens to sit in the text.
+// Tolerates: markdown bold ("**Verdict:**") around the label and/or
+// the category word, a colon or dash (or neither) between them, and
+// a line break in place of that colon/dash -- a real model answer
+// that prompted this (see findBestCategoryMatch()'s own doc comment)
+// wrote `**Verdict:**\nNOT ADDRESSED`, label and word on separate
+// lines, which a same-line-only pattern would have missed.
+const VERDICT_LABEL_PATTERNS = CATEGORY_PATTERNS.map(({ label, re }) => ({
+  label,
+  re: new RegExp(`\\*{0,2}\\s*verdict\\s*\\*{0,2}\\s*[:\\-–—]?\\s*\\*{0,2}\\s*(?:${re.source})\\*{0,2}`, 'i'),
+}));
+
+// Tier 2 for findBestCategoryMatch() below: each CATEGORY_PATTERNS
+// entry re-wrapped to require the ENTIRE line (ignoring markdown bold
+// asterisks, a leading blockquote "&gt;" marker, and trailing
+// punctuation/whitespace) be nothing but that one category phrase --
+// a model that states its verdict as a bare standalone line without
+// ever writing the word "Verdict" at all. The 'm' flag makes ^/$
+// match at each line's own start/end rather than the whole string's.
+const VERDICT_STANDALONE_LINE_PATTERNS = CATEGORY_PATTERNS.map(({ label, re }) => ({
+  label,
+  re: new RegExp(`^[ \\t>]*\\*{0,2}\\s*(?:${re.source})\\s*\\*{0,2}[ \\t.]*$`, 'im'),
+}));
+
+/**
+ * Finds, across every pattern in `patterns`, whichever one's FIRST
+ * match occurs earliest in `text` -- used for VERDICT_LABEL_PATTERNS
+ * tier 1 in findBestCategoryMatch() below, where more than one
+ * explicit "Verdict:" label in a single answer should be rare, and
+ * the first one is the most trustworthy if it ever happens anyway
+ * (matching this file's existing "discard rambling after the real
+ * answer" posture -- see composeComparisonQuestion()'s own doc
+ * comment in idealProposals.js for where that posture comes from).
+ * @param {string} text
+ * @param {Array<{label: string, re: RegExp}>} patterns
+ * @returns {{label: string, index: number, matchedText: string}|null}
+ */
+function findEarliestMatch(text, patterns) {
+  let best = null;
+  for (const { label, re } of patterns) {
+    const m = re.exec(text);
+    if (m && (!best || m.index < best.index)) {
+      best = { label, index: m.index, matchedText: m[0] };
+    }
+  }
+  return best;
+}
+
+/**
+ * Finds, across every pattern in `patterns`, whichever one's LAST
+ * match occurs latest in `text` -- used for VERDICT_STANDALONE_LINE_PATTERNS
+ * (tier 2) and the bare CATEGORY_PATTERNS fallback (tier 3) in
+ * findBestCategoryMatch() below. Deliberately the opposite tie-break
+ * from findEarliestMatch() above: compareInstruction (see
+ * HARDCODED_FALLBACK_COMPARE_INSTRUCTION and composeComparisonQuestion()
+ * in idealProposals.js) explicitly asks for "the full, direct answer
+ * first... after your direct answer, give a verdict," so once there's
+ * no explicit "Verdict:" label to go on, the real verdict is
+ * structurally more likely to be the LAST occurrence of a category
+ * word than the first -- unlike tier 1, where a second "Verdict:"
+ * label is unusual enough that the first one is still the safer bet.
+ * @param {string} text
+ * @param {Array<{label: string, re: RegExp}>} patterns
+ * @returns {{label: string, index: number, matchedText: string}|null}
+ */
+function findLatestMatch(text, patterns) {
+  let best = null;
+  for (const { label, re } of patterns) {
+    // re.exec() alone only ever returns the FIRST match -- running it
+    // with a 'g' flag added (if the pattern doesn't already have one)
+    // and calling exec() in a loop until it returns null is the
+    // standard way to walk every match and keep the last one.
+    const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    let m;
+    let last = null;
+    while ((m = globalRe.exec(text))) {
+      last = m;
+      // Guards against an infinite loop on a zero-length match, which
+      // none of these patterns can actually produce -- cheap
+      // insurance, not a case expected to trigger.
+      if (m[0].length === 0) globalRe.lastIndex += 1;
+    }
+    if (last && (!best || last.index > best.index)) {
+      best = { label, index: last.index, matchedText: last[0] };
+    }
+  }
+  return best;
+}
+
+/**
+ * Picks the one category match extractCategoryAndResult() below
+ * should trust, out of however many of the four category words
+ * (Not addressed / Falls short / Exceeds / Matches) show up anywhere
+ * in `text`. Three tiers, tried in order, first one to find anything
+ * wins:
+ *
+ *   1. An explicit "Verdict:" label (VERDICT_LABEL_PATTERNS) directly
+ *      introducing the word -- the model marking its own verdict.
+ *   2. The word sitting alone on its own line (VERDICT_STANDALONE_LINE_PATTERNS)
+ *      -- a verdict stated without the word "Verdict" in front of it.
+ *   3. The LAST occurrence of the word anywhere at all (bare
+ *      CATEGORY_PATTERNS), even used as ordinary prose -- the final
+ *      fallback for a model that free-forms its answer with neither
+ *      of the above.
+ *
+ * This replaces what used to be a single, much simpler check: just
+ * tier 3, and with the OPPOSITE tie-break (earliest occurrence wins,
+ * not latest). That combination is what caused a real, confirmed
+ * misgrading: an attribute's answer quoted source material reading
+ * "...personnel cannot respond to emergencies when winds exceed
+ * 60 mph..." early in a long "direct answer" section, which matched
+ * the Exceeds pattern (bare "exceed", used as an ordinary verb) well
+ * before the model's actual stated verdict, `**Verdict:**\nNOT
+ * ADDRESSED`, later in the same answer -- "earliest wins" picked the
+ * quoted sentence's incidental "exceed" over the real verdict purely
+ * because of where it happened to sit in the text. Tiers 1-2 above
+ * catch that case (and the common case generally) by looking for the
+ * verdict specifically rather than scanning the whole answer
+ * undifferentiated; tier 3 is only reached for a model that does
+ * neither, and even then "latest wins" is the better default given
+ * compareInstruction's own "answer first, verdict last" structure
+ * (see findLatestMatch()'s own doc comment above for the full
+ * reasoning, including the residual, much narrower risk it still
+ * carries: trailing content AFTER a real verdict could still outrank
+ * it the same way leading content used to).
+ * @param {string} text
+ * @returns {{label: string, index: number, matchedText: string}|null}
+ */
+function findBestCategoryMatch(text) {
+  return (
+    findEarliestMatch(text, VERDICT_LABEL_PATTERNS) ||
+    findLatestMatch(text, VERDICT_STANDALONE_LINE_PATTERNS) ||
+    findLatestMatch(text, CATEGORY_PATTERNS)
+  );
+}
+
 /**
  * Finds an attribute name inside `text`, tolerating a common real-world
  * mismatch: a combined name built by joining several spreadsheet
@@ -294,13 +434,13 @@ function extractCategoryAndResult(segment, attributeName) {
   // opening quote), not merely present somewhere in the text.
   text = text.replace(/^[\s:\-–—"”]+/, '');
 
-  let best = null;
-  for (const { label, re } of CATEGORY_PATTERNS) {
-    const m = re.exec(text);
-    if (m && (!best || m.index < best.index)) {
-      best = { label, index: m.index, matchedText: m[0] };
-    }
-  }
+  // See findBestCategoryMatch()'s own doc comment for the three-tier
+  // strategy this now runs (an explicit "Verdict:" label, then a
+  // standalone verdict line, then -- only as a last resort -- the
+  // latest bare occurrence of a category word anywhere in the text)
+  // and the real misgrading it replaces a simpler, buggier check to
+  // fix.
+  const best = findBestCategoryMatch(text);
 
   // A multi-attribute batch's segment is sliced right up to (but not
   // including) the next attribute's name — see splitByAttributeNames()

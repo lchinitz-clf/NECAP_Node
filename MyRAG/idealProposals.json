@@ -417,237 +417,304 @@
     {
       "id": "coastal-resilience",
       "label": "Coastal Resilience",
-      "description": "Policy proposals for coastal resilience.",
       "attributes": [
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards",
-          "proposal": "Does the plan incorporate projections of increased frequency, severity and extent of extreme climatic events into its vulnerability and risk assessments?"
+          "name": "CR1 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "How does the plan define coastal flooding?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards (2)",
-          "proposal": "To what extent does the plan account for anticipated long-term climate trends, including projected sea level rise and increasing water temperatures, over the planning period?"
+          "name": "CR2 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan identify the number of projected coastal flooding days by 2050?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards (3)",
-          "proposal": "What specific methods and data sources does the plan use to analyze the potential for coastal inundation under various climate change scenarios (e.g., dynamic flood hazard modeling)?"
+          "name": "CR3 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan specify which regions or municipalities face the highest risk of coastal flooding?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards (4)",
-          "proposal": "What methodologies are used to analyze and project the impacts of storm surge flooding, including considerations for storm intensity and storm track?"
+          "name": "CR4 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan project sea level rise through 2050?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards (5)",
-          "proposal": "Does the plan assess the risk of saltwater intrusion into groundwater resources?"
+          "name": "CR5 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan project increased water temperatures through 2025?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Natural Hazards (6)",
-          "proposal": "Does the plan analyze the potential impacts of rising water tables on coastal infrastructure and ecosystems?"
+          "name": "CR6 - Vulnerability and Risk Assessment - Scope",
+          "proposal": "Does the plan assess the risk of high tide or sunny day flooding?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Pollutants",
-          "proposal": "Does the plan assess the vulnerability of coastal areas to non-point source pollution?"
+          "name": "CR7 - Vulnerability and Risk Assessment - Scope",
+          "proposal": "Does the plan address the risk of storm surge flooding?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Pollutants (2)",
-          "proposal": "Does the plan analyze the potential for increased introduction of toxins into coastal ecosystems?"
+          "name": "CR8 - Vulnerability and Risk Assessment - Scope",
+          "proposal": "Does the plan address the risk of compound flooding?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Species Migration",
-          "proposal": "How does the plan consider the potential impacts of species migration on coastal ecosystems and human communities?"
+          "name": "CR9 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "What specific methods and data sources does the plan use to analyze the potential for coastal inundation under various climate change scenarios?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Social Vulnerability",
-          "proposal": "How comprehensively does the plan integrate a social vulnerability lens throughout its vulnerability and risk assessment, considering factors like demographics, socioeconomic status, and historical inequities?"
+          "name": "CR10 - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "Does the plan call for improvements in coastal flood forecasting?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Social Vulnerability (2)",
-          "proposal": "How does the plan's assessment of social vulnerability address the needs of environmental justice populations, including low-income and historically marginalized communities?"
+          "name": "CR11 - Vulnerability and Risk Assessment - Natural Hazards",
+          "proposal": "Does the plan assess the risk of saltwater intrusion into groundwater resources?",
+          "included": true
         },
         {
-          "name": "Vulnerability and Risk Assessment - Prediction Accuracy",
-          "proposal": "How does the plan integrate both historical climate data and future climate projections to inform its vulnerability and risk assessments?"
+          "name": "CR12 - Vulnerability and Risk Assessment - Pollutants",
+          "proposal": "Does the plan assess the vulnerability of coastal areas to non-point source pollution?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Human Life and Health",
-          "proposal": "How does the plan address potential increases in illnesses, injuries, and loss of life due to climate change impacts?"
+          "name": "CR13 - Vulnerability and Risk Assessment - Pollutants",
+          "proposal": "Does the plan analyze the potential for increased introduction of toxins into coastal ecosystems?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Infrastructure",
-          "proposal": "How does the plan address potential damage uytility (electricity, gas, sewer, water) transmission and distribution systems (e.g., through hardening, redundancy, decentralization, cybersecurity, and system monitoring) in coastal communities?"
+          "name": "CR14 - Vulnerability and Risk Assessment - Species Migration",
+          "proposal": "Does the plan consider the potential impacts of flooding induced species migration on coastal ecosystems and human communities?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Infrastructure (2)",
-          "proposal": "What measures does the plan include to address potential damage to coastal buildings and port facilities?"
+          "name": "CR15 - Adaptation Strategies and Long-Term Actions - Protect Human Life and Health",
+          "proposal": "Does the plan address potential increases in illnesses, injuries, and loss of life due to coastal flooding?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Infrastructure (3)",
-          "proposal": "How does the plan address potential disruptions to energy production and resources and improve the resilience of energy supply chains in coastal communities?"
+          "name": "CR16 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan address potential damage to utility transmission and distribution systems in coastal communities?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Infrastructure (4)",
-          "proposal": "Does the plan address the potential for damage to nuclear waste disposal sites, including the ability of the site and containment structures to withstand flooding?"
+          "name": "CR17 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan include measures to address potential damage to coastal buildings?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Protect Infrastructure (5)",
-          "proposal": "How does the plan assess and mitigate risks to waste disposal sites from climate change impacts?"
+          "name": "CR18 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan include measures to address potential damage to working port facilities?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms",
-          "proposal": "How does the plan account for potential destruction and damage to coastal property and infrastructure?"
+          "name": "CR19 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan address potential disruptions to energy supply chains in coastal communities?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (2)",
-          "proposal": "Does the plan address the economic losses associated with the degradation, alteration, or migration of coastal ecosystems?"
+          "name": "CR20 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan address the potential for damage to nuclear waste disposal sites from coastal flooding?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (3)",
-          "proposal": "How does the plan address the potential loss of beach access due to erosion and sea level rise?"
+          "name": "CR21 - Adaptation Strategies and Long-Term Actions - Protect Infrastructure",
+          "proposal": "Does the plan assess and mitigate risks to water and waste treatment plants from coastal flooding?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (4)",
-          "proposal": "What strategies does the plan include to address potential damage to maritime-based industries (e.g., tourism; shipping; fishing; aquaculture)?"
+          "name": "CR22 - Adaptation Strategies and Long-Term Actions - Minimize Socioeconomic Harms",
+          "proposal": "Does the plan address the economic losses associated with the degradation, alteration, or migration of coastal ecosystems?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (5)",
-          "proposal": "How does the plan address the potential impacts of climate change on maritime-based industries (e.g., tourism; shipping; fishing; aquaculture)?"
+          "name": "CR23 - Adaptation Strategies and Long-Term Actions - Minimize Socioeconomic Harms",
+          "proposal": "Does the plan address the potential loss of beach access due to erosion and sea level rise?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (6)",
-          "proposal": "How does the plan address the economic impacts of the decline in quantity and quality of freshwater resources in coastal communities?"
+          "name": "CR24 - Adaptation Strategies and Long-Term Actions - Minimize Socioeconomic Harms",
+          "proposal": "Does the plan include measures to address potential damage to maritime industries, including fishing?",
+          "included": true
         },
         {
-          "name": "Resilience Strategies - Minimize Socioeconomic Harms (7)",
-          "proposal": "Does the plan address the potential loss of cultural resources due to climate change impacts?"
+          "name": "CR25 - Adaptation Strategies and Long-Term Actions - Minimize Socioeconomic Harms",
+          "proposal": "Does the plan address the economic impacts of the decline in quantity and quality of freshwater resources in coastal communities?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Prioritization",
-          "proposal": "How clearly does the plan outline criteria for prioritizing elevation and relocation projects, considering factors such as risk assessments, economic viability, and community needs?"
+          "name": "CR26 - Policy and Regulatory Implementation - Elevation and Relocation",
+          "proposal": "Does the plan address elevation or relocation of transportation infrastructure?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Funding",
-          "proposal": "Does the plan identify potential funding sources for these projects, such as grants, loans, and public-private partnerships?"
+          "name": "CR27 - Policy and Regulatory Implementation - Elevation and Relocation",
+          "proposal": "Does the plan create a program for building elevation and relocation projects?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Funding (2)",
-          "proposal": "Does the plan aign potential funding sources for these projects (e.g, grants, loans, and public-private partnerships) with project types?"
+          "name": "CR28 - Policy and Regulatory Implementation - Elevation and Relocation",
+          "proposal": "Does the plan create regulatory requirements for building elevation and relocation projects?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping",
-          "proposal": "To what extent does the plan incorporate green infrastructure elements, such as bioswales, rain gardens, and green roofs, as part of its adaptation strategy?"
+          "name": "CR29 - Policy and Regulatory Implementation - Elevation and Relocation",
+          "proposal": "Does the plan create new funding sources for building elevation and relocation projects?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (2)",
-          "proposal": "To what extent does the plan prioritize the use of nature-based solutions and living shorelines over built solutions for coastal adaptation?"
+          "name": "CR30 - Policy and Regulatory Implementation - Nature Based Solutions",
+          "proposal": "Does the plan create a program or actions to use nature-based solutions and living shorelines for coastal adaptation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (3)",
-          "proposal": "How does the plan address wet floodproofing (e.g., flood barriers, waterproofing buildings)?"
+          "name": "CR31 - Policy and Regulatory Implementation - Nature Based Solutions",
+          "proposal": "Does the plan create regulatory requirements for the use nature-based solutions and living shorelines for coastal adaptation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (4)",
-          "proposal": "How does the plan address dry floodproofing (e.g, elevating critical equipment)?"
+          "name": "CR32 - Policy and Regulatory Implementation - Nature Based Solutions",
+          "proposal": "Does the plan fund the use of nature-based solutions and living shorelines for coastal adaptation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (5)",
-          "proposal": "How does the plan address the protection of vulnerable areas from erosion through the construction of both 'grey' infrastructure (e.g., seawalls, breakwaters, groins) and 'green' infrastructure (e.g., dune restoration, beach nourishment)?"
+          "name": "CR33 - Policy and Regulatory Implementation - Solution Shaping",
+          "proposal": "How does the plan address the protection of vulnerable coastal areas from erosion?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (6)",
-          "proposal": "Does the plan call for the management, conservation, and restoration of coastal vegetation, including salt marshes, seagrass beds, and oyster reefs?"
+          "name": "CR34 - Policy and Regulatory Implementation - Solution Shaping",
+          "proposal": "Does the plan call for the management, conservation, and restoration of coastal vegetation, including salt marshes, seagrass beds, and oyster reefs?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (7)",
-          "proposal": "Does the plan call for the management and preservation of coastal habitats and protected areas to help maintain biodiversity?"
+          "name": "CR35 - Policy and Regulatory Implementation - Solution Shaping",
+          "proposal": "Does the plan call for the management and preservation of coastal habitats and protected areas to help maintain biodiversity?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (8)",
-          "proposal": "How effective are the proposed strategies for managed retreat from at-risk areas, including financial assistance programs for property buyouts, relocation assistance, and community planning for resettlement?"
+          "name": "CR36 - Policy and Regulatory Implementation - Solution Shaping",
+          "proposal": "Does the plan propose strategies for managed retreat from at-risk areas?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (9)",
-          "proposal": "Does the plan address potential conflicts between zoning regulations and the needs of vulnerable populations?"
+          "name": "CR37 - Policy and Regulatory Implementation - Working Waterfronts",
+          "proposal": "Does the plan create a program for the protection of ports and working waterfronts from coastal flooding?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (10)",
-          "proposal": "What policy and regulatory actions does the plan recommend for insurance reform that incentivizes climate adaptation?"
+          "name": "CR38 - Policy and Regulatory Implementation - Working Waterfronts",
+          "proposal": "Does the plan create new regulatory requirements for the protection of ports and working waterfronts from coastal flooding?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (11)",
-          "proposal": "What policy and regulatory actions does the plan suggest for the protection of ports and working waterfronts?"
+          "name": "CR39 - Policy and Regulatory Implementation - Working Waterfronts",
+          "proposal": "Does the plan create new sources of funding for the  protection of ports and working waterfronts from coastal flooding?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (12)",
-          "proposal": "What policy and regulatory actions does the plan suggest for job creation tied to ecosystem restoration and preservation?"
+          "name": "CR40 - Policy and Regulatory Implementation - Coastal Ecosystems",
+          "proposal": "Does the plan create a program for coastal ecosystem restoration and preservation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (13)",
-          "proposal": "What policy and regulatory actions does the plan suggest for job creation tied to infrastructure construction and improvement?"
+          "name": "CR41 - Policy and Regulatory Implementation - Coastal Ecosystems",
+          "proposal": "Does the plan create new regulatory requirements for coastal ecosystem restoration and preservation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Solution Shaping (14)",
-          "proposal": "What policy and regulatory actions does the plan suggest for economic diversification in coastal communities?"
+          "name": "CR42 - Policy and Regulatory Implementation - Coastal Ecosystems",
+          "proposal": "Does the plan create new funding sources for coastal ecosystem restoration and preservation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Equity",
-          "proposal": "How does the plan ensure that the burdens and benefits of climate adaptation are distributed equitably across the coastal region's population?"
+          "name": "CR43 - Policy and Regulatory Implementation - Economic Development",
+          "proposal": "Does the address the need for economic diversification in coastal communities?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Land Use and Zoning",
-          "proposal": "How does the plan address updating building codes to account for the identified hazards and how does it address zoning and permitting reform to account for these hazards?"
+          "name": "CR44 - Policy and Regulatory Implementation - Insurance Reform",
+          "proposal": "Does the plan recommend for insurance reform that incentivizes coastal climate adaptation?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Land Use and Zoning (2)",
-          "proposal": "How does the plan address updating land use laws and regulations to account for the identified hazards?"
+          "name": "CR45 - Policy and Regulatory Implementation - Building Codes",
+          "proposal": "Does the plan call for updating building codes to increase resilience to coastal flooding?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Land Use and Zoning (3)",
-          "proposal": "What policy and regulatory actions does the plan recommend for building resilient affordable housing?"
+          "name": "CR46 - Policy and Regulatory Implementation - Zoning",
+          "proposal": "Does the plan call for zoning reform to increase resilience to coastal flooding?",
+          "included": true
         },
         {
-          "name": "Policy and Regulatory Implementation - Land Use and Zoning (4)",
-          "proposal": "What policy and regulatory actions does the plan recommend for anti-displacement measures that prevent climate gentrification?"
+          "name": "CR47 - Equity and Environmental Justice - Social Vulnerability",
+          "proposal": "Does the plan integrate a social vulnerability lens throughout its vulnerability and risk assessment?",
+          "included": true
         },
         {
-          "name": "Local Capacity Building - Community Outreach",
-          "proposal": "How does the plan outline strategies for building the capacity of local communities to conduct community outreach and education?"
+          "name": "CR48 - Equity and Environmental Justice - Social Vulnerability",
+          "proposal": "Does the plan address the needs of environmental justice populations, including low-income and historically marginalized communities?",
+          "included": true
         },
         {
-          "name": "Local Capacity Building - Community Outreach (2)",
-          "proposal": "How does the plan call for building the capacity of local communities to increase access to information, including for vulnerable or marginalized communities?"
+          "name": "CR49 - Equity and Environmental Justice - Land Use and Zoning",
+          "proposal": "What policy and regulatory actions does the plan recommend for building resilient affordable housing?",
+          "included": true
         },
         {
-          "name": "Local Capacity Building - Land Use and Zoning",
-          "proposal": "How does the plan call for building the capacity of local communities for local land use planning and zoning?"
+          "name": "CR50 - Equity and Environmental Justice - Land Use and Zoning",
+          "proposal": "Does the plan recommend anti-displacement measures that prevent climate gentrification in coastal areas?",
+          "included": true
         },
         {
-          "name": "Local Capacity Building - Social Capital",
-          "proposal": "How does the plan call for building the capacity of local communities for strengthening human or social capital?"
+          "name": "CR51 - Equity and Environmental Justice - Community Outreach",
+          "proposal": "Does the plan call for building the capacity of local communities to increase access to information, including for vulnerable or marginalized communities?",
+          "included": true
         },
         {
-          "name": "Local Capacity Building - Social Capital (2)",
-          "proposal": "How does the plan otherwise call for providing local communities with technical assistance and financial assistance?"
+          "name": "CR52 - Local Capacity Building - Community Outreach",
+          "proposal": "Does plan outline strategies for building the capacity of local communities to conduct community outreach and education?",
+          "included": true
         },
         {
-          "name": "Disaster Response and Preparedness - Accountability",
-          "proposal": "Does the plan delineate lines of authority and responsibility for disaster response, with specific accountability measures for all levels of government and key stakeholders?"
+          "name": "CR53 - Local Capacity Building - Technical Assistance",
+          "proposal": "Does the plan provide technical assistances for local communitie to develop municipal coastal resilience plans?",
+          "included": true
         },
         {
-          "name": "Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Are disaster response teams staffed and trained for extreme climate-exacerbated weather events?"
+          "name": "CR54 - Local Capacity Building - Technical Assistance",
+          "proposal": "Does the plan encourage regional collaboration in creating coastal resilience plans?",
+          "included": true
         },
         {
-          "name": "Disaster Response and Preparedness - Evacuation Planning",
-          "proposal": "Does the plan address evacuation planning for coastal communities, including designated safe routes and shelter locations?"
+          "name": "CR55 - Local Capacity Building - Funding",
+          "proposal": "Does the plan provide new funding for local communitie to develop municipal coastal resilience plans?",
+          "included": true
         },
         {
-          "name": "Disaster Response and Preparedness - Preparedness",
-          "proposal": "Does the plan ensure that the state and coastal communities are prepared for more climate related disasters?"
+          "name": "CR56 - Disaster Response and Preparedness - Accountability",
+          "proposal": "Does the plan delineate lines of authority and responsibility for disaster response, with specific accountability measures for all levels of government and key stakeholders?",
+          "included": true
         },
         {
-          "name": "Disaster Response and Preparedness - Preparedness (2)",
-          "proposal": "Does the plan ensure that disaster warning systems are operating, adequately funded, and well-managed?"
+          "name": "CR57 - Disaster Response and Preparedness - Emergency Response",
+          "proposal": "Does the plan ensure disaster response teams are staffed and trained for coastal flooding events?",
+          "included": true
+        },
+        {
+          "name": "CR58 - Disaster Response and Preparedness - Evacuation Planning",
+          "proposal": "Does the plan address evacuation planning for coastal communities?",
+          "included": true
+        },
+        {
+          "name": "CR59 - Disaster Response and Preparedness - Preparedness",
+          "proposal": "Does the plan ensure that disaster warning systems are adequate?",
+          "included": true
         }
-      ]
+      ],
+      "description": "Policy proposals for coastal resilience."
     },
     {
       "id": "community-engagement-equity",
@@ -799,197 +866,197 @@
         {
           "name": "HW01 - Accountability & Governance - Roles and Responsibilities",
           "proposal": "The plan should identify specific governmental agencies which are responsible for implementing the state’s HIGH WIND strategies.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW02 - Accountability & Governance - Funding and financing",
           "proposal": "The plan shall identify funding sources for HIGH WIND resilience work.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW03 - Accountability & Governance - Costs",
           "proposal": "The plan should estimate the cost of proposed HIGH WIND resilience actions.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW04 - Accountability & Governance - Indicators",
-          "proposal": "The plan should propose specific indicators for monitoring long-term HIGH WIND resilience, for example, reducing the duration of outages after high wind events.",
+          "proposal": "The plan should propose specific indicators (metrics) for monitoring long-term HIGH WIND resilience, for example, reducing the duration of outages after high wind events.",
           "included": true
         },
         {
           "name": "HW05 - Accountability & Governance - Transparency",
           "proposal": "The plan should commit to public reporting and transparency related to progress towards meeting its goals.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW06 - Accountability & Governance - Coordination",
           "proposal": "The plan should specify how state agencies will coordinate with municipalities, utilities, and community-based organizations.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW07 - Accountability & Governance - Coordination",
           "proposal": "The plan should describe how the public can learn about progress on high wind resilience.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW08 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should specify urban forestry design techniquest that will be used to reduce wind vulnerability.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW09 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should discuss the protection and restoration of coastal wetlands and dune systems which can be used to buffer wind impacts.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW10 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should discuss specific plans to deploy green infrastructure for high‑wind resilience in urban and suburban areas.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW11 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should reduce high‑wind risk at the landscape scale by discussion of techniques such as, but not limited to: maintaining contiguous habitat corridors, restricting development in forest‑edge and ridge‑top areas most exposed to wind, and aligning land conservation priorities with wind risk mapping.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW12 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "The plan should commit to proactive grid hardening that includes techniques such as, but not limited to, selective undergrounding of power lines in high‑outage corridors and environmental justice communities, grid modernization measures such as distributed energy resources (microgrids), and grid segmentation to prevent cascading failures during high‑wind events.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW13 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "The plan should commit to deploying \"islandable\" microgrids specifically designed to maintain power during high‑wind events, particularly for critical facilities and community anchor institutions.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW14 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "The plan shall prioritize clean, renewable distributed energy and storage for wind resilience while minimizing reliance on fossil‑fuel backup generation.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW15 - Disaster Response and Preparedness - Emergency Response",
           "proposal": "The plan should specify specific HIGH WIND weather emergency response measures,  such as, but not limited to, specifications for backup power generation and plans for healthcare systems and water and wastewater utilities.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW16 - Disaster Response and Preparedness - Emergency Identification",
           "proposal": "The plan shall describe early warning systems or public communication strategies for HIGH WINDS.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW17 - Disaster Response and Preparedness - Emergency Response",
           "proposal": "The plan shall outline protocols for protecting unhoused residents during HIGH WIND events.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW18 - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "The plan should address how high wind exposure may have disproportionate effects in Environmental Justice communities.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW19 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan shall propose community engagement processes for designing HIGH WIND resilience strategies.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW20 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan should identify barriers faced by renters, non-English speakers, and undocumented residents during HIGH WIND events.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW21 - Equity & Environmental Justice - System Adaptation",
           "proposal": "The plan should describe strategies to ensure that HIGH WIND resilience investments do not contribute to displacement or gentrification of neighborhoods.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW22 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan should account for differential impacts among various communities, such as different levels of infrastructure fragility and different levels of access to insurance or recovery funds.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW23 - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "The plan should commit to prioritizing HIGH WIND resilience investments in environmental justice communities.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW24 - Local Capacity Building - Supporting Local Governments",
           "proposal": "The plan shall support municipalities in developing local HIGH WIND resilience plans.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW25 - Local Capacity Building - Supporting Local Governments",
           "proposal": "The plan shall provide technical assistance or funding for local HIGH WIND mitigation projects",
-          "included": true
+          "included": false
         },
         {
           "name": "HW26 - Local Capacity Building - Capacity building",
           "proposal": "The plan shall outline training or capacity-building programs for local officials, emergency managers, and public health departments.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW27 - Local Capacity Building - Community Outreach",
           "proposal": "The plan should support community-based organizations in outreach, education, and HIGH WIND emergency response.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW28 - Local Capacity Building - Data",
           "proposal": "The plan should encourage local data collection such as, but not limited to, wind risk mapping and vulnerability assessments.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW29 - Local Capacity Building - Community Outreach",
           "proposal": "The plan shall outline public education campaigns for communicating HIGH WIND risks.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW30 - Local Capacity Building - Legal and Regulatory Frameworks",
           "proposal": "The plan shall either require or incentivize municipalities to adopt HIGH WIND-resilient land-use and zoning policies.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW31 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan shall commit to strengthening building codes with wind‑specific performance standards that reflect current and projected climate risks.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW32 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan shall reference state and municipal ordinances related to HIGH WIND mitigation.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW33 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan should identify any regulatory barriers, either federal, state, or local that limit implementation of HIGH WIND resilience strategies.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW34 - Vulnerability and Risk Assessment - Definitions",
           "proposal": "How does the state define HIGH WIND in the plan?",
-          "included": true
+          "included": false
         },
         {
           "name": "HW35 - Vulnerability and Risk Assessment - Human health",
           "proposal": "What specific health impacts from HIGH WIND does the plan highlight?  Provide a complete, bulletized list.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW36 - Vulnerability and Risk Assessment - Infrastructure",
           "proposal": "How do HIGH WIND events affect each of the folllowing: power transmission and distribution, telecommunications, transportation systems, water and wastewater facilities.  Provide information on each.",
-          "included": true
+          "included": false
         },
         {
           "name": "HW37 - Vulnerability and Risk Assessment - Forecasts",
           "proposal": "Does the plan identify state- or region-specific climate projections (e.g., downscaled models) that address changes in wind speed, frequency, or storm intensity?",
-          "included": true
+          "included": false
         },
         {
           "name": "HW38 - Vulnerability and Risk Assessment - Forecasts",
           "proposal": "Does the plan specify which regions or municipalities face the highest projected HIGH WIND risk?",
-          "included": true
+          "included": false
         },
         {
           "name": "HW39 - Vulnerability and Risk Assessment - Human health",
           "proposal": "Does the plan discuss compounding impacts of HIGH WIND with precipitation,  wildfire,  and coastal flooding?",
-          "included": true
+          "included": false
         }
       ],
       "description": "Policy proposals for high wind.",
