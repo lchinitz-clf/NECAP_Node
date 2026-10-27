@@ -900,7 +900,7 @@
         },
         {
           "name": "HW08 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
-          "proposal": "The plan should specify urban forestry design techniquest that will be used to reduce wind vulnerability.",
+          "proposal": "The plan should specify urban forestry design techniques that will be used to reduce wind vulnerability.",
           "included": false
         },
         {
@@ -915,12 +915,12 @@
         },
         {
           "name": "HW11 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
-          "proposal": "The plan should reduce high‑wind risk at the landscape scale by discussion of techniques such as, but not limited to: maintaining contiguous habitat corridors, restricting development in forest‑edge and ridge‑top areas most exposed to wind, and aligning land conservation priorities with wind risk mapping.",
+          "proposal": "The plan should reduce high‑wind risk at the landscape scale.  Examples of related techniques may include, but do not need to include: maintaining contiguous habitat corridors, restricting development in forest‑edge and ridge‑top areas most exposed to wind, and aligning land conservation priorities with wind risk mapping.",
           "included": false
         },
         {
           "name": "HW12 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "The plan should commit to proactive grid hardening that includes techniques such as, but not limited to, selective undergrounding of power lines in high‑outage corridors and environmental justice communities, grid modernization measures such as distributed energy resources (microgrids), and grid segmentation to prevent cascading failures during high‑wind events.",
+          "proposal": "The plan should commit to proactive grid hardening.  Examples of related techniques may include, but do not need to include, selective undergrounding of power lines in high‑outage corridors and environmental justice communities, grid modernization measures such as distributed energy resources (microgrids), and grid segmentation to prevent cascading failures during high‑wind events.",
           "included": false
         },
         {
@@ -954,6 +954,11 @@
           "included": false
         },
         {
+          "name": "HW18B - Equity & Environmental Justice - Distribution of Impacts",
+          "proposal": "The plan should address how Environmental Justice communities will be engaged and provided explicit support to address high wind exposure.",
+          "included": false
+        },
+        {
           "name": "HW19 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan shall propose community engagement processes for designing HIGH WIND resilience strategies.",
           "included": false
@@ -984,8 +989,18 @@
           "included": false
         },
         {
+          "name": "HW24B - Local Capacity Building - Supporting Local Governments",
+          "proposal": "The plan shall support municipalities in developing local resilience plans.",
+          "included": false
+        },
+        {
           "name": "HW25 - Local Capacity Building - Supporting Local Governments",
           "proposal": "The plan shall provide technical assistance or funding for local HIGH WIND mitigation projects",
+          "included": false
+        },
+        {
+          "name": "HW25B - Local Capacity Building - Supporting Local Governments",
+          "proposal": "The plan shall provide technical assistance or funding for local hazard mitigation projects.",
           "included": false
         },
         {
@@ -1009,8 +1024,18 @@
           "included": false
         },
         {
+          "name": "HW29B - Local Capacity Building - Community Outreach",
+          "proposal": "The plan shall outline public education campaigns for communicating climate hazard risks.",
+          "included": false
+        },
+        {
           "name": "HW30 - Local Capacity Building - Legal and Regulatory Frameworks",
           "proposal": "The plan shall either require or incentivize municipalities to adopt HIGH WIND-resilient land-use and zoning policies.",
+          "included": false
+        },
+        {
+          "name": "HW30B - Local Capacity Building - Legal and Regulatory Frameworks",
+          "proposal": "The plan shall either require or incentivize municipalities to adopt land-use and zoning policies to address climate hazards.",
           "included": false
         },
         {
@@ -1019,8 +1044,18 @@
           "included": false
         },
         {
+          "name": "HW31B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "The plan shall commit to strengthening building codes to address current and projected climate risks.",
+          "included": false
+        },
+        {
           "name": "HW32 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan shall reference state and municipal ordinances related to HIGH WIND mitigation.",
+          "included": false
+        },
+        {
+          "name": "HW32B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "The plan shall reference existing, and propose necessary changes to, state and municipal ordinances related to climate hazard mitigation.",
           "included": false
         },
         {
@@ -1029,8 +1064,18 @@
           "included": false
         },
         {
+          "name": "HW33B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
+          "proposal": "The plan should identify any regulatory barriers, either federal, state, or local that limit implementation of any climate hazard resilience strategies.",
+          "included": false
+        },
+        {
           "name": "HW34 - Vulnerability and Risk Assessment - Definitions",
           "proposal": "How does the state define HIGH WIND in the plan?",
+          "included": false
+        },
+        {
+          "name": "HW34B - Vulnerability and Risk Assessment - Definitions",
+          "proposal": "In the plan, what are the main problems identified as being caused by high wind events?",
           "included": false
         },
         {
@@ -1040,7 +1085,7 @@
         },
         {
           "name": "HW36 - Vulnerability and Risk Assessment - Infrastructure",
-          "proposal": "How do HIGH WIND events affect each of the folllowing: power transmission and distribution, telecommunications, transportation systems, water and wastewater facilities.  Provide information on each.",
+          "proposal": "How do HIGH WIND events affect each of the following: power transmission and distribution, telecommunications, transportation systems, water and wastewater facilities.  Provide information on each.",
           "included": false
         },
         {
