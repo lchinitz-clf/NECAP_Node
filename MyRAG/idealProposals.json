@@ -714,7 +714,8 @@
           "included": true
         }
       ],
-      "description": "Policy proposals for coastal resilience."
+      "description": "Policy proposals for coastal resilience.",
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
       "id": "community-engagement-equity",
@@ -1358,181 +1359,105 @@
     {
       "id": "governance",
       "label": "Governance",
-      "description": "Policy proposals for governance.",
       "attributes": [
         {
-          "name": "G1 - Participation - Access to Information",
-          "proposal": "Can stakeholders easily and independently access key scientific analysis, technical documents and policy papers to inform their opinions about risks and responses?"
+          "name": "GF1 - Requirements - Definitions",
+          "proposal": "How are climate resilience and climate adaptation defined in the plan?",
+          "included": true
         },
         {
-          "name": "G2 - Participation - Access to Information",
-          "proposal": "Does such information relate to climate adaptation as a whole, or particular risks?"
+          "name": "GF2 - Requirements - Updates",
+          "proposal": "Does the plan identify guidelines for periodic updates of the resilience plan?",
+          "included": true
         },
         {
-          "name": "G3 - Participation - Access to Information",
-          "proposal": "Is information made available in the appropriate languages and formats?"
+          "name": "GF3 - Leadership - Executive",
+          "proposal": "Is there an executive branch leader responsible for climate resilience at the state level (such as a Chief Resilience Officer)?",
+          "included": true
         },
         {
-          "name": "G4 - Participation - Access to Information",
-          "proposal": "How is the information communicated to non-technical audiences?"
+          "name": "GF4 - Leadership - Executive",
+          "proposal": "Is there an executive branch office or agency responsible for coordinating climate resilience activities across state agencies?",
+          "included": true
         },
         {
-          "name": "G5 - Participation - Meaningful Opportunities",
-          "proposal": "Are stakeholders provided with meaningful opportunities to participate in climate change preparation and adaption?"
+          "name": "GF5 - Coordination",
+          "proposal": "Does the plan identify an interagency coordinating body focused on climate resilience?",
+          "included": true
         },
         {
-          "name": "G6 - Participation - Meaningful Opportunities",
-          "proposal": "What measures beyond traditional notice and comment period are provided?"
+          "name": "GF6 - Coordination",
+          "proposal": "Does the plan encourage or require coordination with other climate or hazard mitigation plans?",
+          "included": true
         },
         {
-          "name": "G7 - Participation - Inclusiveness",
-          "proposal": "Can you please provide examples where state plans identify populations in states of vulnerability (e.g., disabled, EJ populations, youth, immigrants, etc.) and facilitate their participation in policy-making?"
+          "name": "GF7 - Responsibility",
+          "proposal": "How are climate resilience roles and responsibilities for each key state office and agency defined?",
+          "included": true
         },
         {
-          "name": "G8 - Participation - On-going Involvement",
-          "proposal": "Is the on-going involvement of key stakeholders encouraged (e.g., maintaining active dialogues, informing participations of the results and impact of their inputs, etc.)?"
+          "name": "GF8 - Skills",
+          "proposal": "Does the plan invest in developing the skills of state employees needed to address the climate resilience issues identified in the plan?",
+          "included": true
         },
         {
-          "name": "G9 - Institutions - Goal Definition",
-          "proposal": "Is there a clear definition of what ‘climate resilience’ and ‘climate adaptation’ would mean in the state?"
+          "name": "GF9 - Outside Expertise",
+          "proposal": "Is there an advisory council of experts to guide the plan's development and evaluation?",
+          "included": true
         },
         {
-          "name": "G10 - Institutions - Goal Definition",
-          "proposal": "Are the policy measures to achieve that goal gathered in one plan that is periodically revised?"
+          "name": "GF10 - Accountability",
+          "proposal": "How will progress on the climate adaptation plan be tracked and verified?",
+          "included": true
         },
         {
-          "name": "G11 - Institutions - Political Leadership",
-          "proposal": "Is strong political leadership shaping and supporting climate adaptation policy?"
+          "name": "GF11 - Accountability",
+          "proposal": "Are clear, measurable metrics associated with actions in the climate resilience plan?",
+          "included": true
         },
         {
-          "name": "G12 - Institutions - Political Leadership",
-          "proposal": "Is the climate adaptation plan required by statue or an executive order?"
+          "name": "GF12 - Accountability",
+          "proposal": "How frequently will information on progress against the plan's actions be released?",
+          "included": true
         },
         {
-          "name": "G13 - Institutions - Technical Leadership",
-          "proposal": "Is there a dedicated climate resilience officer at the highest level of state government?"
+          "name": "GF13 - Accountability",
+          "proposal": "How will the public be able to access information on progress against the plan?",
+          "included": true
         },
         {
-          "name": "G14 - Institutions - Technical Leadership",
-          "proposal": "Is there an administrative office committed to climate adaptation?"
+          "name": "GF14 - Finance and Budget",
+          "proposal": "How does the plan estimate the costs of individual climate resilience actions?",
+          "included": true
         },
         {
-          "name": "G15 - Institutions - Technical Leadership",
-          "proposal": "Are the roles and responsibilities of the office committed to cliamte adapatation defined in enabling legislation or state policy?"
+          "name": "GF15 - Finance and Budget",
+          "proposal": "Does the plan identify new, dedicated funding sources for climate resilience?",
+          "included": true
         },
         {
-          "name": "G16 - Institutions - Agency Cooperation",
-          "proposal": "Are there strong mechanisms to ensure that government agencies are achieving the same climate adaptation ends in ways that increase efficiency through cooperation?"
+          "name": "GF16 - Finance and Budget",
+          "proposal": "Does the plan delineate funding expected from federal and state sources?",
+          "included": true
         },
         {
-          "name": "G17 - Institutions - Agency Cooperation",
-          "proposal": "Is there an explicit understanding of how climate adaptation can be reflected in such departments priorities?"
+          "name": "GF17 - Finance and Budget",
+          "proposal": "Does the plan distribute funding to regional planning agencies, municipalities and tribal communities?",
+          "included": true
         },
         {
-          "name": "G18 - Institutions - Legal and Regulatory Framework",
-          "proposal": "Are the governance arrangements for the climate adaptation plan supported by a framework of laws and executive orders?"
+          "name": "GF18 - Finance and Budget",
+          "proposal": "Does the plan provide incentives for private investment?",
+          "included": true
         },
         {
-          "name": "G19 - Institutions - Expertise",
-          "proposal": "Does the institutional framework encourage the use of best scientific evidence for risk identification and responsive policy design?"
-        },
-        {
-          "name": "G20 - Institutions - Expertise",
-          "proposal": "Is there a process for incorporating new findings as they emerge?"
-        },
-        {
-          "name": "G21 - Institutions - Expertise",
-          "proposal": "Does the plan mention consultation with expert bodies (e.g., climate scientists, engineers)?"
-        },
-        {
-          "name": "G22 - Institutions - Expertise",
-          "proposal": "Is there a formal advisory council of experts to guide the plan's development and evaluation?"
-        },
-        {
-          "name": "G23 - Institutions - Expertise",
-          "proposal": "Are mechanisms in place to allow for expert input during planning, implementation, monitoring and evaluation?"
-        },
-        {
-          "name": "G24 - Institutions - Capacity Development",
-          "proposal": "Does the climate adaptation plan address increasing the capability of government departments and employees to identify and address risks arising from climate adaptation?"
-        },
-        {
-          "name": "G25 - Transparency - Quality",
-          "proposal": "Does the data provided give the public an on-going sense of the risks of climate adaptation and the progress of policy measures to prepare, respond to and recover from them?"
-        },
-        {
-          "name": "G26 - Transparency - Quality",
-          "proposal": "Is there a clear audit trail and verification mechanism?"
-        },
-        {
-          "name": "G27 - Transparency - Granularity",
-          "proposal": "Are the data and reports provided sufficiently granular to provide a clear picture at the community level, without masking outcomes or impacts on vulnerable populations?"
-        },
-        {
-          "name": "G28 - Transparency - Granularity",
-          "proposal": "Have clear, useful metrics been developed?"
-        },
-        {
-          "name": "G29 - Transparency - Speed and Frequency",
-          "proposal": "Is information provided sufficiently quickly and with enough frequency to give stakeholders a solid understanding of a climate adaptation risk or policy?"
-        },
-        {
-          "name": "G30 - Transparency - Speed and Frequency",
-          "proposal": "Are data and reports stale or irrelevant by the time the public has access?"
-        },
-        {
-          "name": "G31 - Transparency - Reach",
-          "proposal": "Is the information made available to all impacted stakeholders in a manner that facilitates their understanding?"
-        },
-        {
-          "name": "G32 - Accountability - Clarity",
-          "proposal": "Are roles, responsibilities and objectives clearly delineated?"
-        },
-        {
-          "name": "G33 - Accountability - Enforceability",
-          "proposal": "Do citizens have statutory rights to enforce the climate adaptation policy or pursue breaches?"
-        },
-        {
-          "name": "G34 - Accountability - Enforceability",
-          "proposal": "Does the plan outline the consequences for departments or entities that fail to meet their obligations?"
-        },
-        {
-          "name": "G35 - Accountability - Systematic",
-          "proposal": "Is there a systematic approach to monitoring, evaluation, publication and learning to maximize positive outcomes and learning?"
-        },
-        {
-          "name": "G36 - Resources - Human Resources",
-          "proposal": "Are enough people with a broad range of skills giving enough attention to the critical climate adaptation risks?"
-        },
-        {
-          "name": "G37 - Resources - Human Resources",
-          "proposal": "Does the plan invest in building the skills of state employees needed to address climate adaptation issues?"
-        },
-        {
-          "name": "G38 - Resources - Public Financial Resources",
-          "proposal": "Does the plan provide estimated costs of increasing the resilience of key physical and natural assets?  Are funding mechanisms identified to cover those costs?"
-        },
-        {
-          "name": "G39 - Resources - Public Financial Resources",
-          "proposal": "Is it identified and protected in state budgets?"
-        },
-        {
-          "name": "G40 - Resources - Public Financial Resources",
-          "proposal": "Does the plan provide dedicated funding for proactive climate adaptation measures, separate from funding for disaster recovery?"
-        },
-        {
-          "name": "G41 - Resources - Private Financial Resources",
-          "proposal": "Does the plan provide incentives that encourage private investment in climate resilience measures? Are the resources required from private investment quantified?"
-        },
-        {
-          "name": "G42 - Resources - Private Financial Resources",
-          "proposal": "Do these incentives advance or detract from efforts to ensure public climate readiness?"
-        },
-        {
-          "name": "G43 - Resources - Access",
-          "proposal": "Are financial, human and knowledge resources made available to regional/municipal entities?"
+          "name": "GF19 - Finance and Budget",
+          "proposal": "Does the plan enable municipalities to levy fees or taxes on areas most vulnerable to climate impacts?",
+          "included": true
         }
-      ]
+      ],
+      "description": "Policy proposals for governance.",
+      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
       "id": "city-level-hazard",
