@@ -451,12 +451,16 @@ at the CLI) — this app was originally throwing it away unread, since
 doesn't anymore.
 
 An "Enable thinking" checkbox sits next to temperature/max-answer-length
-in the Ask form, checked by default (matching Ollama's own default).
-Unchecking it sends `think: false` to Ollama, which is a genuine skip —
-per Ollama's docs the model runs in a non-thinking mode and never
-generates those tokens at all, not just a hidden-but-still-generated
-step — so it's a real speed/compute win on modest hardware, not only a
-display filter. Leaving it checked doesn't send `think` at all, letting
+in the Ask form. It starts UNCHECKED by default — a deliberate change
+from this feature's original checked-by-default state, made once it
+became clear that Ollama's own default (thinking on for every
+supporting model, on every request) cost more in time and tokens than
+it was worth for most day-to-day use here. Unchecking it (its default
+state) sends `think: false` to Ollama, which is a genuine skip — per
+Ollama's docs the model runs in a non-thinking mode and never generates
+those tokens at all, not just a hidden-but-still-generated step — so
+it's a real speed/compute win on modest hardware, not only a display
+filter. Checking it back on doesn't send `think` at all, letting
 Ollama's own default apply; there's no need to send `think: true`
 explicitly for the same effect. A model that doesn't support thinking
 (llama3.1, for instance) just ignores the setting either way.

@@ -2820,10 +2820,15 @@ async function submitRubricForm(e) {
  *
  * @param {boolean} [think] - true (or omitted) leaves thinking at
  *   whatever Ollama's own default is for this model (on, for
- *   supported models — same as thinkCheckbox defaulting checked);
- *   false explicitly skips it. See the `think` param on chat() in
- *   ollamaClient.js for why this is a real skip, not just a display
- *   filter.
+ *   supported models). false explicitly skips it, and is what the
+ *   "Enable thinking" checkbox in index.html now sends by default —
+ *   that checkbox starts UNCHECKED (a deliberate change from its
+ *   original checked-by-default state; see README.md's "Reasoning
+ *   models and the 'thinking' trace" section for the current
+ *   default), so `think` is `false` here unless the person viewing
+ *   the page explicitly checks it back on. See the `think` param on
+ *   chat() in ollamaClient.js for why this is a real skip, not just a
+ *   display filter.
  * @param {number} [numCtx] - the "Request size" Advanced setting —
  *   passed straight through to Ollama's `num_ctx` (see the doc on
  *   chat()'s `numCtx` option in ollamaClient.js for what this
@@ -2890,9 +2895,11 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
     // value (the field always has a number in it, never blank) —
     // there's no "leave it out to get a default" meaning to preserve
     // the way there is for the others above. `retryNotAddressed` is
-    // the "Retry Not addressed..." checkbox's plain boolean, off by
-    // default; omitted entirely would be indistinguishable from
-    // false, so it's always sent too.
+    // the "Retry Not addressed..." checkbox's plain boolean — ON by
+    // default (a deliberate change from its original unchecked-by-
+    // default state; see its own `checked` attribute in index.html);
+    // omitted entirely would be indistinguishable from false, so it's
+    // always sent too.
     body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed }),
     signal,
   });
