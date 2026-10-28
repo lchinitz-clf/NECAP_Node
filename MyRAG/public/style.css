@@ -791,7 +791,7 @@ tr.batch-summary-row td {
 
 /* ---- Introduction tab ----
    #introContent is filled once, on page load, with the plain-HTML
-   fragment fetched from intro.html — see loadIntroContent() in
+   fragment fetched from description.html — see loadIntroContent() in
    script.js. That fragment carries no classes or styling of its own
    (just h2/h3/p/ol/ul/strong), so these rules just bring it in line
    with the compact sizing the rest of the app already uses (see h1/h2

@@ -28,7 +28,7 @@ async function applyConfig() {
 
 let introContentEl;
 
-// Fills the Introduction tab with the fragment from intro.html —
+// Fills the Introduction tab with the fragment from description.html —
 // plain HTML, not Markdown, served as a static file alongside this
 // script. Kept out of index.html entirely so that tab's content can
 // be edited (even by someone not comfortable with the rest of this
@@ -36,15 +36,23 @@ let introContentEl;
 // config.json's own doc comment above gives for keeping appName out
 // of index.html. Called once from init(), below applyConfig() in the
 // "Initial data loads" section.
+//
+// Renamed from intro.html to description.html (previously): that name
+// was one keystroke away from index.html, and a real incident where
+// description.html got overwritten with a copy of index.html (likely
+// via a typo'd copy/save) produced a confusing nested-page bug here —
+// loadIntroContent() injected the resulting full-page markup straight
+// into #introContent via innerHTML. description.html is intentionally
+// a less similar name to reduce the odds of that mistake recurring.
 async function loadIntroContent() {
   try {
-    const res = await fetch('/intro.html', { cache: 'no-store' });
+    const res = await fetch('/description.html', { cache: 'no-store' });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     introContentEl.innerHTML = await res.text();
   } catch (err) {
-    console.warn('Could not load intro.html:', err);
+    console.warn('Could not load description.html:', err);
     introContentEl.innerHTML =
-      '<p class="error">Couldn\'t load the introduction text (intro.html). The rest of the app is unaffected.</p>';
+      '<p class="error">Couldn\'t load the introduction text (description.html). The rest of the app is unaffected.</p>';
   }
 }
 
