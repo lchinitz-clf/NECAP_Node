@@ -2325,6 +2325,7 @@ app.post('/query/stream', lockGate, async (req, res) => {
       // "proposal".
       const materialLabel = rubricMatches ? 'rubric under review' : (topic ? 'proposal' : undefined);
       const messages = buildRagMessages(effectiveQuestion, matches, materialLabel);
+      //console.log(`LMCLMC:\n Here is the effectiveQuestion sent in the rubric analysis: \n ${effectiveQuestion} \n\n`);
       const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, {
         model: chatModel,
         temperature,

@@ -867,17 +867,17 @@
         {
           "name": "HW01 - Accountability & Governance - Roles and Responsibilities",
           "proposal": "The plan should identify specific governmental agencies which are responsible for implementing the state’s HIGH WIND strategies.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW02 - Accountability & Governance - Funding and financing",
           "proposal": "The plan shall identify funding sources for HIGH WIND resilience work.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW03 - Accountability & Governance - Costs",
           "proposal": "The plan should estimate the cost of proposed HIGH WIND resilience actions.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW04 - Accountability & Governance - Indicators",
@@ -887,222 +887,222 @@
         {
           "name": "HW05 - Accountability & Governance - Transparency",
           "proposal": "The plan should commit to public reporting and transparency related to progress towards meeting its goals.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW06 - Accountability & Governance - Coordination",
           "proposal": "The plan should specify how state agencies will coordinate with municipalities, utilities, and community-based organizations.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW07 - Accountability & Governance - Coordination",
           "proposal": "The plan should describe how the public can learn about progress on high wind resilience.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW08 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should specify urban forestry design techniques that will be used to reduce wind vulnerability.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW09 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should discuss the protection and restoration of coastal wetlands and dune systems which can be used to buffer wind impacts.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW10 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should discuss specific plans to deploy green infrastructure for high‑wind resilience in urban and suburban areas.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW11 - Adaptation Strategies & Long-Term Actions - Nature-based solutions",
           "proposal": "The plan should reduce high‑wind risk at the landscape scale.  Examples of related techniques may include, but do not need to include: maintaining contiguous habitat corridors, restricting development in forest‑edge and ridge‑top areas most exposed to wind, and aligning land conservation priorities with wind risk mapping.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW12 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "The plan should commit to proactive grid hardening.  Examples of related techniques may include, but do not need to include, selective undergrounding of power lines in high‑outage corridors and environmental justice communities, grid modernization measures such as distributed energy resources (microgrids), and grid segmentation to prevent cascading failures during high‑wind events.",
-          "included": false
+          "proposal": "The plan should commit to proactive grid hardening.  Examples of related techniques may include selective undergrounding of power lines in high‑outage corridors and environmental justice communities, grid modernization measures such as distributed energy resources (microgrids), and grid segmentation to prevent cascading failures during high‑wind events.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
+          "included": true
         },
         {
           "name": "HW13 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "The plan should commit to deploying \"islandable\" microgrids specifically designed to maintain power during high‑wind events, particularly for critical facilities and community anchor institutions.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW14 - Adaptation Strategies & Long-Term Actions - Infrastructure",
           "proposal": "The plan shall prioritize clean, renewable distributed energy and storage for wind resilience while minimizing reliance on fossil‑fuel backup generation.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW15 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "The plan should specify specific HIGH WIND weather emergency response measures,  such as, but not limited to, specifications for backup power generation and plans for healthcare systems and water and wastewater utilities.",
-          "included": false
+          "proposal": "The plan should specify specific HIGH WIND weather emergency response measures.  Examples include specifications for backup power generation and plans for healthcare systems and water and wastewater utilities. Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
+          "included": true
         },
         {
           "name": "HW16 - Disaster Response and Preparedness - Emergency Identification",
           "proposal": "The plan shall describe early warning systems or public communication strategies for HIGH WINDS.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW17 - Disaster Response and Preparedness - Emergency Response",
           "proposal": "The plan shall outline protocols for protecting unhoused residents during HIGH WIND events.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW18 - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "The plan should address how high wind exposure may have disproportionate effects in Environmental Justice communities.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW18B - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "The plan should address how Environmental Justice communities will be engaged and provided explicit support to address high wind exposure.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW19 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan shall propose community engagement processes for designing HIGH WIND resilience strategies.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW20 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan should identify barriers faced by renters, non-English speakers, and undocumented residents during HIGH WIND events.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW21 - Equity & Environmental Justice - System Adaptation",
           "proposal": "The plan should describe strategies to ensure that HIGH WIND resilience investments do not contribute to displacement or gentrification of neighborhoods.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW22 - Equity & Environmental Justice - Community Outreach",
           "proposal": "The plan should account for differential impacts among various communities, such as different levels of infrastructure fragility and different levels of access to insurance or recovery funds.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW23 - Equity & Environmental Justice - Distribution of Impacts",
           "proposal": "The plan should commit to prioritizing HIGH WIND resilience investments in environmental justice communities.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW24 - Local Capacity Building - Supporting Local Governments",
           "proposal": "The plan shall support municipalities in developing local HIGH WIND resilience plans.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW24B - Local Capacity Building - Supporting Local Governments",
-          "proposal": "The plan shall support municipalities in developing local resilience plans.",
-          "included": false
+          "proposal": "The plan shall support municipalities in developing local hazard resilience plans. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW25 - Local Capacity Building - Supporting Local Governments",
           "proposal": "The plan shall provide technical assistance or funding for local HIGH WIND mitigation projects",
-          "included": false
+          "included": true
         },
         {
           "name": "HW25B - Local Capacity Building - Supporting Local Governments",
-          "proposal": "The plan shall provide technical assistance or funding for local hazard mitigation projects.",
-          "included": false
+          "proposal": "The plan shall provide technical assistance or funding for local hazard mitigation projects. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW26 - Local Capacity Building - Capacity building",
           "proposal": "The plan shall outline training or capacity-building programs for local officials, emergency managers, and public health departments.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW27 - Local Capacity Building - Community Outreach",
           "proposal": "The plan should support community-based organizations in outreach, education, and HIGH WIND emergency response.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW28 - Local Capacity Building - Data",
-          "proposal": "The plan should encourage local data collection such as, but not limited to, wind risk mapping and vulnerability assessments.",
-          "included": false
+          "proposal": "The plan should encourage local data collection.  Examples include wind risk mapping and vulnerability assessments.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
+          "included": true
         },
         {
           "name": "HW29 - Local Capacity Building - Community Outreach",
           "proposal": "The plan shall outline public education campaigns for communicating HIGH WIND risks.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW29B - Local Capacity Building - Community Outreach",
-          "proposal": "The plan shall outline public education campaigns for communicating climate hazard risks.",
-          "included": false
+          "proposal": "The plan shall outline public education campaigns for communicating climate hazard risks. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW30 - Local Capacity Building - Legal and Regulatory Frameworks",
           "proposal": "The plan shall either require or incentivize municipalities to adopt HIGH WIND-resilient land-use and zoning policies.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW30B - Local Capacity Building - Legal and Regulatory Frameworks",
-          "proposal": "The plan shall either require or incentivize municipalities to adopt land-use and zoning policies to address climate hazards.",
-          "included": false
+          "proposal": "The plan shall either require or incentivize municipalities to adopt land-use and zoning policies to address climate hazards. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW31 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan shall commit to strengthening building codes with wind‑specific performance standards that reflect current and projected climate risks.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW31B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "The plan shall commit to strengthening building codes to address current and projected climate risks.",
-          "included": false
+          "proposal": "The plan shall commit to strengthening building codes to address current and projected climate risks. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW32 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan shall reference state and municipal ordinances related to HIGH WIND mitigation.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW32B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "The plan shall reference existing, and propose necessary changes to, state and municipal ordinances related to climate hazard mitigation.",
-          "included": false
+          "proposal": "The plan shall reference existing, and propose necessary changes to, state and municipal ordinances related to climate hazard mitigation. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW33 - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
           "proposal": "The plan should identify any regulatory barriers, either federal, state, or local that limit implementation of HIGH WIND resilience strategies.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW33B - Policy and Regulatory Implementation - Legal and Regulatory Frameworks",
-          "proposal": "The plan should identify any regulatory barriers, either federal, state, or local that limit implementation of any climate hazard resilience strategies.",
-          "included": false
+          "proposal": "The plan should identify any regulatory barriers, either federal, state, or local that limit implementation of any climate hazard resilience strategies. Any relevant material constitutes a match.  High-wind context is not required to be present.",
+          "included": true
         },
         {
           "name": "HW34 - Vulnerability and Risk Assessment - Definitions",
           "proposal": "How does the state define HIGH WIND in the plan?",
-          "included": false
+          "included": true
         },
         {
           "name": "HW34B - Vulnerability and Risk Assessment - Definitions",
           "proposal": "In the plan, what are the main problems identified as being caused by high wind events?",
-          "included": false
+          "included": true
         },
         {
           "name": "HW35 - Vulnerability and Risk Assessment - Human health",
           "proposal": "What specific health impacts from HIGH WIND does the plan highlight?  Provide a complete, bulletized list.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW36 - Vulnerability and Risk Assessment - Infrastructure",
           "proposal": "How do HIGH WIND events affect each of the following: power transmission and distribution, telecommunications, transportation systems, water and wastewater facilities.  Provide information on each.",
-          "included": false
+          "included": true
         },
         {
           "name": "HW37 - Vulnerability and Risk Assessment - Forecasts",
           "proposal": "Does the plan identify state- or region-specific climate projections (e.g., downscaled models) that address changes in wind speed, frequency, or storm intensity?",
-          "included": false
+          "included": true
         },
         {
           "name": "HW38 - Vulnerability and Risk Assessment - Forecasts",
           "proposal": "Does the plan specify which regions or municipalities face the highest projected HIGH WIND risk?",
-          "included": false
+          "included": true
         },
         {
           "name": "HW39 - Vulnerability and Risk Assessment - Human health",
           "proposal": "Does the plan discuss compounding impacts of HIGH WIND with precipitation,  wildfire,  and coastal flooding?",
-          "included": false
+          "included": true
         }
       ],
       "description": "Policy proposals for high wind.",
