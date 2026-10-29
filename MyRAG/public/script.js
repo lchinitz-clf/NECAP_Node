@@ -160,15 +160,28 @@ const DEFAULT_NUM_CTX = 8192;
 //
 // Qwen3.8-27B entry: native context window is 262,144 tokens (up to
 // 1,000,000 with extension) — see the "numCtx / context window"
-// discussion that led here. 65536 (64K) was chosen as a generous but
-// conservative step up from the 8192 default specifically because it
-// was NOT yet verified against this deployment's actual hardware at
-// the time this entry was added — it's a reasoned starting point
-// (well within the native window, chosen to leave real headroom for
-// the KV cache), not a confirmed-safe number yet. Update this value
-// (and this comment) once it's actually been run and confirmed to
-// hold up on this machine; raise it further if it does, lower it if
-// it doesn't.
+// discussion that led here. 65536 (64K) was originally a reasoned-but-
+// unverified starting point; it's since been run for real on this
+// deployment (AWS g6.xlarge) and held up: a 56-attribute rubric
+// comparison at numCtx=65536 with topK=50 completed in ~69 minutes
+// (vs. ~41 minutes for the same comparison at the old 8192/topK=10
+// settings), answer quality looked comparable on inspection, and
+// nothing failed to load or ran out of memory. So 65536 is now
+// CONFIRMED safe on this specific VM, not just a conservative guess —
+// treat it accordingly if you're ever deciding whether to raise it
+// further (the native window still has a lot of headroom above 64K,
+// if there's reason to push it).
+//
+// Two things worth knowing about that test before reading its numbers
+// as "numCtx costs ~70% more time": first, it changed topK from 10 to
+// 50 at the same time as numCtx — the time difference reflects BOTH a
+// much bigger KV cache allocation AND 5x more retrieved chunks being
+// processed per call, not numCtx alone; a numCtx-only comparison at
+// the same topK hasn't been run. Second, the first request after the
+// model loads at a new numCtx takes noticeably longer (a few minutes),
+// almost certainly the larger KV cache being allocated; every request
+// after that was reported as quick, so that cost is paid once per
+// model load, not per query.
 const CONTEXT_WINDOW_SUGGESTIONS = [
   {
     pattern: /qwen3\.8:27b/i,
@@ -176,10 +189,10 @@ const CONTEXT_WINDOW_SUGGESTIONS = [
     recommendedNumCtx: 65536,
     reason:
       'This model natively supports up to 262,144 tokens of context — 65536 is a conservative ' +
-      'step up from the 8192 default, chosen to leave real headroom for the KV cache on this ' +
-      'deployment (see the comment on CONTEXT_WINDOW_SUGGESTIONS in script.js: not yet verified ' +
-      'against this machine at the time this entry was added — confirm it loads and runs ' +
-      'cleanly before relying on it for real work, and adjust the number here once you have).',
+      'step up from the 8192 default, and has been run for real on this deployment (a ' +
+      '56-attribute rubric comparison completed without issue). The first request after ' +
+      'switching to it takes a few minutes longer while the larger cache is set up; after ' +
+      'that, responses are quick.',
   },
 ];
 
@@ -1326,9 +1339,23 @@ function renderSourceChips(sources, threshold) {
 // populates this at all, since parseComparisonAnswer() is only ever
 // run for a topic-comparison batch (see the "batch-done" handling in
 // the query form's submit handler below).
+//
+// showBatchRows deliberately reads batches[0]'s own totalBatches
+// field (the stream's declared batch count for this whole run, e.g.
+// 56 — known from the very first "batch-done" event) rather than
+// `batches.length` (how many have accumulated into latestBatches SO
+// FAR, client-side, at the moment this particular render happens).
+// Those two are NOT the same thing mid-run: on the very first call,
+// right after attribute 1's own "batch-done" event, batches.length is
+// 1 even though totalBatches is 56 — using batches.length here used
+// to suppress attribute 1's own summary row entirely on that first
+// render (not just its token-usage phrase, the whole row), only for
+// it to reappear once attribute 2 arrived and triggered a full
+// re-render of both. See the bug report this fixed for the full
+// before/after trace.
 function renderAttributeResults(batches, numCtx, threshold) {
   attributeResultsBody.innerHTML = '';
-  const showBatchRows = batches.length > 1;
+  const showBatchRows = Boolean(batches[0] && batches[0].totalBatches > 1);
   let anyRecords = false;
 
   for (const batch of batches) {
