@@ -9,24 +9,6 @@
   ],
   "topics": [
     {
-      "id": "test-rubric",
-      "label": "Test Rubric",
-      "attributes": [
-        {
-          "name": "TestQuestion",
-          "proposal": "Plan should include complete loss-avoidance studies to better understand the positive impact of completed mitigation work, including the value of open space, forested and conserved land.",
-          "included": true
-        },
-        {
-          "name": "Test Question 2",
-          "proposal": "Plan should develop case studies to showcase replicable pilot projects that reduce community vulnerability and have direct benefits to frontline/impacted communities",
-          "included": true
-        }
-      ],
-      "description": "Place to test rubric wording.",
-      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
-    },
-    {
       "id": "inland-flooding",
       "label": "Inland Flooding",
       "attributes": [
@@ -714,7 +696,7 @@
           "included": true
         }
       ],
-      "description": "Policy proposals for coastal resilience.",
+      "description": "KB Update from 10/26/2026",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
@@ -1105,7 +1087,7 @@
           "included": true
         }
       ],
-      "description": "Policy proposals for high wind.",
+      "description": "LMC update, 10/29/2026",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state.\nNote that the plan may use other terms instead of \"High Wind\", such as \"Extreme Wind\" or \"Fortified Wind\" or \"Strong Wind\".  These should be considered synonyms.  Also, consider any terms such as \"Hurricane\" or \"Tornado\" or \"Typhoon\" to be synonymous with \"High Wind\"."
     },
     {
@@ -1114,27 +1096,27 @@
       "attributes": [
         {
           "name": "EH1 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "How does the plan define extreme heat?",
+          "proposal": "How does the plan define extreme heat?  Indicate if temperature thresholds or heat index values are used.",
           "included": true
         },
         {
           "name": "EH2 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "Does the plan identify key impacts on human health from extreme heat?",
+          "proposal": "Does the plan identify key impacts on human health from extreme heat?  Examples include the impact of heat on air quality.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "EH3 - Vulnerability and Risk Assessment - Infrastructure",
-          "proposal": "Does the plan identify key impacts on physical assets from extreme heat?",
+          "proposal": "Does the plan identify key impacts on physical assets from extreme heat?  Examples include transportation networks and assets, energy systems, residential and commercial buildings. Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "EH4 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan identify the number of extreme heat days expected in the future?",
+          "proposal": "Does the plan identify the number of extreme heat days expected in the future?  Highlight the specific timeline used for the prediction.",
           "included": true
         },
         {
           "name": "EH5 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan specify which regions or municipalities face the highest projected risk from extreme heat?",
+          "proposal": "Does the plan specify which regions or municipalities face the highest projected risk from extreme heat?  Examples could specific populations, neighborhoods or census-tracts. Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
@@ -1144,17 +1126,17 @@
         },
         {
           "name": "EH7 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan identify specific census tracts or neighborhoods facing the highest risk from extreme heat?",
+          "proposal": "Does the plan identify specific census tracts or neighborhoods facing the highest risk from extreme heat?  Examples could include outdoor workers, unhoused residents, people in low-income communities, renters, non-English speakers, undocumented residents, people without access to cooling.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "EH8 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "Does the plan identify other climate change risks likely to compound exterme heat risk to human health?",
+          "proposal": "Does the plan identify other climate change risks likely to compound extreme heat risk to human health?  Examples may include air quality, drought, wildfire smoke.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "EH9 - Policy and Regulatory Implementation - Building codes",
-          "proposal": "Does the plan propose changes to statewide building codes to promote resilience to extreme heat?",
+          "proposal": "Does the plan propose changes to statewide building codes to promote resilience to extreme heat?  Of particular importance are building codes for rental housing and public buildings.",
           "included": true
         },
         {
@@ -1219,17 +1201,17 @@
         },
         {
           "name": "EH22 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "What heat emergency response measures does the plan include?",
+          "proposal": "What heat emergency response measures does the plan include?  Examples may include: cooling centers, surge capacity planning for hospitals and EMS.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "EH23 - Disaster Response and Preparedness - Emergency Identification",
-          "proposal": "Does the plan ensure early warning systems are in place for heat waves?",
+          "proposal": "Does the plan ensure early warning systems are in place for heat waves?  Focus in the answer on how these systems communicate with the public.",
           "included": true
         },
         {
           "name": "EH24 - Disaster Response and Preparedness - Emergency Response",
-          "proposal": "Does the plan ensure cooling centers are available and accessible during extreme heat events?",
+          "proposal": "Does the plan ensure cooling centers are available and accessible during extreme heat events?  Focus in the answer on hours of operation and transportation access.",
           "included": true
         },
         {
@@ -1254,7 +1236,7 @@
         },
         {
           "name": "EH29 - Adaptation Strategies & Long-Term Actions - Heat Islands",
-          "proposal": "Does the plan include actions to reduce urban heat islands?",
+          "proposal": "Does the plan include actions to reduce urban heat islands?  Examples may include expanding tree canopy in historically underserved neighborhoods.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
@@ -1284,7 +1266,7 @@
         },
         {
           "name": "EH35 - Adaptation Strategies & Long-Term Actions - Green infrastructure",
-          "proposal": "Does the plan include actions to increase the use of green roofs?",
+          "proposal": "Does the plan include actions to increase the use of green roofs?  Examples my include expanding the tree canopy.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
@@ -1329,7 +1311,7 @@
         },
         {
           "name": "EH44 - Accountability & Governance - Funding and financing",
-          "proposal": "Does the plan identify new funding sources and mechanisms for extreme heat resilience investments?",
+          "proposal": "Does the plan identify new funding sources and mechanisms for extreme heat resilience investments? Examples my include bonds, federal grants, utility programs.  Any relevant material is a match.  Examples are for reference, and are not required to be included.",
           "included": true
         },
         {
@@ -1353,7 +1335,7 @@
           "included": true
         }
       ],
-      "description": "Policy proposals for extreme heat.",
+      "description": "KB update, 10/23/2026",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
@@ -1456,7 +1438,7 @@
           "included": true
         }
       ],
-      "description": "Policy proposals for governance.",
+      "description": "Update from KB, 10/27/2026",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     },
     {
@@ -1733,340 +1715,232 @@
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
     },
     {
-      "id": "liz-review",
-      "label": "Liz Review",
-      "attributes": [
-        {
-          "name": "Haz01",
-          "proposal": "What are the major natural hazards relevant to the municipality’s geography and climate conditions.  Provide a list of all identified hazards.",
-          "included": false
-        },
-        {
-          "name": "Haz11",
-          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to each hazard?",
-          "included": false
-        },
-        {
-          "name": "Haz11-heat",
-          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to excessive heat events?",
-          "included": false
-        },
-        {
-          "name": "Haz11-heat-people",
-          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive heat events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-heat-buildings",
-          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive heat events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-heat-facilities",
-          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive heat events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-heat-acres",
-          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive heat events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-flooding-people",
-          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive flooding events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-flooding-buildings",
-          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive flooding events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-flooding-facilities",
-          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive flooding events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-flooding-acres",
-          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive flooding events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-cold-people",
-          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive cold events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-cold-buildings",
-          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive cold events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-cold-facilities",
-          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive cold events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-cold-acres",
-          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive cold events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-storm-people",
-          "proposal": "Does the plan say anything meaningful about the number of people likely to be especially vulnerable to excessive storm events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-storm-buildings",
-          "proposal": "Does the plan say anything meaningful about the number of buildings likely to be especially vulnerable to excessive storm events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-storm-facilities",
-          "proposal": "Does the plan say anything meaningful about the number of facilities likely to be especially vulnerable to excessive storm events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-storm-acres",
-          "proposal": "Does the plan say anything meaningful about the number of acres likely to be especially vulnerable to excessive storm events?",
-          "included": true
-        },
-        {
-          "name": "Haz11-flood",
-          "proposal": "Does the plan quantify the number of people, buildings, facilities, and acres exposed to flooding events?",
-          "included": false
-        },
-        {
-          "name": "Haz14",
-          "proposal": "Does the plan use state-specific or locally developed hazard datasets when available rather than relying exclusively on national datasets?",
-          "included": false
-        },
-        {
-          "name": "Haz46",
-          "proposal": "Based on available evidence, are any critical community assets missing from the assessment?",
-          "included": false
-        },
-        {
-          "name": "Haz47",
-          "proposal": "Are there opportunities to improve the accuracy of risk estimates through better datasets, updated modeling, or additional local analysis?",
-          "included": false
-        }
-      ],
-      "description": "Boston HMP items for which we have a human review",
-      "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer."
-    },
-    {
       "id": "drought",
       "label": "Drought",
       "attributes": [
         {
           "name": "Drgt01 - Accountability & Governance - Coordination",
-          "proposal": "How will state agencies coordinate drought response with municipalities, utilities and community-based organizations?",
+          "proposal": "State agencies SHOULD coordinate drought response with municipalities, utilities and community-based organizations.",
           "included": true
         },
         {
           "name": "Drgt02 - Accountability & Governance - Costs",
-          "proposal": "What is the cost of proposed drought resilience actions?",
+          "proposal": "The plan SHOULD estimate the cost of proposed drought resilience actions.",
           "included": true
         },
         {
           "name": "Drgt03 - Accountability & Governance - Funding and financing",
-          "proposal": "What is the impact and cost of potential droughts?",
+          "proposal": "The plan SHOULD estimate both the impact and cost of potential droughts.",
           "included": true
         },
         {
           "name": "Drgt04 - Accountability & Governance - Funding and financing",
-          "proposal": "What are specific funding sources and mechanisms for drought resilience?",
+          "proposal": "The plan SHOULD describe specific funding sources and mechanisms to be used for drought resilience programs.",
           "included": true
         },
         {
           "name": "Drgt05 - Accountability & Governance - Indicators",
-          "proposal": "What indicators will measure long-term drought resilience (including on human health)?",
+          "proposal": "The plan SHOULD propose  long-term indicators (metrics) that will be used to measure the community's resilience to drought. An example of a metric could be measuring the impact on human health.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "Drgt06 - Accountability & Governance - Roles and Responsibilities",
-          "proposal": "Which agencies are responsible for implementing the state’s extreme DROUGHT strategies?",
+          "proposal": "The plan SHALL list the agencies that are responsible for implementing the state’s extreme drought strategies.",
           "included": true
         },
         {
           "name": "Drgt07 - Accountability & Governance - Transparency",
-          "proposal": "How will the public learn about progress on drought resilience?",
+          "proposal": "The plan SHALL describe communication strategies to allow the public to learn about progress on drought resilience?",
           "included": true
         },
         {
           "name": "Drgt08 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What will be done to preserve or restore floodplains?",
+          "proposal": "The plan SHOULD present strategies to preserve and/or restore floodplains.",
           "included": true
         },
         {
           "name": "Drgt09 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What will be done to preserve or restore wetlands?",
+          "proposal": "The plan SHOULD present strategies to preserve and/or restore wetlands.",
           "included": true
         },
         {
           "name": "Drgt10 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "will invasive vegetation be removed and replaced with native plant species?",
+          "proposal": "The plan SHOULD present strategies to remove invasive vegetation and replace it with native plant species.",
+          "included": true
+        },
+        {
+          "name": "Drgt10B - Adaptation Strategies & Long-Term Actions - Nature based solutions",
+          "proposal": "The plan MAY present strategies to remove water-intensive vegetation and replace it with less water-intensive, more drought-resistant plant species.",
           "included": true
         },
         {
           "name": "Drgt11 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What will be done to preserve or create riparian buffers?",
+          "proposal": "The plan SHOULD propose strategies to preserve and/or create riparian buffers.",
           "included": true
         },
         {
           "name": "Drgt12 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What measures will be implemented to improve water use in agriculture?",
+          "proposal": "The plan SHOULD discuss measures to be implemented to improve water use in agriculture.",
           "included": true
         },
         {
           "name": "Drgt13 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What measures will be used to encourage use of green infrastructre that recharges ground water (like green roofs, permeable pavement)?",
+          "proposal": "The plan SHOULD discuss measures to be used to encourage use of green infrastructure that recharges ground water.   Examples of related techniques may include green roofs and permeable pavement. Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "Drgt14 - Adaptation Strategies & Long-Term Actions - Nature based solutions",
-          "proposal": "What measures will be implemented to improve the role of forests in drought management?",
+          "proposal": "The plan SHOULD proposed measures to be implemented to improve the role of forests in drought management.",
           "included": true
         },
         {
           "name": "Drgt15 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "How are local drought response plans encouraged?",
+          "proposal": "The plan SHOULD describe regulations or incentives to encourage the creation of local drought response plans.",
           "included": true
         },
         {
           "name": "Drgt16 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "How will alternative water sources be encouraged?",
+          "proposal": "The plan SHOULD describe regulations or incentives to encourage the identification of alternative water sources.",
           "included": true
         },
         {
           "name": "Drgt17 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "How will the plan encourage water conservation measures?",
+          "proposal": "The plan SHOULD describe regulations or incentives to encourage water conservation measures.",
           "included": true
         },
         {
           "name": "Drgt18 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "What improvements at water utilities will be funded?",
+          "proposal": "The plan SHOULD describe which necessary improvements at water utilities will be funded.",
           "included": true
         },
         {
           "name": "Drgt19 - Adaptation Strategies & Long-Term Actions - Infrastructure",
-          "proposal": "What technical assistance will be provided for communities to build resilence into public water supplies.",
+          "proposal": "The plan SHOULD describe what technical assistance will be provided to communities to build resilience into public water supplies.",
           "included": true
         },
         {
           "name": "Drgt20 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "How will communities be engaged in desinging drought resilience strategies?",
+          "proposal": "The plan SHALL explain how  communities will be engaged in designing drought resilience strategies.",
           "included": true
         },
         {
           "name": "Drgt21 - Equity & Environmental Justice - Community Outreach",
-          "proposal": "What barriers will be faced by renters, low-income communities, non-English speakers, or undocumented residents during extreme drought events?",
+          "proposal": "The plan SHOULD describe the barriers that will be faced by renters, low-income communities, non-English speakers, or undocumented residents during extreme drought events.",
           "included": true
         },
         {
           "name": "Drgt22 - Equity & Environmental Justice - Distribution of Impacts",
-          "proposal": "How is the disproportionate impact of drought addressed for low-income communities or environmental justice communities?",
+          "proposal": "The plan SHOULD describe the impact of drought on low-income communities or environmental justice communities? The plan MAY detail how this impact will be disproportionally felt by these communities, if appropriate.",
           "included": true
         },
         {
           "name": "Drgt23 - Equity & Environmental Justice - System Adaptation",
-          "proposal": "how can drought resilience investments avoid displacement or gentrification?",
+          "proposal": "The plan MAY discuss how drought resilience investments can be implemented in such a way as to avoid displacement and/or gentrification.",
           "included": true
         },
         {
           "name": "Drgt24 - Local Capacity Building - technical assistance",
-          "proposal": "Does the plan support community-based organizations in outreach, education, or DROUGHT emergency response?",
+          "proposal": "The plan SHOULD support community-based organizations in outreach, education, or drought emergency response.",
           "included": true
         },
         {
           "name": "Drgt25 - Local Capacity Building - technical assistance",
-          "proposal": "What public education campaigns around extreme drought risks will occur?",
+          "proposal": "The plan SHOULD describe specific public education campaigns that will occur to address extreme drought risks.",
+          "included": true
+        },
+        {
+          "name": "Drgt25B - Local Capacity Building - technical assistance",
+          "proposal": "The plan SHOULD describe specific public education campaigns that will occur to address climate hazard risks. Any relevant material constitutes a match.  drought context is not required to be present.",
           "included": true
         },
         {
           "name": "Drgt26 - Local Capacity Building - technical assistance",
-          "proposal": "Does the plan encourage local data collection such as DROUGHT mapping or vulnerability assessments?",
+          "proposal": "The plan SHOULD encourage local data collection.  Examples may include drought mapping or vulnerability assessments. Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "Drgt27 - Local Capacity Building - incentives",
-          "proposal": "Does the plan require or incentivize municipalities to adopt DROUGHT-resilient land-use or zoning policies?",
+          "proposal": "The plan SHOULD require or incentivize municipalities to adopt drought-resilient land-use or zoning policies.",
           "included": true
         },
         {
           "name": "Drgt28 - Local Capacity Building - technical assistance",
-          "proposal": "How are local water supply availability and reliability assessments supported?",
+          "proposal": "The plan SHOULD discuss how are local water supply availability and reliability assessments are supported.",
           "included": true
         },
         {
-          "name": "Drgt28a - Local Capacity Building - technical assistance",
-          "proposal": "Does the plan require or incentivize municipalities to adopt outdoor water use bylaws?",
+          "name": "Drgt28B - Local Capacity Building - technical assistance",
+          "proposal": "The plan SHALL require or incentivize municipalities to adopt outdoor water use bylaws.",
           "included": true
         },
         {
-          "name": "Drgt28b - Local Capacity Building - technical assistance",
-          "proposal": "Does the plan require or incentivize municipalities to develop a local drought management plan?",
+          "name": "Drgt28C - Local Capacity Building - technical assistance",
+          "proposal": "The plan SHALL require or incentivize municipalities to develop a local drought management plan.",
           "included": true
         },
         {
-          "name": "Drgt28c - Local Capacity Building - technical assistance",
-          "proposal": "Does the plan require or incentivize municipalities to develop water pricing strategies that encourage conservation?",
+          "name": "Drgt28D - Local Capacity Building - technical assistance",
+          "proposal": "The plan SHALL require or incentivize municipalities to develop water pricing strategies that encourage conservation.",
           "included": true
         },
         {
           "name": "Drgt29 - Policy and Regulatory Implementation - Regulatory barriers",
-          "proposal": "Does the plan identify regulatory barriers that limit implementation of DROUGHT resilience strategies?",
+          "proposal": "The plan SHOULD identify regulatory barriers that limit implementation of drought resilience strategies.",
+          "included": true
+        },
+        {
+          "name": "Drgt29B - Policy and Regulatory Implementation - Regulatory barriers",
+          "proposal": "The plan SHOULD identify regulatory barriers that limit implementation of environmental hazard resilience strategies. Any relevant material constitutes a match.  drought context is not required to be present.",
           "included": true
         },
         {
           "name": "Drgt30 - Policy and Regulatory Implementation - Local Ordinances",
-          "proposal": "How will water shutoff occur during drought events?",
+          "proposal": "The plan SHOULD describe how water shutoff will occur during drought events.",
           "included": true
         },
         {
           "name": "Drgt31 - Policy and Regulatory Implementation - Building Codes / Zoning",
-          "proposal": "What changes to building codes will occur to require water conservation?",
+          "proposal": "The plan SHALL describe changes to building codes that will be implemented to require water conservation.",
           "included": true
         },
         {
           "name": "Drgt32 - Policy and Regulatory Implementation - Building Codes / Zoning",
-          "proposal": "What changes to building codes will occur to require water reuse?",
+          "proposal": "The plan SHALL describe changes to building codes that will be implemented to require water reuse.",
           "included": true
         },
         {
           "name": "Drgt33 - Policy and Regulatory Implementation - Local Ordinances",
-          "proposal": "Is net zero water use required in new developments?",
+          "proposal": "The plan SHOULD explain whether net zero water use is required in new developments.",
           "included": true
         },
         {
           "name": "Drgt34 - Policy and Regulatory Implementation - State guidelines",
-          "proposal": "How will non-essential water use be restricted in times of drought?",
+          "proposal": "The plan SHALL describe how  non-essential water use will be restricted in times of drought.",
           "included": true
         },
         {
           "name": "Drgt35 - Policy and Regulatory Implementation - Stormwater Permitting",
-          "proposal": "What updates to MS4 or other stormwater permits are expected?",
+          "proposal": "The plan SHOULD explain what updates to stormwater permits are expected.  An example of such a permit is  MS4.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "Drgt36 - Policy and Regulatory Implementation - technical assistance",
-          "proposal": "What assistance will be provided to private well owners?",
+          "proposal": "The plan SHOULD describe the assistance that will be provided to private well owners.",
           "included": true
         },
         {
           "name": "Drgt37 - Policy and Regulatory Implementation - Disclosure",
-          "proposal": "What water use disclosure requirements will be put in place?",
+          "proposal": "The plan SHOULD describe the water use disclosure requirements that will be put in place.",
           "included": true
         },
         {
           "name": "Drgt38 - Policy and Regulatory Implementation - incentives",
-          "proposal": "What measures will be implemented to improve industrial and agricultural water use?",
+          "proposal": "The plan SHALL describe the measures to be implemented to improve industrial and agricultural water use.",
           "included": true
         },
         {
-          "name": "Drgt38a - Policy and Regulatory Implementation - Communcations",
-          "proposal": "How will drought conditions and conservation measures be communicated to the public?",
+          "name": "Drgt38B - Policy and Regulatory Implementation - Communications",
+          "proposal": "The plan SHALL describe in detail how  drought conditions and conservation measures will be communicated to the public.",
           "included": true
         },
         {
@@ -2076,56 +1950,56 @@
         },
         {
           "name": "Drgt40 - Vulnerability and Risk Assessment - Definitions",
-          "proposal": "How is extreme drought measuresd?",
+          "proposal": "How is extreme drought measured?",
           "included": true
         },
         {
           "name": "Drgt41 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "How many projected extreme drought days are expected by mid-century?",
+          "proposal": "How many projected extreme drought days are expected by the middle of the 21st century?  Estimates for exactly 2050 are not required.  Any estimates for years between 2030 and 2100 constitute a match.",
           "included": true
         },
         {
           "name": "Drgt42 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Which regions or municipalities or neighborhoods face the highest projected DROUGHT risk?",
+          "proposal": "The plan SHOULD describe which regions, municipalities, or neighborhoods face the highest projected drought risk.",
           "included": true
         },
         {
-          "name": "Drgt42a - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan fund improvements in hydrologic monitoring?",
+          "name": "Drgt42B - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "The plan SHOULD fund improvements in hydrologic monitoring.",
           "included": true
         },
         {
           "name": "Drgt43 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "What are the health impacts from extreme drought?",
+          "proposal": "The plan SHOULD describe the health impacts from extreme drought.",
           "included": true
         },
         {
           "name": "Drgt44 - Vulnerability and Risk Assessment - Human health",
-          "proposal": "How do drought impacts compound with air quality issues, flash flooding, extreme heat or wildfire?",
+          "proposal": "The plan SHOULD discuss how drought impacts compound with other climate hazards.  Examples could include air quality issues, flash flooding, extreme heat or wildfire.  Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
           "name": "Drgt45 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "How will drought forecasting occur? Will it include indices such as precipitation, groundwater, streamflow and soil moisture?",
+          "proposal": "The plan SHOULD describe the metrics to be used for  drought forecasting.  Examples of metrics include indices such as precipitation, groundwater, streamflow and soil moisture.    Any relevant material constitutes a match.  Examples are for reference and are not required to be present.",
           "included": true
         },
         {
-          "name": "Drgt45a - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan create a statewide database on water use and management across sectors?",
+          "name": "Drgt45B - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "The plan SHOULD create a statewide database on water use and management across sectors.",
           "included": true
         },
         {
-          "name": "Drgt45b - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "Does the plan assess and map the vulnerability of private and public water supply wells to drought?",
+          "name": "Drgt45C - Vulnerability and Risk Assessment - Forecasts",
+          "proposal": "The plan SHOULD assess and map the vulnerability of private and public water supply wells to drought.",
           "included": true
         },
         {
           "name": "Drgt46 - Vulnerability and Risk Assessment - Forecasts",
-          "proposal": "how may communities identify signficiant industrial uses of water?",
+          "proposal": "The plan SHOULD explain how communities can identify significant industrial uses of water.",
           "included": true
         }
       ],
-      "description": "Updated version from Liz, 10/21/2026",
+      "description": "Updated version from LMC, 10/29/2026",
       "compareInstruction": "Answer the question or address the criterion below thoroughly and directly, using only the material provided. Include every specific figure, number, example, or detail you find, even if you can only address part of what's asked. Do not skip straight to a judgment — give the full, direct answer first.\nAfter your direct answer, give a verdict: MATCHES if the material fully answers or satisfies what's asked, FALLS SHORT if it partially addresses it or gives less than what's asked, EXCEEDS if it goes beyond what's asked, or NOT ADDRESSED if the material says nothing relevant to this at all.\nIf the question uses shall/should/may language, define EXCEEDS to mean \"addresses all shall requirements and some of the should/may requirements\", MATCHES to mean \"addresses all of the shall requirements\", FALLS SHORT to mean \"does not address all shall requirements, but addresses at least some of the shall/should/may requirements\", and NOT ADDRESSED to mean \"does not address any of the shall/should/may requirements.\"\nIf more than one attribute is listed above, address them one at a time, in order: give each attribute its own direct answer followed by its own verdict, clearly labeled by that attribute's name, and do not blend separate attributes' information together into a single combined answer or verdict.\nFor each answer, provide one or more direct quotes from the provided material that best illustrate the point(s) being made, in the format: Quote: \"<a short phrase copied word-for-word from the proposal>\" [<source file name>, chunk <chunk number>].  \nOnce you have given your direct answer and verdict for an attribute, move on immediately — do not re-examine, re-derive, or revise it. If you are genuinely torn between two verdicts for the same attribute, choose the more conservative one (FALLS SHORT rather than MATCHES) and continue; do not keep switching between them.\nDo not repeat, restate, quote, or summarize any part of these instructions in your reply, and do not add any preamble, acknowledgment, or introduction before your answer — begin your response immediately with your direct answer.\nLean towards providing a verbose answer with as much detail as possible, rather than a short, terse answer.\nFor any quote provided, always use the entire quote.  Do not paraphrase or shorten the quote using ellipses.\nIf the verdict is either \"FALLS SHORT\" or \"EXCEEDS\", provide the rationale to justify that determination.\nFor any material from the state plan used as evidence, note specifically if this material references a plan that the state is considering, or if it is an example of a plan from an entirely different state."
     }
   ]
