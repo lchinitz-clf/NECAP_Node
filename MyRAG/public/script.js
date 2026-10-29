@@ -125,6 +125,65 @@ function matchReasoningTemperatureSuggestion(modelName) {
   return REASONING_TEMPERATURE_SUGGESTIONS.find((s) => s.pattern.test(modelName || ''));
 }
 
+// Model-specific "Request size" (numCtx) suggestions — same idea and
+// same shape as REASONING_TEMPERATURE_SUGGESTIONS just above, but for
+// context-window size instead of temperature. The app-wide default
+// (8192, set in index.html) stays the fallback for any model with no
+// entry here; an entry only ever proposes going HIGHER than whatever
+// is currently in the field (see updateContextWindowSuggestion()
+// below), never lower.
+//
+// IMPORTANT, unlike the temperature table: a recommendedNumCtx value
+// here is NOT "the model's native/claimed context window." It's
+// specifically a number that has been verified to actually load and
+// run on THIS app's own deployment machine without exhausting its
+// VRAM/RAM — Ollama allocates the KV cache for the full numCtx at
+// model-load time, regardless of how much of it a given request
+// actually uses, so a value that's merely "within the model's native
+// window" can still fail to load on a given machine. Because this app
+// runs on one shared hosted VM that everyone queries (not a separate
+// Ollama instance per user), a value verified here is valid for every
+// user of this deployment — there's no per-user hardware to account
+// for. It stops being valid the moment the deployment moves to
+// different hardware, so re-verify every entry below (not just add
+// new ones) after any VM change or resize.
+//
+// Qwen3.8-27B entry: native context window is 262,144 tokens (up to
+// 1,000,000 with extension) — see the "numCtx / context window"
+// discussion that led here. 65536 (64K) was chosen as a generous but
+// conservative step up from the 8192 default specifically because it
+// was NOT yet verified against this deployment's actual hardware at
+// the time this entry was added — it's a reasoned starting point
+// (well within the native window, chosen to leave real headroom for
+// the KV cache), not a confirmed-safe number yet. Update this value
+// (and this comment) once it's actually been run and confirmed to
+// hold up on this machine; raise it further if it does, lower it if
+// it doesn't.
+const CONTEXT_WINDOW_SUGGESTIONS = [
+  {
+    pattern: /qwen3\.8:27b/i,
+    label: 'Qwen3.8-27B',
+    recommendedNumCtx: 65536,
+    reason:
+      'This model natively supports up to 262,144 tokens of context — 65536 is a conservative ' +
+      'step up from the 8192 default, chosen to leave real headroom for the KV cache on this ' +
+      'deployment (see the comment on CONTEXT_WINDOW_SUGGESTIONS in script.js: not yet verified ' +
+      'against this machine at the time this entry was added — confirm it loads and runs ' +
+      'cleanly before relying on it for real work, and adjust the number here once you have).',
+  },
+];
+
+/**
+ * @param {string} modelName
+ * @returns {object|undefined} the first entry in
+ *   CONTEXT_WINDOW_SUGGESTIONS above whose pattern matches, or
+ *   undefined if the model name (as selected in the chat-model
+ *   dropdown) doesn't match any of them.
+ */
+function matchContextWindowSuggestion(modelName) {
+  return CONTEXT_WINDOW_SUGGESTIONS.find((s) => s.pattern.test(modelName || ''));
+}
+
 let chatModelSelect, chatModelHint;
 let temperatureInput, temperatureSuggestionWrap, temperatureSuggestionText, temperatureSuggestionApplyBtn;
 let queryAdvancedSettings;
@@ -194,6 +253,57 @@ function updateTemperatureSuggestion() {
   queryAdvancedSettings.open = true;
 }
 
+let numCtxInput, contextWindowSuggestionWrap, contextWindowSuggestionText, contextWindowSuggestionApplyBtn;
+
+// Tracks which chat-model selection the context-window suggestion box
+// was last dismissed for — same convention and same reasoning as
+// temperatureSuggestionDismissedFor above, just a separate variable so
+// dismissing one suggestion never hides the other. null means
+// "nothing dismissed since the last model change."
+let contextWindowSuggestionDismissedFor = null;
+
+/**
+ * Shows or hides the "this model supports a much bigger context
+ * window" callout next to the Request size (numCtx) field. Same
+ * mechanism as updateTemperatureSuggestion() above — called after the
+ * model list loads, on every chat-model selection change, and
+ * whenever the Request size field itself changes — and the same
+ * purely-advisory contract: this never touches the field's value on
+ * its own, only the Apply button does, and only when clicked. See
+ * CONTEXT_WINDOW_SUGGESTIONS above for the match table this reads,
+ * including the important caveat there about what recommendedNumCtx
+ * actually means (verified-safe-on-this-deployment, not "the model's
+ * native maximum").
+ */
+function updateContextWindowSuggestion() {
+  const match = matchContextWindowSuggestion(chatModelSelect.value);
+  const currentNumCtx = Number(numCtxInput.value);
+  const shouldShow =
+    match &&
+    chatModelSelect.value !== contextWindowSuggestionDismissedFor &&
+    // Not >= : if it's already at or above what's recommended for this
+    // model, there's nothing useful to suggest — this also means
+    // clicking Apply below hides the box on its own, since the field's
+    // new value no longer qualifies, with no extra bookkeeping needed.
+    (Number.isNaN(currentNumCtx) || currentNumCtx < match.recommendedNumCtx);
+
+  if (!shouldShow) {
+    contextWindowSuggestionWrap.style.display = 'none';
+    return;
+  }
+
+  contextWindowSuggestionText.textContent = `${match.label} supports a much larger context window than the ${currentNumCtx || 'current'} "Request size" set here. ${match.reason}`;
+  contextWindowSuggestionApplyBtn.textContent = `Use ${match.recommendedNumCtx}`;
+  contextWindowSuggestionApplyBtn.dataset.recommendedNumCtx = String(match.recommendedNumCtx);
+  contextWindowSuggestionWrap.style.display = 'block';
+  // See queryAdvancedSettings's own doc comment above (on
+  // temperatureSuggestionWrap's block): same reasoning applies here —
+  // a closed <details> hides its content at the rendering-engine
+  // level, so this suggestion would otherwise be invisible and
+  // unclickable to anyone who hasn't already opened Advanced settings.
+  queryAdvancedSettings.open = true;
+}
+
 // Loads models actually pulled into this Ollama installation (GET
 // /models -> Ollama's /api/tags) into the chat-model dropdown. This
 // list includes embedding models too — Ollama doesn't label which
@@ -217,6 +327,7 @@ async function refreshModels() {
       chatModelSelect.appendChild(opt);
       chatModelHint.textContent = '';
       updateTemperatureSuggestion();
+      updateContextWindowSuggestion();
       return;
     }
 
@@ -238,6 +349,7 @@ async function refreshModels() {
     // explicit check rather than relying on the listener wired up in
     // init().
     updateTemperatureSuggestion();
+    updateContextWindowSuggestion();
   } catch (err) {
     console.warn('Could not load model list:', err);
     chatModelSelect.innerHTML = '';
@@ -248,6 +360,7 @@ async function refreshModels() {
     chatModelSelect.appendChild(opt);
     chatModelHint.textContent = 'Is Ollama running? Falling back to the server default if you ask a question anyway.';
     updateTemperatureSuggestion();
+    updateContextWindowSuggestion();
   }
 }
 
@@ -2997,6 +3110,29 @@ function init() {
   temperatureSuggestionDismissBtn.addEventListener('click', () => {
     temperatureSuggestionDismissedFor = chatModelSelect.value;
     updateTemperatureSuggestion();
+  });
+
+  numCtxInput = document.getElementById('numCtx');
+  contextWindowSuggestionWrap = document.getElementById('contextWindowSuggestion');
+  contextWindowSuggestionText = document.getElementById('contextWindowSuggestionText');
+  contextWindowSuggestionApplyBtn = document.getElementById('contextWindowSuggestionApply');
+  const contextWindowSuggestionDismissBtn = document.getElementById('contextWindowSuggestionDismiss');
+
+  // Same pattern as the temperature-suggestion wiring just above — see
+  // updateContextWindowSuggestion()'s own doc comment for why both
+  // triggers matter; refreshModels() below triggers its own check once
+  // the pulled-models list loads.
+  chatModelSelect.addEventListener('change', updateContextWindowSuggestion);
+  numCtxInput.addEventListener('input', updateContextWindowSuggestion);
+  contextWindowSuggestionApplyBtn.addEventListener('click', () => {
+    numCtxInput.value = contextWindowSuggestionApplyBtn.dataset.recommendedNumCtx;
+    // Re-check rather than just hiding directly — same reasoning as
+    // the temperature Apply handler above.
+    updateContextWindowSuggestion();
+  });
+  contextWindowSuggestionDismissBtn.addEventListener('click', () => {
+    contextWindowSuggestionDismissedFor = chatModelSelect.value;
+    updateContextWindowSuggestion();
   });
 
   idealTopicSelect = document.getElementById('idealTopic');

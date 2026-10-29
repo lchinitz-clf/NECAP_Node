@@ -631,6 +631,23 @@
         <div>
           <label for="numCtx">Request size</label>
           <input type="number" id="numCtx" value="8192" placeholder="model default" min="512" step="512" />
+          <!-- Hidden unless the selected chat model matches a known
+               entry in CONTEXT_WINDOW_SUGGESTIONS AND the current
+               value is below what that entry recommends — see
+               CONTEXT_WINDOW_SUGGESTIONS and
+               updateContextWindowSuggestion() in script.js. Same
+               mechanism as #temperatureSuggestion just above
+               (deliberately reusing the .model-suggestion styling and
+               Apply/Keep-current pattern): purely advisory, nothing
+               here changes the field without the "Use ..." button
+               being clicked. -->
+          <div class="model-suggestion" id="contextWindowSuggestion">
+            <p id="contextWindowSuggestionText"></p>
+            <div class="button-row">
+              <button type="button" id="contextWindowSuggestionApply" class="btn-apply"></button>
+              <button type="button" id="contextWindowSuggestionDismiss" class="btn-secondary">Keep current value</button>
+            </div>
+          </div>
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>

@@ -1020,14 +1020,21 @@ If you keep hitting either case, the practical fixes are: raise
 settings, since `num_ctx` itself is meaningless to most users) so the
 model has more room to begin with, or lower `topK` (fewer retrieved
 chunks = smaller prompt) or chunk size so the existing room goes
-further. `numCtx`/"Request size" is left blank by default, same
-existing behavior as before it existed — a larger context window uses
-more memory, so this app doesn't pick a bigger number on your behalf
-without being asked. Raising a model's default permanently (rather
-than per-request) is also possible outside this app entirely, via a
-custom `Modelfile` (`PARAMETER num_ctx 8192`, for a model that
-supports it) or, on newer Ollama versions, `ollama run <model>
---ctx-size 8192`.
+further. `numCtx`/"Request size" defaults to 8192 (raised from
+blank/unset in an earlier version, once it became clear topK plus a
+rubric's own instructions routinely needed more than the model's own
+commonly-4096 default) — a larger context window uses more memory, so
+this app doesn't raise it further on your behalf without being asked.
+For a chat model specifically known to support (and, on this
+deployment, verified to actually run with) a much bigger window than
+that, a dismissible suggestion appears next to the field proposing a
+larger value — see CONTEXT_WINDOW_SUGGESTIONS in `script.js` for the
+current list and the deployment-specific caveat on why those numbers
+aren't just "the model's claimed maximum." Raising a model's default
+permanently (rather than per-request) is also possible outside this
+app entirely, via a custom `Modelfile` (`PARAMETER num_ctx 8192`, for
+a model that supports it) or, on newer Ollama versions, `ollama run
+<model> --ctx-size 8192`.
 
 ## Inspecting the store
 
