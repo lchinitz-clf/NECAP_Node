@@ -125,13 +125,23 @@ function matchReasoningTemperatureSuggestion(modelName) {
   return REASONING_TEMPERATURE_SUGGESTIONS.find((s) => s.pattern.test(modelName || ''));
 }
 
+// The baseline "Request size" every model falls back to — must match
+// index.html's own `value="8192"` on #numCtx (not read from the DOM
+// here, since this constant is also needed before init() has run).
+// Used two ways: as the number cited in suggestion text below, and by
+// resetContextWindowForModel() further down, which snaps the field
+// back to this value whenever the selected model has no entry in
+// CONTEXT_WINDOW_SUGGESTIONS and the field currently holds something
+// ABOVE it — see that function's own doc comment for why "above" is
+// the specific condition that matters here.
+const DEFAULT_NUM_CTX = 8192;
+
 // Model-specific "Request size" (numCtx) suggestions — same idea and
 // same shape as REASONING_TEMPERATURE_SUGGESTIONS just above, but for
-// context-window size instead of temperature. The app-wide default
-// (8192, set in index.html) stays the fallback for any model with no
-// entry here; an entry only ever proposes going HIGHER than whatever
-// is currently in the field (see updateContextWindowSuggestion()
-// below), never lower.
+// context-window size instead of temperature. DEFAULT_NUM_CTX above
+// stays the fallback for any model with no entry here; an entry only
+// ever proposes going HIGHER than whatever is currently in the field
+// (see updateContextWindowSuggestion() below), never lower.
 //
 // IMPORTANT, unlike the temperature table: a recommendedNumCtx value
 // here is NOT "the model's native/claimed context window." It's
@@ -304,6 +314,48 @@ function updateContextWindowSuggestion() {
   queryAdvancedSettings.open = true;
 }
 
+/**
+ * Prevents an elevated Request size from silently carrying over to a
+ * model it was never verified for. Call this on every chat-model
+ * SELECTION CHANGE (not on every keystroke in the Request size field
+ * itself — see the "only on 'change'" note at its call site) before
+ * updateContextWindowSuggestion() runs.
+ *
+ * If the newly selected model has no CONTEXT_WINDOW_SUGGESTIONS entry
+ * and the field currently holds a number above DEFAULT_NUM_CTX, resets
+ * it back down to DEFAULT_NUM_CTX. That specific condition — "no entry
+ * for this model" AND "currently above the baseline" — is deliberately
+ * narrower than "always reset on every model switch":
+ *   - A model WITH its own entry is left alone here entirely; raising
+ *     numCtx for it (if it's not already at/above its own
+ *     recommendation) is updateContextWindowSuggestion()'s job, via
+ *     the dismissible suggestion box, never this function's.
+ *   - A blank field (meaning "use the model's own Modelfile default",
+ *     per the field's own placeholder/hint text) is left blank, not
+ *     forced to 8192 — blank was a deliberate choice with its own
+ *     defined meaning, and leaving it blank is also the actually-safe
+ *     choice memory-wise (whatever that model's own author considered
+ *     safe), so there's nothing to protect against there.
+ *   - A value already at or below DEFAULT_NUM_CTX (including a smaller
+ *     custom number someone typed in by hand for some other, unlisted
+ *     model) is left alone — it was never elevated above the app's own
+ *     safe baseline in the first place, so it isn't the thing this
+ *     function exists to clean up.
+ * The case this DOES catch: switching away from a model whose
+ * suggestion you applied (e.g. Qwen3.8-27B's 65536) to a model with no
+ * verified recommendation of its own — without this, that elevated
+ * value would otherwise just sit in the field, asking an unverified
+ * model to allocate a KV cache sized for a completely different one.
+ */
+function resetContextWindowForModel() {
+  const match = matchContextWindowSuggestion(chatModelSelect.value);
+  if (match) return;
+  const currentNumCtx = Number(numCtxInput.value);
+  if (!Number.isNaN(currentNumCtx) && currentNumCtx > DEFAULT_NUM_CTX) {
+    numCtxInput.value = String(DEFAULT_NUM_CTX);
+  }
+}
+
 // Loads models actually pulled into this Ollama installation (GET
 // /models -> Ollama's /api/tags) into the chat-model dropdown. This
 // list includes embedding models too — Ollama doesn't label which
@@ -327,6 +379,7 @@ async function refreshModels() {
       chatModelSelect.appendChild(opt);
       chatModelHint.textContent = '';
       updateTemperatureSuggestion();
+      resetContextWindowForModel();
       updateContextWindowSuggestion();
       return;
     }
@@ -349,6 +402,7 @@ async function refreshModels() {
     // explicit check rather than relying on the listener wired up in
     // init().
     updateTemperatureSuggestion();
+    resetContextWindowForModel();
     updateContextWindowSuggestion();
   } catch (err) {
     console.warn('Could not load model list:', err);
@@ -360,6 +414,7 @@ async function refreshModels() {
     chatModelSelect.appendChild(opt);
     chatModelHint.textContent = 'Is Ollama running? Falling back to the server default if you ask a question anyway.';
     updateTemperatureSuggestion();
+    resetContextWindowForModel();
     updateContextWindowSuggestion();
   }
 }
@@ -3121,8 +3176,16 @@ function init() {
   // Same pattern as the temperature-suggestion wiring just above — see
   // updateContextWindowSuggestion()'s own doc comment for why both
   // triggers matter; refreshModels() below triggers its own check once
-  // the pulled-models list loads.
-  chatModelSelect.addEventListener('change', updateContextWindowSuggestion);
+  // the pulled-models list loads. The 'change' listener additionally
+  // runs resetContextWindowForModel() FIRST, and only on 'change' —
+  // deliberately not on the numCtxInput 'input' listener below, which
+  // would otherwise fight every keystroke typed into Request size for
+  // a model with no suggestion entry. See that function's own doc
+  // comment for exactly what it resets and why.
+  chatModelSelect.addEventListener('change', () => {
+    resetContextWindowForModel();
+    updateContextWindowSuggestion();
+  });
   numCtxInput.addEventListener('input', updateContextWindowSuggestion);
   contextWindowSuggestionApplyBtn.addEventListener('click', () => {
     numCtxInput.value = contextWindowSuggestionApplyBtn.dataset.recommendedNumCtx;
