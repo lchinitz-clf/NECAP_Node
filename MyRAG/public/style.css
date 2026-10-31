@@ -56,10 +56,6 @@ body {
    (e.g. the delete-workspace confirmation) still correctly layers on
    top of this header, not under it. */
 .app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
   position: sticky;
   top: 0;
   z-index: 40;
@@ -68,19 +64,32 @@ body {
   margin: 0 0 0.25rem;
   border-bottom: 1px solid var(--border);
 }
-/* Whole-app lock banner (see index.html's own comment on #lockBanner
-   for why it lives here, between the title and the hamburger menu).
-   Reuses the existing --ok/--low "verdict" colors (green/amber)
-   instead of introducing a third status color -- "available" reads
-   the same way a passing check does elsewhere in this app, "locked"
-   the same way a low-confidence result does: worth a second look, not
-   an error. */
-.lock-banner {
+/* The title/hints + hamburger-menu row -- this is what .app-header
+   itself used to be (display:flex, justify-content:space-between)
+   before the lock banner moved to its own row below it (see
+   .lock-banner's own comment just below for why). */
+.app-header-top {
   display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+/* Whole-app lock banner (see index.html's own comment on #lockBanner
+   for why it's a separate row below .app-header-top rather than a
+   third item squeezed into that same flex row, which is how this used
+   to be laid out). Reuses the existing --ok/--low "verdict" colors
+   (green/amber) instead of introducing a third status color --
+   "available" reads the same way a passing check does elsewhere in
+   this app, "locked" the same way a low-confidence result does: worth
+   a second look, not an error.
+   display:inline-flex (not flex) deliberately keeps this sized to its
+   own content -- a compact pill, same as before -- rather than
+   stretching to the full width now available to it on its own line. */
+.lock-banner {
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  flex-shrink: 0;
-  align-self: center;
+  margin-top: 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.35rem 0.65rem;

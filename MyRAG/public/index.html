@@ -22,6 +22,7 @@
 <body onload="init(); initBestPracticesTab()">
 
 <div class="app-header">
+ <div class="app-header-top">
   <div>
     <h1 id="appNameHeading">local-rag</h1>
     <!-- These two describe how the OTHER tabs work (storage areas,
@@ -33,21 +34,6 @@
       <p class="sub">Everything below works within a single storage area — pick or create one first.</p>
       <p class="sub">For more detail about any item, click on the arrow near the information (&#9432;) icon.</p>
     </div>
-  </div>
-
-  <!-- Whole-app lock status: see src/appLock.js's own top-of-file
-       comment for why this exists at all (one shared Ollama server,
-       global rubric/workspace state), and GET /lock-status/stream +
-       POST /lock-status/force-unlock in index.js for how it's pushed
-       and cleared. Deliberately placed and made sticky the same way
-       as the hamburger menu right below it, so it's visible no matter
-       which of Documents/Rubric/Query/etc. is the active tab, not just
-       on whichever tab happens to be the one that locked it.
-       initLockStatus() in script.js owns everything inside this div
-       from here on. -->
-  <div id="lockBanner" class="lock-banner" role="status" aria-live="polite">
-    <span id="lockBannerText" class="lock-banner-text">Checking status…</span>
-    <button type="button" id="forceUnlockBtn" class="lock-banner-force-btn" style="display:none;" title="Clear a stuck lock without waiting for whatever holds it to finish on its own">Force unlock</button>
   </div>
 
   <!-- Hamburger menu: switches which tab-panel below is visible. See
@@ -69,6 +55,30 @@
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="bestPractices">Best Practices Comparison</button>
       <button type="button" class="tab-menu-item" role="menuitem" data-tab="logs">Logs</button>
     </div>
+  </div>
+ </div>
+
+  <!-- Whole-app lock status: see src/appLock.js's own top-of-file
+       comment for why this exists at all (one shared Ollama server,
+       global rubric/workspace state), and GET /lock-status/stream +
+       POST /lock-status/force-unlock in index.js for how it's pushed
+       and cleared. Deliberately placed and made sticky the same way
+       as the hamburger menu above, so it's visible no matter which of
+       Documents/Rubric/Query/etc. is the active tab, not just on
+       whichever tab happens to be the one that locked it. On its OWN
+       row below the title/hamburger row (not squeezed between them in
+       a single flex row, as this used to be) specifically because its
+       text can now run long — "Locked by alice — attribute 14 of 48
+       (9m 23s elapsed)" — and a flex-shrink:0 pill that long used to
+       compress #appHeaderHints's text into an unreadably narrow
+       column rather than ever actually wrapping itself (see its own
+       white-space:nowrap in style.css). Giving it the full header
+       width as its own line means it never needs to compete with
+       anything else for space. initLockStatus() in script.js owns
+       everything inside this div from here on. -->
+  <div id="lockBanner" class="lock-banner" role="status" aria-live="polite">
+    <span id="lockBannerText" class="lock-banner-text">Checking status…</span>
+    <button type="button" id="forceUnlockBtn" class="lock-banner-force-btn" style="display:none;" title="Clear a stuck lock without waiting for whatever holds it to finish on its own">Force unlock</button>
   </div>
 </div>
 
