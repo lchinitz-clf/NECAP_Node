@@ -37,8 +37,10 @@
 // under it. Comparing tokens (a plain compare-and-swap) rather than
 // just unconditionally setting `current = null` is what makes
 // release() safe to call even long after the lock it thinks it holds
-// has already moved on.
-let current = null; // { token, user, since }
+// has already moved on. `detail` follows the exact same compare-and-
+// swap safety via updateDetail() below, for the same reason — see its
+// own doc comment.
+let current = null; // { token, user, since, detail }
 let nextToken = 1;
 
 // Every open SSE connection's "push an update" callback (see
@@ -49,8 +51,8 @@ const subscribers = [];
 
 function snapshot() {
   return current
-    ? { locked: true, user: current.user, since: current.since }
-    : { locked: false, user: null, since: null };
+    ? { locked: true, user: current.user, since: current.since, detail: current.detail }
+    : { locked: false, user: null, since: null, detail: null };
 }
 
 function broadcast() {
@@ -71,10 +73,18 @@ function broadcast() {
 }
 
 /**
- * Returns the current lock status — {locked, user, since} — exactly
- * the shape pushed over SSE. `user` is the display name to show
- * ("Locked by alice"); null means nobody holds it. `since` is a
+ * Returns the current lock status — {locked, user, since, detail} —
+ * exactly the shape pushed over SSE. `user` is the display name to
+ * show ("Locked by alice"); null means nobody holds it. `since` is a
  * `Date.now()`-style epoch-ms timestamp, or null when unlocked.
+ * `detail` is whatever the current holder last passed to
+ * updateDetail() below — null until (or unless) they ever call it, so
+ * most lock holders (a document upload, a rubric edit, a plain
+ * question) simply never populate it and every consumer keeps working
+ * exactly as it did before this field existed. The one caller that
+ * does populate it today is /query/stream's rubric-batch loop in
+ * index.js, with `{batchIndex, totalBatches}` — see updateDetail()'s
+ * own doc comment.
  */
 function getStatus() {
   return snapshot();
@@ -97,7 +107,7 @@ function getStatus() {
 function tryAcquire(user) {
   if (current) return { ok: false, status: snapshot() };
   const token = nextToken++;
-  current = { token, user: user || null, since: Date.now() };
+  current = { token, user: user || null, since: Date.now(), detail: null };
   broadcast();
   return { ok: true, token };
 }
@@ -116,6 +126,40 @@ function tryAcquire(user) {
 function release(token) {
   if (!current || current.token !== token) return; // already released, or superseded by a force-unlock + new acquire
   current = null;
+  broadcast();
+}
+
+/**
+ * Lets the CURRENT lock holder attach a small, operation-specific
+ * progress payload to the lock — e.g. `{batchIndex, totalBatches}`
+ * from /query/stream's rubric-batch loop in index.js — so a second
+ * browser tab (which has no connection at all to the original
+ * request's own private response stream) can still see roughly where
+ * a long-running operation stands, over the SAME `/lock-status/stream`
+ * broadcast it's already subscribed to for the "Locked by ..." banner
+ * itself. Entirely optional: a lock holder that never calls this
+ * simply leaves `detail` at the `null` tryAcquire() set it to, and
+ * every consumer already treats that as "no extra detail to show" —
+ * see getStatus()'s own doc comment.
+ *
+ * Same token-based compare-and-swap safety as release() above, and
+ * for the identical reason: if this lock has already moved on to a
+ * new holder (a force-unlock followed by a fresh acquire, or this
+ * holder's own request having already finished and released), a
+ * late-arriving progress update from the ORIGINAL request must not
+ * overwrite the new holder's status — or, worse, resurrect a `detail`
+ * value after the lock has already gone back to fully unlocked.
+ * Silently no-ops in both of those cases rather than throwing, since a
+ * caller racing its own release() is an expected, harmless timing
+ * case, not a bug to report.
+ * @param {number} token - the same token tryAcquire() returned.
+ * @param {*} detail - whatever small, JSON-serializable progress
+ *   payload the caller wants other tabs to see; entirely opaque to
+ *   this module.
+ */
+function updateDetail(token, detail) {
+  if (!current || current.token !== token) return;
+  current.detail = detail;
   broadcast();
 }
 
@@ -175,4 +219,4 @@ function subscribe(send) {
   };
 }
 
-module.exports = { getStatus, tryAcquire, release, forceUnlock, subscribe };
+module.exports = { getStatus, tryAcquire, release, updateDetail, forceUnlock, subscribe };

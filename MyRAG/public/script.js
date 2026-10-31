@@ -1865,13 +1865,19 @@ async function initRole() {
 // per-session) ----
 //
 // GET /lock-status/stream (SSE, not polled -- see that route's own doc
-// comment in index.js for why) pushes {locked, user, since} once the
-// instant a tab connects and again on every change, for as long as
-// that connection stays open. appLockStatus always holds the latest
-// one; onLockStatusChange() lets any other part of this file (the
-// banner itself, and every lock-aware button below) react to it
-// without this section needing to know what any of them are.
-let appLockStatus = { locked: false, user: null, since: null };
+// comment in index.js for why) pushes {locked, user, since, detail}
+// once the instant a tab connects and again on every change, for as
+// long as that connection stays open. appLockStatus always holds the
+// latest one; onLockStatusChange() lets any other part of this file
+// (the banner itself, and every lock-aware button below) react to it
+// without this section needing to know what any of them are. `detail`
+// is whatever the current holder last posted via
+// appLock.updateDetail() server-side (see its doc comment in
+// src/appLock.js) — null for every lock-gated action except
+// /query/stream's rubric-batch loop, which posts
+// {batchIndex, totalBatches} as it works through each attribute; see
+// buildLockBannerText() below for how that's turned into text.
+let appLockStatus = { locked: false, user: null, since: null, detail: null };
 const lockStatusListeners = [];
 
 /**
@@ -1974,6 +1980,45 @@ function refreshAllLockAwareControls() {
 
 let lockBannerEl, lockBannerTextEl, forceUnlockBtn;
 
+// Ticks #lockBannerText's elapsed-time portion once a second while
+// locked, same "live-updating timer handle" idea as queryTimerHandle
+// elsewhere in this file — started the moment the banner first shows
+// "locked" (see renderLockBanner() below) and cleared the moment it
+// goes back to "available", rather than running forever regardless of
+// lock state. A fresh lock-status push (a new batch starting, or the
+// lock releasing) re-renders the text anyway via renderLockBanner()
+// itself; this timer is only what keeps the seconds moving in between
+// those pushes, which can legitimately be many minutes apart for one
+// slow batch (see the reasoning-effort token-count discussion this
+// feature came out of).
+let lockBannerTimerHandle = null;
+
+/**
+ * Turns appLockStatus into the #lockBannerText string: "Locked by
+ * alice", plus " — attribute N of M" when the current holder has
+ * posted batch progress via appLock.updateDetail() (see that
+ * function's own doc comment in src/appLock.js — `detail` is null for
+ * every lock-gated action except /query/stream's rubric-batch loop),
+ * plus "(Xm YYs elapsed)" using the SAME formatElapsedMs() the
+ * per-batch summary rows and the Best Practices tab's own timer
+ * already use (reportHtml.js), for one consistent time format
+ * everywhere this app shows one. `detail.totalBatches > 1` is
+ * deliberately the same gate script.js's renderAttributeResults() uses
+ * for its own showBatchRows — a plain, single-question run (totalBatches
+ * 1) isn't worth announcing as "attribute 1 of 1" here either.
+ */
+function buildLockBannerText() {
+  let text = `Locked by ${appLockStatus.user}`;
+  const detail = appLockStatus.detail;
+  if (detail && detail.totalBatches > 1) {
+    text += ` — attribute ${detail.batchIndex + 1} of ${detail.totalBatches}`;
+  }
+  if (appLockStatus.since) {
+    text += ` (${formatElapsedMs(Date.now() - appLockStatus.since)} elapsed)`;
+  }
+  return text;
+}
+
 /**
  * Reflects appLockStatus into #lockBanner — called immediately on
  * registration and again on every change (see onLockStatusChange()
@@ -1987,12 +2032,21 @@ function renderLockBanner() {
   lockBannerEl.classList.remove('available', 'locked');
   if (appLockStatus.locked) {
     lockBannerEl.classList.add('locked');
-    lockBannerTextEl.textContent = `Locked by ${appLockStatus.user}`;
+    lockBannerTextEl.textContent = buildLockBannerText();
     forceUnlockBtn.style.display = currentRole === 'admin' ? '' : 'none';
+    if (!lockBannerTimerHandle) {
+      lockBannerTimerHandle = setInterval(() => {
+        lockBannerTextEl.textContent = buildLockBannerText();
+      }, 1000);
+    }
   } else {
     lockBannerEl.classList.add('available');
     lockBannerTextEl.textContent = 'Available';
     forceUnlockBtn.style.display = 'none';
+    if (lockBannerTimerHandle) {
+      clearInterval(lockBannerTimerHandle);
+      lockBannerTimerHandle = null;
+    }
   }
 }
 

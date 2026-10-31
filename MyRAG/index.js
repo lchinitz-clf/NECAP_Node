@@ -115,6 +115,14 @@ function lockGate(req, res, next) {
     });
   }
 
+  // Exposed so a route handler can optionally call
+  // appLock.updateDetail(req.lockToken, ...) to post its own progress
+  // where every open tab's lock-status subscription can see it — see
+  // that function's own doc comment in src/appLock.js. Most routes
+  // below never touch this at all, which is fine: it's only consumed
+  // if a handler chooses to use it.
+  req.lockToken = result.token;
+
   // Released on EITHER event below, not just one — 'finish' covers an
   // ordinary completed response, 'close' covers a client disconnecting
   // mid-request (same event /query/stream already listens for to
@@ -2274,6 +2282,19 @@ app.post('/query/stream', lockGate, async (req, res) => {
   try {
     for (let i = 0; i < batches.length; i++) {
       if (clientGone) break;
+
+      // Posted unconditionally (even for a single-batch/plain-question
+      // run, where totalBatches is 1) — it's cheap, and it's the
+      // CLIENT's job to decide whether a totalBatches of 1 is worth
+      // showing as "attribute 1 of 1" or not (see renderLockBanner()
+      // in script.js), not this route's. Set at the START of each
+      // batch's work, not after it finishes, so a second tab watching
+      // the lock banner sees "working on attribute 4" for the full
+      // duration that attribute is actually in flight, rather than the
+      // count only advancing once each (potentially very long, per the
+      // reasoning-effort testing earlier) batch completes.
+      appLock.updateDetail(req.lockToken, { batchIndex: i, totalBatches });
+
       const attributesSubset = batches[i];
 
       // Batch 0 reuses the retrieval already done above (so it isn't
@@ -2325,7 +2346,6 @@ app.post('/query/stream', lockGate, async (req, res) => {
       // "proposal".
       const materialLabel = rubricMatches ? 'rubric under review' : (topic ? 'proposal' : undefined);
       const messages = buildRagMessages(effectiveQuestion, matches, materialLabel);
-      //console.log(`LMCLMC:\n Here is the effectiveQuestion sent in the rubric analysis: \n ${effectiveQuestion} \n\n`);
       const { text: answer, thinking, doneReason, promptTokens, answerTokens, model: usedModel } = await chat(messages, {
         model: chatModel,
         temperature,
