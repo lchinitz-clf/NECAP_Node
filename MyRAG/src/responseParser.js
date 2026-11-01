@@ -71,6 +71,20 @@
  * category word it could possibly pick for that. "Exceeds" is
  * deliberately left untouched by this downgrade (see VERDICT_ORDER's
  * doc comment below for why).
+ *
+ * A real, observed gap in all of the above: a model sometimes cites a
+ * sentence of its OWN unquoted prose next to a bracketed citation —
+ * `Create a program to support climate-smart food production... [Source:
+ * plan.pdf, chunk 268]` — with no "Quote:" label and no quotation marks
+ * anywhere, even when that sentence is, word for word, lifted straight
+ * from the chunk it cites. extractQuotesAndCitations() below has a
+ * fourth shape for exactly this: a bracketed citation with no quote
+ * marks or label nearby gets the sentence immediately in front of it
+ * (found by scanning backward to the nearest sentence boundary) tried as
+ * an unmarked candidate quote, but ONLY surfaced at all when it actually
+ * verifies — see that function's own doc comment for why an unverified
+ * one is simply discarded rather than flagged, unlike the other three
+ * shapes.
  */
 
 // Checked longest/most-specific phrase first so e.g. "not addressed"
@@ -557,7 +571,38 @@ function extractCategoryAndResult(segment, attributeName) {
  * quoted.
  *
  * @param {string} text
- * @returns {Array<{start: number, end: number, quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null}>}
+ * A fourth shape is layered on top of those three, unlike them in one
+ * important way: it needs `matches` to even decide whether something
+ * counts as a candidate at all, not just to verify one afterward. A
+ * bracketed citation with no "Quote:" label and no quotation marks
+ * anywhere nearby — just the model's own plain sentence immediately
+ * followed by `[Source: file, chunk N]` — gets the text immediately in
+ * front of the bracket tried as an unmarked quote, found by scanning
+ * backward from the bracket to the nearest sentence boundary (a
+ * period/!/? followed by whitespace-then-capital-letter, or a run of
+ * newlines), stopping at whatever the three shapes above already
+ * claimed so this can never steal text from a real quote or a
+ * previously-found unmarked one. That candidate is checked against
+ * `matches` via resolveCitation() RIGHT HERE, during extraction, and is
+ * kept ONLY if it actually verifies — an unverified one is discarded
+ * completely rather than returned as a new kind of "not found" match.
+ * That asymmetry is deliberate: the model never claimed this sentence
+ * was a quote in the first place, so a plain paraphrase that happens to
+ * sit next to a citation bracket should stay looking like ordinary,
+ * unflagged prose, not suddenly grow a verification warning it never
+ * asked for. Only when the words genuinely do match the source verbatim
+ * does it make sense to say anything about it at all. Tagged
+ * `kind: 'unquoted'` (every other match's `kind` is implicit/unused by
+ * callers) so renderQuoteMatch() below knows not to wrap it in
+ * quotation marks the model never wrote.
+ *
+ * @param {string} text
+ * @param {Array<{sourceFile: string, chunkIndex: number, text: string}>} [matches] -
+ *   this batch's own retrieved chunks. Only used by the fourth shape
+ *   above (the first three need nothing but the text itself); omitting
+ *   it simply skips that fourth shape entirely, same "no matches array
+ *   -> nothing to verify" convention used throughout this file.
+ * @returns {Array<{start: number, end: number, quote: string, claimedSourceFile: string|null, claimedChunkIndex: string|null, kind?: string}>}
  *   In text order. `quote` is '' for a "none"-shaped match — see
  *   spliceVerifiedQuotes() below for how callers should treat that
  *   (render nothing for it, but don't lose the surrounding prose).
@@ -565,7 +610,7 @@ function extractCategoryAndResult(segment, attributeName) {
  *   (e.g. "6", or the bogus "6b" or "PROPOSAL START"), kept only as a
  *   tiebreaker in resolveCitation() below — never displayed directly.
  */
-function extractQuotesAndCitations(text) {
+function extractQuotesAndCitations(text, matches) {
   // "Quote" is followed by an optional colon, not a required one — a
   // model has been observed writing "Quote none" with no punctuation
   // at all (still unambiguous: only "Quote"/"Quote:" ever precedes the
@@ -620,6 +665,82 @@ function extractQuotesAndCitations(text) {
     results.push({ start: cand.start, end: cand.end, quote, claimedSourceFile, claimedChunkIndex });
     cursor = cand.end;
   }
+
+  // Fourth shape — see this function's own doc comment above for the
+  // full reasoning. Skipped entirely without `matches`, since nothing
+  // found here could ever be verified anyway.
+  if (matches && matches.length > 0) {
+    const citationBracketRe = /\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\]/g;
+    // Every interval already spoken for, kept in position order and
+    // grown as unmarked candidates are confirmed below — this is what
+    // stops this pass from (a) re-detecting a bracket that's already
+    // part of one of the three real-quote shapes above, and (b) two
+    // unmarked sentences in a row stealing each other's text when their
+    // citation brackets sit close together.
+    const claimed = results.map((r) => ({ start: r.start, end: r.end }));
+
+    let bm;
+    while ((bm = citationBracketRe.exec(text))) {
+      const bStart = bm.index;
+      const bEnd = bm.index + bm[0].length;
+      if (claimed.some((c) => bStart >= c.start && bStart < c.end)) continue; // already part of a real match above
+
+      // The nearest already-claimed interval ending at or before this
+      // bracket — the backward scan below never crosses it, so it can
+      // never swallow a prior quote's (or a prior unmarked sentence's)
+      // own text into this one.
+      let lowerBound = 0;
+      for (const c of claimed) {
+        if (c.end <= bStart && c.end > lowerBound) lowerBound = c.end;
+      }
+
+      const preceding = text.slice(lowerBound, bStart);
+      // The rightmost sentence boundary in `preceding`: a period/!/?
+      // followed by whitespace then a capital letter or opening quote
+      // (so "$1.2M" or "U.S." mid-sentence isn't mistaken for a
+      // sentence end), or any run of newlines (a new bullet/paragraph
+      // always starts a new "sentence" here, no punctuation needed).
+      const boundaryRe = /[.!?](?=\s+["“]?[A-Z])|\n+/g;
+      let lastBoundaryEnd = 0;
+      let bm2;
+      while ((bm2 = boundaryRe.exec(preceding))) {
+        lastBoundaryEnd = bm2.index + bm2[0].length;
+      }
+
+      const candidateRaw = preceding.slice(lastBoundaryEnd);
+      // Strips a leading bullet/number marker and a short markdown-bold
+      // label ("**Federal Funding Sources**: ") the same way
+      // extractCategoryAndResult() and splitIntoListItems() above strip
+      // the same kind of leading junk elsewhere in this file — a label
+      // isn't part of the quoted sentence itself.
+      const leadingJunkRe = /^[\s\-*•]*(?:\*{1,2}[^*\n]{1,80}?\*{1,2}\s*[:\-–—]?\s*)?/;
+      const leadingJunk = candidateRaw.match(leadingJunkRe);
+      const afterJunk = candidateRaw.slice(leadingJunk ? leadingJunk[0].length : 0);
+      const leftTrimLen = afterJunk.length - afterJunk.replace(/^\s+/, '').length;
+      const quote = afterJunk.trim();
+
+      // Too short to trust as deliberate, substantial evidence rather
+      // than an incidental fragment — same floor isSubstantialPiece()
+      // below already applies to one piece of an ellipsis-split quote.
+      if (!isSubstantialPiece(quote)) continue;
+      // A stray quote character here means the backward scan likely
+      // crossed into a real quoted span one of the three shapes above
+      // should have caught on its own — bail rather than risk double-
+      // counting or mangling it.
+      if (/["“”]/.test(quote)) continue;
+
+      const claimedSourceFile = bm[1] ? bm[1].trim() : null;
+      const claimedChunkIndex = bm[2] !== undefined ? bm[2].trim() : null;
+      const resolved = resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex);
+      if (!resolved || !resolved.verified) continue; // never claimed as a quote — only ever surfaced when it actually checks out
+
+      const start = lowerBound + lastBoundaryEnd + (leadingJunk ? leadingJunk[0].length : 0) + leftTrimLen;
+      results.push({ start, end: bEnd, quote, claimedSourceFile, claimedChunkIndex, kind: 'unquoted' });
+      claimed.push({ start, end: bEnd });
+    }
+    results.sort((a, b) => a.start - b.start);
+  }
+
   return results;
 }
 
@@ -647,6 +768,28 @@ function extractQuotesAndCitations(text) {
 function renderQuoteMatch(match, matches) {
   if (!match.quote) return '';
   const resolved = resolveCitation(match.quote, matches, match.claimedSourceFile, match.claimedChunkIndex);
+
+  if (match.kind === 'unquoted') {
+    // extractQuotesAndCitations() only ever hands back an 'unquoted'
+    // match once it has already confirmed it verifies — see that
+    // function's own doc comment for why an unverified one is dropped
+    // before it gets here rather than rendered as a new "not found"
+    // warning. This re-checks rather than trusting that invariant
+    // blindly, so a direct/test call on an unverified one still fails
+    // safe (returns '') instead of mangling the caller's text.
+    if (!resolved || !resolved.verified) return '';
+    const citation = resolved.attributeName
+      ? ` [${resolved.sourceFile} — rubric item: "${resolved.attributeName}"]`
+      : ` [${resolved.sourceFile}, chunk ${resolved.chunkIndex}]`;
+    // Deliberately NOT wrapped in quotation marks — the model never
+    // wrote this as a quote, so adding quote marks here would make it
+    // look like it did, which is confusing to debug against the raw
+    // answer later. "matched verbatim in source" instead of "quote
+    // verified" says plainly that this is the app's own finding, not
+    // the model's claim.
+    return `${match.quote}${citation} ✓ matched verbatim in source`;
+  }
+
   const citation = resolved && resolved.verified
     ? (resolved.attributeName
       ? ` [${resolved.sourceFile} — rubric item: "${resolved.attributeName}"]`
@@ -691,7 +834,7 @@ function renderQuoteMatch(match, matches) {
  * @returns {string}
  */
 function spliceVerifiedQuotes(text, chunkMatches) {
-  const found = extractQuotesAndCitations(text);
+  const found = extractQuotesAndCitations(text, chunkMatches);
   if (found.length === 0) return text;
 
   let out = '';
@@ -789,7 +932,7 @@ function spliceVerifiedQuotes(text, chunkMatches) {
  * one happened to have.
  */
 function verifyQuotesInPlace(text, chunkMatches) {
-  const found = extractQuotesAndCitations(text);
+  const found = extractQuotesAndCitations(text, chunkMatches);
   if (found.length === 0) return text;
 
   let out = '';
@@ -1089,7 +1232,12 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
  * out, exactly mirroring how a person skimming a multi-quote answer
  * would judge it — one solid piece of verified evidence is enough,
  * regardless of how many other quotes alongside it turned out
- * fabricated, paraphrased, or simply absent.
+ * fabricated, paraphrased, or simply absent. "Even one" now also
+ * covers extractQuotesAndCitations()'s fourth shape — a verbatim
+ * sentence cited WITHOUT quote marks or a "Quote:" label — since that
+ * function only ever returns one of those already confirmed to verify
+ * (passing `matches` through here is what turns that shape on at all;
+ * see its own doc comment).
  *
  * Must be called on the RAW segment text, before spliceVerifiedQuotes()
  * has replaced each raw quote span with its already-rendered ✓/⚠ form
@@ -1113,7 +1261,7 @@ function resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex) {
  * @returns {boolean}
  */
 function hasVerifiedQuote(text, matches) {
-  const found = extractQuotesAndCitations(text);
+  const found = extractQuotesAndCitations(text, matches);
   return found.some((m) => {
     if (!m.quote) return false;
     const resolved = resolveCitation(m.quote, matches, m.claimedSourceFile, m.claimedChunkIndex);
