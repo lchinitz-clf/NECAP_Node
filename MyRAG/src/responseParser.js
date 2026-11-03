@@ -610,6 +610,20 @@ function extractCategoryAndResult(segment, attributeName) {
  *   (e.g. "6", or the bogus "6b" or "PROPOSAL START"), kept only as a
  *   tiebreaker in resolveCitation() below — never displayed directly.
  */
+function pickCitationGroups(bracketSource, bracketChunk, parenSource, parenChunk) {
+  // Each citation-matching alternative inside the regexes below carries
+  // its own capture-group pair — only one pair is ever actually filled
+  // per match (bracket or paren, never both), so this just picks
+  // whichever side fired instead of repeating that "a || b" logic at
+  // every call site.
+  return {
+    claimedSourceFile: bracketSource !== undefined ? (bracketSource ? bracketSource.trim() : null)
+      : parenSource ? parenSource.trim() : null,
+    claimedChunkIndex: bracketChunk !== undefined ? bracketChunk.trim()
+      : parenChunk !== undefined ? parenChunk.trim() : null,
+  };
+}
+
 function extractQuotesAndCitations(text, matches) {
   // "Quote" is followed by an optional colon, not a required one — a
   // model has been observed writing "Quote none" with no punctuation
@@ -619,9 +633,40 @@ function extractQuotesAndCitations(text, matches) {
   // All three carry the "g" flag now (they didn't need one when only
   // the first match anywhere ever mattered) so exec() can be called
   // repeatedly to walk every match in the text.
-  const labeledRe = /[\s.;:—–-]*Quote\s*:?\s*(?:["“]([^"”]*)["”]|(none|n\/a|no quote))\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])?/gi;
-  const inlineRe = /["“]([^"”]+)["”]\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/gi;
-  const bareNoneRe = /(?:none|n\/a|no quote)\s*[.,;:]?\s*(?:\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\])/gi;
+  //
+  // Each citation can be written either as "[file, chunk N]" or as
+  // "(Source: file, chunk N)" — models have been observed doing both —
+  // so every pattern below matches either bracket or paren form as an
+  // explicit alternation (never a char class mixing the two kinds of
+  // delimiter, which would also accept a mismatched "[...)" pair).
+  //
+  // For inlineRe/bareNoneRe (not labeledRe, which is already anchored
+  // by the literal word "Quote" and doesn't need this), the gap between
+  // the quote/placeholder and its citation is a bounded, lazy class
+  // instead of the old strict "optional punctuation + whitespace" —
+  // real responses sometimes put a whole clause (or even one short
+  // extra sentence of commentary) between a quote and its citation,
+  // and the citation at the end of that span almost always still
+  // belongs to the quote. Excluding quote characters keeps it from
+  // ever swallowing a different quoted span; excluding '.'/'!'/'?'
+  // stops it at the next sentence that has its OWN terminating
+  // punctuation ahead of the citation (a genuinely unrelated later
+  // sentence) — note this only catches a boundary marked by a period
+  // sitting inside the gap itself, not one consumed by the closing
+  // quote mark of the quote just before it, so a short, unterminated
+  // trailing clause/sentence is deliberately still bridged. The lazy
+  // quantifier keeps already-adjacent citations matching exactly as
+  // before, and the 120-char bound keeps the gap "short," not
+  // unbounded.
+  const citationGap = '[^.!?"“”]{0,120}?';
+  const bracketCitation = '\\[\\s*(?:Source\\s*:\\s*)?([^,\\]]+?)\\s*,\\s*chunk\\s*([^\\]]+?)\\s*\\]';
+  const parenCitation = '\\(\\s*(?:Source\\s*:\\s*)?([^,)]+?)\\s*,\\s*chunk\\s*([^)]+?)\\s*\\)';
+  const labeledRe = new RegExp(
+    `[\\s.;:—–-]*Quote\\s*:?\\s*(?:["“]([^"”]*)["”]|(none|n/a|no quote))\\s*(?:${bracketCitation}|${parenCitation})?`,
+    'gi'
+  );
+  const inlineRe = new RegExp(`["“]([^"”]+)["”]${citationGap}(?:${bracketCitation}|${parenCitation})`, 'gi');
+  const bareNoneRe = new RegExp(`(?:none|n/a|no quote)${citationGap}(?:${bracketCitation}|${parenCitation})`, 'gi');
 
   const raw = [];
   for (const { re, kind } of [
@@ -648,19 +693,16 @@ function extractQuotesAndCitations(text, matches) {
     let quote, claimedSourceFile, claimedChunkIndex;
     if (kind === 'labeled') {
       quote = (m[1] || '').trim();
-      claimedSourceFile = m[3] ? m[3].trim() : null;
-      claimedChunkIndex = m[4] !== undefined ? m[4].trim() : null;
+      ({ claimedSourceFile, claimedChunkIndex } = pickCitationGroups(m[3], m[4], m[5], m[6]));
     } else if (kind === 'inline') {
       quote = (m[1] || '').trim();
-      claimedSourceFile = m[2] ? m[2].trim() : null;
-      claimedChunkIndex = m[3] !== undefined ? m[3].trim() : null;
+      ({ claimedSourceFile, claimedChunkIndex } = pickCitationGroups(m[2], m[3], m[4], m[5]));
     } else {
       // bareNone: never has a quote to capture — "none" itself isn't
       // the quote text, it's the model saying there ISN'T one — so
       // quote stays '' just like the labeled "Quote: none" case does.
       quote = '';
-      claimedSourceFile = m[1] ? m[1].trim() : null;
-      claimedChunkIndex = m[2] !== undefined ? m[2].trim() : null;
+      ({ claimedSourceFile, claimedChunkIndex } = pickCitationGroups(m[1], m[2], m[3], m[4]));
     }
     results.push({ start: cand.start, end: cand.end, quote, claimedSourceFile, claimedChunkIndex });
     cursor = cand.end;
@@ -670,7 +712,7 @@ function extractQuotesAndCitations(text, matches) {
   // full reasoning. Skipped entirely without `matches`, since nothing
   // found here could ever be verified anyway.
   if (matches && matches.length > 0) {
-    const citationBracketRe = /\[\s*(?:Source\s*:\s*)?([^,\]]+?)\s*,\s*chunk\s*([^\]]+?)\s*\]/g;
+    const citationBracketRe = new RegExp(`${bracketCitation}|${parenCitation}`, 'g');
     // Every interval already spoken for, kept in position order and
     // grown as unmarked candidates are confirmed below — this is what
     // stops this pass from (a) re-detecting a bracket that's already
@@ -729,8 +771,7 @@ function extractQuotesAndCitations(text, matches) {
       // counting or mangling it.
       if (/["“”]/.test(quote)) continue;
 
-      const claimedSourceFile = bm[1] ? bm[1].trim() : null;
-      const claimedChunkIndex = bm[2] !== undefined ? bm[2].trim() : null;
+      const { claimedSourceFile, claimedChunkIndex } = pickCitationGroups(bm[1], bm[2], bm[3], bm[4]);
       const resolved = resolveCitation(quote, matches, claimedSourceFile, claimedChunkIndex);
       if (!resolved || !resolved.verified) continue; // never claimed as a quote — only ever surfaced when it actually checks out
 

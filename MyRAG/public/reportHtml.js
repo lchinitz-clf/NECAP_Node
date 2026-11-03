@@ -133,6 +133,59 @@ function formatBatchSummary(batch, numCtx) {
 }
 
 /**
+ * One sentence summarizing EVERY batch's token usage against the
+ * Request size (numCtx) ceiling at once — meant for the top of the
+ * report, so a reader doesn't have to scan down through every
+ * individual attribute's own formatBatchSummary() line just to learn
+ * whether anything came close to running out of room.
+ *
+ * A batch counts as "larger than your Request size" when its prompt
+ * and answer tokens TOGETHER exceed numCtx. In practice, for the
+ * ordinary case of a batch getting cut off mid-answer because it ran
+ * out of context, that sum can never actually come out larger than
+ * numCtx — generation halts right before the token that would have
+ * overflowed it, so a cut-off batch's own reported total lands at or
+ * just under the ceiling, never over it (see formatBatchSummary()'s
+ * "⚠ Cut off" flag for that case, and the real examples that motivated
+ * this distinction: sums like 8,188/8,192 or 16,383/16,384). So a
+ * batch THIS function actually flags means something different and
+ * worth calling out on its own: the PROMPT itself — the question plus
+ * however many retrieved blocks "Blocks to search" pulled in — was
+ * already too large for the configured Request size before the model
+ * even started generating an answer, not merely a long answer running
+ * the budget down from the other end.
+ *
+ * Returns '' (render nothing) when `numCtx` is undefined — there's no
+ * configured ceiling to measure against, the same case
+ * formatBatchSummary() falls back on different phrasing for — or when
+ * not one batch has `promptTokens` recorded at all (nothing to
+ * summarize).
+ * @param {Array<{promptTokens?: number, answerTokens?: number}>} batches
+ * @param {number} [numCtx]
+ * @returns {{text: string, warn: boolean}|null}
+ */
+function summarizeTokenBudget(batches, numCtx) {
+  if (numCtx === undefined) return null;
+  const withTokenData = batches.filter((b) => b.promptTokens !== undefined);
+  if (withTokenData.length === 0) return null;
+
+  const overages = withTokenData
+    .map((b) => (b.promptTokens + (b.answerTokens || 0)) - numCtx)
+    .filter((over) => over > 0);
+
+  if (overages.length === 0) {
+    return { text: `All requests fit within your ${numCtx.toLocaleString()}-token Request size.`, warn: false };
+  }
+
+  const maxOverage = Math.max(...overages);
+  const n = overages.length;
+  const text =
+    `${n} request${n === 1 ? ' was' : 's were'} larger than your ${numCtx.toLocaleString()}-token ` +
+    `Request size, by as much as ${maxOverage.toLocaleString()} token${maxOverage === 1 ? '' : 's'}.`;
+  return { text, warn: true };
+}
+
+/**
  * Renders one attribute's already-parsed resultText into report HTML,
  * escaping it for safety first (attribute names, proposal text, and a
  * model's own answer are all untrusted input) and then re-marking up
@@ -264,7 +317,9 @@ function formatSettingsChips(meta) {
  * completion email, for exactly the case a spreadsheet cell handles
  * badly: a long, multi-quote answer per attribute that's hard to read
  * as one undifferentiated block of CSV text. Structure: a header with
- * the run's metadata, a "Score summary" table tallying how many
+ * the run's metadata, a one-line token-budget summary (see
+ * summarizeTokenBudget() above — omitted when `meta.numCtx` wasn't
+ * supplied), a "Score summary" table tallying how many
  * attributes landed on each verdict (count and % of the total,
  * omitted entirely when there are no attributes at all), a one-glance
  * per-attribute summary table (attribute → color-coded verdict badge,
@@ -376,6 +431,8 @@ function buildAttributeResultsHtml(batches, meta) {
     })
     .join('\n');
 
+  const tokenBudgetSummary = summarizeTokenBudget(batches, meta.numCtx);
+
   const generatedAt = new Date().toLocaleString();
   const metaRows = [
     meta.workspaceId ? ['Workspace', escapeHtml(meta.workspaceId)] : null,
@@ -458,6 +515,8 @@ function buildAttributeResultsHtml(batches, meta) {
   dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 1rem 0 2rem; }
   dl.meta dt { color: var(--muted); font-weight: 600; }
   dl.meta dd { margin: 0; }
+  .token-budget-summary { font-size: 0.9em; color: var(--muted); margin: 0 0 1.5rem; }
+  .token-budget-summary.warn { color: var(--warn); font-weight: 600; }
   table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
   th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; }
@@ -492,6 +551,8 @@ function buildAttributeResultsHtml(batches, meta) {
   <dl class="meta">
     ${metaRows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('\n')}
   </dl>
+
+  ${tokenBudgetSummary ? `<p class="token-budget-summary${tokenBudgetSummary.warn ? ' warn' : ''}">${escapeHtml(tokenBudgetSummary.text)}</p>` : ''}
 
   ${totalVerdicts > 0 ? `
   <h2>Score summary</h2>
@@ -532,6 +593,7 @@ if (typeof module !== 'undefined' && module.exports) {
     escapeHtml,
     formatElapsedMs,
     formatBatchSummary,
+    summarizeTokenBudget,
     renderResultTextHtml,
     formatSettingsChips,
     buildAttributeResultsHtml,
