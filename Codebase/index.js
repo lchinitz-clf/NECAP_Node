@@ -2337,7 +2337,23 @@ app.post('/query/stream', lockGate, async (req, res) => {
         // Shouldn't normally happen once batch 0 already found
         // something, but handled defensively rather than assumed
         // impossible — nothing to chat about for this batch.
-        send({ type: 'batch-done', batchIndex: i, totalBatches, answer: '', sources: [], records: [] });
+        // excludedDocuments/includedDocuments are included here too,
+        // not just on the final "done" event below — see the matching
+        // comment on the real batch-done send() further down for why:
+        // the browser's "Export HTML" button has no way to tell "this
+        // run excluded nothing" apart from "this run's exclusion list
+        // just hasn't arrived yet" unless it gets the real answer from
+        // the EARLIEST batch-scoped event, not only the last one.
+        send({
+          type: 'batch-done',
+          batchIndex: i,
+          totalBatches,
+          answer: '',
+          sources: [],
+          records: [],
+          excludedDocuments: [...excludedSourceFiles],
+          includedDocuments,
+        });
         continue;
       }
 
@@ -2512,6 +2528,24 @@ app.post('/query/stream', lockGate, async (req, res) => {
       // `thinking` here mirrors /query's response: only included when
       // non-empty, for a caller that reconnected mid-stream or
       // otherwise missed the individual "thinking" events above.
+      //
+      // excludedDocuments/includedDocuments are sent on EVERY batch-done
+      // event, not only the final "done" event below (where they also
+      // still appear, unchanged, for a run that finishes normally) —
+      // this is what actually fixes the "Documents included in search"
+      // row showing "All" on a report exported mid-run or after Stop:
+      // both of those export the report before "done" ever fires (or,
+      // for Stop, the browser's fetch is aborted and never reaches
+      // "done" handling at all), so a value that only ever arrived on
+      // "done" was never available to it. These two fields are a fixed
+      // snapshot taken once, before this request's batch loop even
+      // started (see excludedSourceFiles/includedDocuments above) —
+      // they never change batch to batch — so repeating them here on
+      // every batch costs nothing and simply makes the already-correct
+      // answer available as early as the first batch completes, which
+      // is also the earliest moment the browser's Export HTML button
+      // ever becomes clickable (see latestBatches/hasRecords in
+      // script.js and bestPracticesTab.js).
       send({
         type: 'batch-done',
         batchIndex: i,
@@ -2522,6 +2556,8 @@ app.post('/query/stream', lockGate, async (req, res) => {
         promptTokens: batchPromptTokens,
         answerTokens: batchAnswerTokens,
         records,
+        excludedDocuments: [...excludedSourceFiles],
+        includedDocuments,
         ...(thinking ? { thinking } : {}),
         ...(verifiedAnswer ? { verifiedAnswer } : {}),
       });

@@ -26,6 +26,30 @@ async function applyConfig() {
   }
 }
 
+// Loads public/exampleQuestions.json — an array of
+// { description, question } objects, kept as a separate, hand-editable
+// file for the same reason config.json/description.html are: so adding,
+// removing, or rewording example questions never means touching this
+// script or index.html. Read by showExampleQuestion() below, which
+// picks one at random each time exampleQuestionBtn (next to "2. Ask a
+// question") is clicked. Left as an empty array (rather than throwing)
+// on a missing/invalid file — showExampleQuestion() silently no-ops in
+// that case, same "absence just means this optional feature does
+// nothing" convention the config.json/description.html loaders use.
+// Called once from init()'s "Initial data loads" section, same as
+// those two.
+let exampleQuestions = [];
+
+async function loadExampleQuestions() {
+  try {
+    const res = await fetch('/exampleQuestions.json', { cache: 'no-store' });
+    const data = await res.json();
+    if (Array.isArray(data)) exampleQuestions = data;
+  } catch (err) {
+    console.warn('Could not load exampleQuestions.json:', err);
+  }
+}
+
 let introContentEl;
 
 // Fills the Introduction tab with the fragment from description.html —
@@ -1078,22 +1102,29 @@ let lastRunElapsedMs = null;
 
 // Captures, once per run, exactly which documents the Documents tab's
 // Include checkboxes had excluded AT THE TIME this run's retrieval
-// actually happened — see the `excludedDocuments` field on
-// /query/stream's "done" event in index.js. Deliberately read from
-// the server's own response rather than re-fetched from GET
-// /workspaces/:id/documents at export time: someone could flip a
-// checkbox between finishing a run and clicking "Export HTML" later,
-// and the report should describe what this SPECIFIC run actually
-// searched, not whatever the checkboxes happen to say right now.
+// actually happened — see the `excludedDocuments` field /query/stream
+// now sends on every "batch-done" event (and still, redundantly, on
+// "done") in index.js. Deliberately read from the server's own
+// response rather than re-fetched from GET /workspaces/:id/documents
+// at export time: someone could flip a checkbox between finishing a
+// run and clicking "Export HTML" later, and the report should
+// describe what this SPECIFIC run actually searched, not whatever the
+// checkboxes happen to say right now.
 // Reset to an empty array at the top of every new run (alongside
 // lastRunElapsedMs), for the same "a stale value from a previous run
-// must never attach to a different run's export" reasoning.
+// must never attach to a different run's export" reasoning. Captured
+// from "batch-done" rather than waiting for "done" specifically so
+// it's already correct by the time "Export HTML" first becomes
+// clickable (see the "batch-done" handler below) — exporting mid-run,
+// or after Stop aborts the request before "done" ever fires, used to
+// leave this stuck at its empty reset value, which is exactly why the
+// report's "Documents included in search" row could wrongly say "All".
 let lastRunExcludedDocuments = [];
 
 // The complement of lastRunExcludedDocuments above, against the
 // workspace's real embedded document set (see getIncludedSourceFiles()
 // in src/documentMeta.js) — captured and reset the same way, from the
-// same /query/stream "done" event's `includedDocuments` field. This,
+// same "batch-done"/"done" events' `includedDocuments` field. This,
 // not lastRunExcludedDocuments, is what the exported report's
 // "Documents included in search" row actually names when something
 // was excluded — see buildAttributeResultsHtml()'s own doc comment in
@@ -1487,6 +1518,40 @@ function openChunkModal() {
 
 function closeChunkModal() {
   chunkModalBackdrop.classList.remove('open');
+}
+
+let exampleQuestionBtn, exampleQuestionModalBackdrop, exampleQuestionModalBody, exampleQuestionModalClose;
+
+function openExampleQuestionModal() {
+  exampleQuestionModalBackdrop.classList.add('open');
+}
+
+function closeExampleQuestionModal() {
+  exampleQuestionModalBackdrop.classList.remove('open');
+}
+
+/**
+ * exampleQuestionBtn's click handler. Picks one random entry from
+ * exampleQuestions (loaded once at startup — see loadExampleQuestions()
+ * above), drops its `question` straight into the question box (plain
+ * overwrite, no confirmation — this button exists specifically so a
+ * confused new user can get unstuck in one click), and shows its
+ * `description` in a modal explaining what makes that particular
+ * question well-formed, so the lesson travels with the example rather
+ * than being a mystery pop-up.
+ *
+ * Silently does nothing if exampleQuestions is still empty — either
+ * loadExampleQuestions() hasn't resolved yet (fetch still in flight) or
+ * it failed/found nothing — same "shouldn't be clickable in that case,
+ * but guard anyway" treatment downloadHtmlBtn's handler gives its own
+ * precondition above.
+ */
+function showExampleQuestion() {
+  if (!exampleQuestions.length) return;
+  const pick = exampleQuestions[Math.floor(Math.random() * exampleQuestions.length)];
+  document.getElementById('question').value = pick.question || '';
+  exampleQuestionModalBody.textContent = pick.description || '';
+  openExampleQuestionModal();
 }
 
 /**
@@ -3350,6 +3415,11 @@ function init() {
   chunkModalBody = document.getElementById('chunkModalBody');
   chunkModalClose = document.getElementById('chunkModalClose');
 
+  exampleQuestionBtn = document.getElementById('exampleQuestionBtn');
+  exampleQuestionModalBackdrop = document.getElementById('exampleQuestionModalBackdrop');
+  exampleQuestionModalBody = document.getElementById('exampleQuestionModalBody');
+  exampleQuestionModalClose = document.getElementById('exampleQuestionModalClose');
+
   documentsDetails = document.getElementById('documentsDetails');
   answerDetails = document.getElementById('answerDetails');
   attributeResultsDetails = document.getElementById('attributeResultsDetails');
@@ -3727,8 +3797,20 @@ function init() {
   chunkModalBackdrop.addEventListener('click', (e) => {
     if (e.target === chunkModalBackdrop) closeChunkModal();
   });
+
+  exampleQuestionBtn.addEventListener('click', showExampleQuestion);
+  exampleQuestionModalClose.addEventListener('click', closeExampleQuestionModal);
+  exampleQuestionModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === exampleQuestionModalBackdrop) closeExampleQuestionModal();
+  });
+
+  // One shared Escape handler for every modal on the page — checked
+  // independently so whichever one (if any) is actually open gets
+  // closed, rather than assuming only chunkModal exists.
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && chunkModalBackdrop.classList.contains('open')) closeChunkModal();
+    if (e.key !== 'Escape') return;
+    if (chunkModalBackdrop.classList.contains('open')) closeChunkModal();
+    if (exampleQuestionModalBackdrop.classList.contains('open')) closeExampleQuestionModal();
   });
 
   // ---- Logs tab ----
@@ -4211,15 +4293,30 @@ function init() {
             doneReason: event.doneReason,
           });
           renderAttributeResults(latestBatches, numCtx, threshold);
+
+          // Captured here too, not only from the final "done" event
+          // below — see lastRunExcludedDocuments's own doc comment
+          // above. This is a fixed, whole-run snapshot the server sends
+          // on every batch-done (it never changes batch to batch), so
+          // capturing it as soon as the FIRST batch arrives is what
+          // makes "Export HTML" correct even when it's clicked mid-run,
+          // or after Stop aborts the request before "done" ever fires —
+          // both cases where this assignment used to never run at all.
+          lastRunExcludedDocuments = event.excludedDocuments || lastRunExcludedDocuments;
+          lastRunIncludedDocuments = event.includedDocuments || lastRunIncludedDocuments;
         }
       }, controller.signal);
 
-      // See lastRunExcludedDocuments's own doc comment above — captured
-      // from the final "done" event regardless of which branch below
-      // actually runs, so it's available to downloadHtmlBtn's export
-      // meta even for the "no documents" case right below.
-      lastRunExcludedDocuments = finalEvent.excludedDocuments || [];
-      lastRunIncludedDocuments = finalEvent.includedDocuments || [];
+      // See lastRunExcludedDocuments's own doc comment above. For a
+      // normal run this is now a harmless no-op re-assignment of the
+      // same values the "batch-done" handler above already captured
+      // (both come from the same fixed, whole-run snapshot) — kept
+      // here specifically for the "no documents embedded yet" case
+      // right below, where the batch loop never runs at all, so
+      // "batch-done" never fires and this "done" event is the only
+      // place these two fields are ever sent.
+      lastRunExcludedDocuments = finalEvent.excludedDocuments || lastRunExcludedDocuments;
+      lastRunIncludedDocuments = finalEvent.includedDocuments || lastRunIncludedDocuments;
 
       // Covers the "no documents embedded yet" case: "done" fires with
       // a ready-made answer and no sources/tokens were ever streamed.
@@ -4354,6 +4451,7 @@ function init() {
 
   applyConfig();
   loadIntroContent();
+  loadExampleQuestions();
   initLockStatus();
   initRole();
   refreshWorkspaces();

@@ -207,6 +207,7 @@ async function chat(messages, { model = 'qwen2.5:14b', temperature = 0.2, maxTok
   // reasoning here) unless the caller took a position on it.
   if (think !== undefined) body.think = think;
   let res;
+  //console.log(body);
   try {
     res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',

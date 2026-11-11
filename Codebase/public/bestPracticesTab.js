@@ -126,18 +126,23 @@
   // `null`) when the field was left blank for that run, matching
   // getAdvancedSettings()'s own "blank means no override" convention.
   let lastNumCtx;
-  // Same purpose, and same "captured from the run's own 'done' event,
+  // Same purpose, and same "captured from the server's own response,
   // never re-fetched live" reasoning, as script.js's
   // lastRunExcludedDocuments — see that variable's own doc comment.
   // Always empty in 'rubric' compare mode (no workspace is involved
   // in that mode at all — see /query/stream in index.js), which is
   // exactly why buildExportMeta() below is fine passing this through
   // unconditionally rather than branching on compareMode itself.
+  // Captured from every "batch-done" event (not just the final "done"),
+  // same reasoning as script.js's own version: it's a fixed snapshot
+  // taken once before the run's batch loop even starts, so capturing it
+  // as soon as the first batch arrives is what keeps the export correct
+  // mid-run or after Stop, instead of only once the run fully finishes.
   let lastExcludedDocuments = [];
-  // The complement of lastExcludedDocuments above — same "captured
-  // from the run's own 'done' event" reasoning, same always-empty-in-
-  // 'rubric'-mode behavior. This, not lastExcludedDocuments, is what
-  // the exported report's "Documents included in search" row actually
+  // The complement of lastExcludedDocuments above — same reasoning,
+  // same always-empty-in-'rubric'-mode behavior, same "batch-done"
+  // capture point. This, not lastExcludedDocuments, is what the
+  // exported report's "Documents included in search" row actually
   // names when something was excluded — see buildAttributeResultsHtml()'s
   // own doc comment in reportHtml.js.
   let lastIncludedDocuments = [];
@@ -1088,6 +1093,18 @@
             };
             latestBatches.push(batch);
             appendRecords(batch);
+
+            // Captured here too, not only from the final "done" event
+            // below -- see lastExcludedDocuments's own doc comment
+            // above. A fixed, whole-run snapshot the server sends on
+            // every batch-done (it never changes batch to batch), so
+            // capturing it as soon as the FIRST batch arrives is what
+            // makes "Export HTML" correct even when it's clicked
+            // mid-run, or after Stop aborts the request before "done"
+            // ever fires -- both cases where this used to stay stuck at
+            // its empty reset value.
+            lastExcludedDocuments = event.excludedDocuments || lastExcludedDocuments;
+            lastIncludedDocuments = event.includedDocuments || lastIncludedDocuments;
           } else if (event.type === 'done' || event.type === 'error') {
             finalEvent = event;
           }
@@ -1097,9 +1114,17 @@
       if (!finalEvent) throw new Error('Server closed the connection before finishing.');
       if (finalEvent.type === 'error') throw new Error(finalEvent.error);
 
-      // See lastExcludedDocuments's own doc comment above.
-      lastExcludedDocuments = finalEvent.excludedDocuments || [];
-      lastIncludedDocuments = finalEvent.includedDocuments || [];
+      // See lastExcludedDocuments's own doc comment above. For a normal
+      // run (including 'rubric' compare mode, which still goes through
+      // the same batch loop and "batch-done" events, just always with
+      // both fields empty) this is now a harmless no-op re-assignment
+      // of the same values the "batch-done" handler above already
+      // captured. Kept here for the "no documents embedded yet" case,
+      // where the batch loop never runs at all, so "batch-done" never
+      // fires and this "done" event is the only place these two fields
+      // are ever sent.
+      lastExcludedDocuments = finalEvent.excludedDocuments || lastExcludedDocuments;
+      lastIncludedDocuments = finalEvent.includedDocuments || lastIncludedDocuments;
 
       // See renderBpTokenUsage()'s own doc comment above -- lastNumCtx
       // was captured at the moment THIS run's request was actually

@@ -1,0 +1,38 @@
+[
+  {
+    "description": "Specific and scoped to one topic, so the LLM can find the exact passage instead of guessing which part of a long plan you mean.",
+    "question": "What funding sources does the plan identify for wildfire risk mapping?"
+  },
+  {
+    "description": "A yes/no \"does the plan address this\" question — a quick way to check whether a topic is covered at all before asking for details.",
+    "question": "Does the plan address inland flooding separately from coastal flooding?"
+  },
+  {
+    "description": "Asks for the plan's own wording, not just a summary — useful when you need to quote the plan directly rather than paraphrase it.",
+    "question": "What exact language does the plan use to describe its goals for forest resilience?"
+  },
+  {
+    "description": "Names a specific program or mechanism rather than asking broadly about \"funding\" in general, so the LLM can search for that exact term.",
+    "question": "How does the plan propose to fund its landscape-scale forest planning efforts?"
+  },
+  {
+    "description": "Asks who is responsible for an action, not just what the action is — useful for identifying which agency or level of government owns a commitment.",
+    "question": "Which level of government — state, municipal, or private — is responsible for conducting the mapping work described in the plan?"
+  },
+  {
+    "description": "Asks about timing, which plans often state separately from the action itself — worth asking on its own rather than assuming a timeline is included.",
+    "question": "Does the plan give a timeline for completing its natural resource mapping efforts?"
+  },
+  {
+    "description": "A narrow, single-document question that still works as a quick first check before setting up a full rubric comparison against a benchmark.",
+    "question": "Does the plan treat wildfire risk as its own hazard, or only as part of a broader forestry section?"
+  },
+  {
+    "description": "Asks about the scope or limits of a commitment, which catches vague language versus a concrete, boundaried plan.",
+    "question": "Is the plan's commitment to assess vulnerability statewide, or limited to specific regions?"
+  },
+  {
+    "description": "Asks for a comparison between two named items within the same plan — still answerable from this one plan, no second plan needed.",
+    "question": "How does the plan's approach to offshore wind differ from its approach to onshore renewable energy?"
+  }
+]
