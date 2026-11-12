@@ -549,7 +549,7 @@
       <details class="tip">
         <summary aria-label="More information">&#9432;</summary>
         <span>
-          This is the AI model that reads your documents and writes the
+          This is the LLM that reads your documents and writes the
           answer. Different models can give different-quality answers,
           or run at different speeds.
         </span>
@@ -615,7 +615,7 @@
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>
-              How strongly the AI model is discouraged from repeating
+              How strongly the LLM is discouraged from repeating
               itself. Leave blank to use the model's own default
               (usually 1.1). Weaker or smaller models can sometimes get
               stuck restating a slight variant of what they just said
@@ -664,7 +664,7 @@
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>
-              How much room the AI model has for your question, the
+              How much room the LLM has for your question, the
               searched blocks, and its answer, all combined. Leave
               blank to use the model's own default — commonly 4096,
               which in practice has been too small once "Blocks to
@@ -689,7 +689,7 @@
           <details class="tip">
             <summary aria-label="More information">&#9432;</summary>
             <span>
-              Some AI models work through their reasoning before giving
+              Some LLMs work through their reasoning before giving
               a final answer — viewable by opening "Show reasoning"
               below the answer. Turning this off skips that step, which
               is usually faster. Models that don't support this ignore
@@ -745,9 +745,7 @@
               instead of the same ones already tried. If the retry does
               no better, only a short note is added; if it does the
               same or better, its material is added in and the better
-              verdict is kept. Off by default since it can roughly
-              double the number of calls for a run with many "Not
-              addressed" results.
+              verdict is kept.
             </span>
           </details>
         </div>
