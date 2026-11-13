@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'idealProposals.json');
+const IDEAL_PROPOSALS_PATH = path.join(__dirname, '..', 'benchmarkData', 'idealProposals.json');
 
 // Last-resort fallback only — used when idealProposals.json itself
 // doesn't define a file-level `defaultCompareInstruction` either (e.g.

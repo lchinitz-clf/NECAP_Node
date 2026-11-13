@@ -34,7 +34,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const BEST_PRACTICES_PATH = path.join(__dirname, '..', 'bestPractices.json');
+const BEST_PRACTICES_PATH = path.join(__dirname, '..', 'benchmarkData', 'bestPractices.json');
 
 /**
  * Reads and parses bestPractices.json fresh from disk.

@@ -1,0 +1,25 @@
+services:
+  necap:
+    build: .
+    image: necap
+    init: true
+    env_file: .env.docker
+    ports:
+      - "3500:3500"
+    environment:
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    volumes:
+      - necap-workspaces:/app/workspaces
+      - necap-logs:/app/logs
+      - necap-benchmarkdata:/app/benchmarkData
+
+volumes:
+  necap-workspaces:
+    name: necap-workspaces
+    external: true
+  necap-logs:
+    name: necap-logs
+    external: true
+  necap-benchmarkdata:
+    name: necap-benchmarkdata
+    external: true
