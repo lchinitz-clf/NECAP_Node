@@ -560,6 +560,27 @@
       <summary>Advanced settings</summary>
       <div class="row">
         <div>
+          <label for="compareDocuments" style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0;">
+            <input type="checkbox" id="compareDocuments" style="width:auto;" />
+            Compare across documents
+          </label>
+          <details class="tip">
+            <summary aria-label="More information">&#9432;</summary>
+            <span>
+              Off (default): "Blocks to search" below is pulled from the
+              whole set of included documents combined -- with several
+              documents included, any one of them may end up
+              contributing only a sliver of that total. On: "Blocks to
+              search" is pulled from EACH included document separately,
+              guaranteeing every one of them a fair share -- useful when
+              comparing how two or more documents (or versions of the
+              same document) each handle the same topic. The total
+              retrieved then grows with how many documents are
+              included, not just with the number below.
+            </span>
+          </details>
+        </div>
+        <div>
           <label for="topK">Blocks to search</label>
           <input type="number" id="topK" value="10" min="1" max="50" step="1" />
           <details class="tip">
@@ -567,9 +588,26 @@
             <span>
               How many blocks from your documents to look at when
               answering. More can give a fuller answer but may take
-              longer.
+              longer. With "Compare across documents" on, this is per
+              document, not a shared total.
             </span>
           </details>
+          <!-- Hidden unless "Compare across documents" is on AND the
+               server reports the resulting total chunk count is past
+               its advisory guideline -- see perDocumentSuggestion on
+               the "sources" stream event (index.js) and
+               updatePerDocSuggestion() in script.js. Purely advisory,
+               same contract as temperatureSuggestion/
+               contextWindowSuggestion above: nothing here changes the
+               topK field on its own, only the Apply button does, and
+               only when clicked. -->
+          <div class="model-suggestion" id="perDocSuggestion" style="display:none;">
+            <p id="perDocSuggestionText"></p>
+            <div class="button-row">
+              <button type="button" id="perDocSuggestionApply" class="btn-apply"></button>
+              <button type="button" id="perDocSuggestionDismiss" class="btn-secondary">Keep current value</button>
+            </div>
+          </div>
         </div>
         <div>
           <label for="threshold">Relevance</label>

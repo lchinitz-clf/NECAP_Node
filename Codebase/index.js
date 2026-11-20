@@ -26,7 +26,7 @@ const { extractText, SUPPORTED_EXTENSIONS } = require('./src/extract');
 const { chunkText } = require('./src/chunker');
 const { embed, chat, listModels } = require('./src/ollamaClient');
 const { listDocuments, getChunk, listChunksForDocument, deleteDocument } = require('./src/store');
-const { hybridSearch } = require('./src/hybridSearch');
+const { hybridSearch, hybridSearchPerDocument } = require('./src/hybridSearch');
 const { embedDocumentIntoWorkspace, rebuildWorkspaceIndex } = require('./src/embedPipeline');
 const { isValidWorkspaceId, listWorkspaces, ensureUploadsDir, deleteWorkspace } = require('./src/workspace');
 const { loadTopics, saveTopics, listTopicSummaries, getTopic, composeComparisonQuestion, composeRetrievalQuery, batchAttributes, getIncludedAttributes, buildRubricMatches, resolveInstructionText, HARDCODED_FALLBACK_COMPARE_INSTRUCTION } = require('./src/idealProposals');
@@ -40,6 +40,22 @@ const { isValidLogFileName, listLogFiles, summarizeLogFile, getLogEntry, getLogE
 const { basicAuth, resolveRole } = require('./src/basicAuth');
 const { sendRubricCompletionEmail } = require('./src/emailNotify');
 const appLock = require('./src/appLock');
+
+// "Compare across documents" chunk-count advisory guidance (the "20
+// total is a good target, 5 per document is the floor" suggestion
+// shown next to "Blocks to search") used to be computed HERE and sent
+// down on the "sources" stream event below -- which meant it could
+// only ever appear AFTER a query had already run with the old topK,
+// one query too late to matter for the run that triggered it. Both
+// numbers it needs (topK, and how many documents are currently
+// included) are already known to the browser before "Ask" is even
+// clicked, so there's no real reason to wait on a round trip: this
+// logic now lives client-side, computed live as the "Compare across
+// documents" checkbox, the topK field, or a document's Include
+// checkbox changes. See computePerDocumentSuggestionClient() and
+// refreshLivePerDocSuggestion() in public/script.js -- that's the
+// current home of this guidance (the 20/5 constants included); this
+// route no longer computes or sends it.
 
 const app = express();
 
@@ -2063,7 +2079,7 @@ app.post('/query/stream', lockGate, async (req, res) => {
   // independent measurement isn't worth the complexity of somehow
   // threading the client's own number back in after the fact.
   const requestStartedAt = Date.now();
-  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, compareAgainstRubricId, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed } = req.body;
+  const { question, workspaceId, topK = 5, chatModel, embedModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, bestPracticesFilter, compareAgainstRubricId, think, attributesPerCall, notifyEmail, notifyEmailTo, threshold, retryNotAddressed, compareDocuments } = req.body;
   // See the matching comment on /query above -- a rubric-comparison run
   // never touches a workspace, so the usual workspaceId requirement is
   // skipped for it.
@@ -2140,6 +2156,15 @@ app.post('/query/stream', lockGate, async (req, res) => {
   // src/documentMeta.js.
   const includedDocuments = rubricMatches ? [] : getIncludedSourceFiles(workspaceId);
 
+  // "Compare across documents" mode -- see hybridSearchPerDocument()'s
+  // doc comment in src/hybridSearch.js. Deliberately scoped to ONLY the
+  // plain-question path: a topic comparison or rubric-comparison run
+  // already has its own batching/attribute structure, and mixing this
+  // mode into that would raise questions (per-document AND per-batch?)
+  // nobody has asked for -- compareDocuments is simply ignored outside
+  // the plain-question case, same as if it had never been sent.
+  const perDocumentMode = Boolean(compareDocuments) && !topic && !rubricMatches;
+
   // See the long comment on batchAttributes() in src/idealProposals.js
   // and on /query above — same batching, just streamed per batch here
   // instead of collected silently into one response.
@@ -2204,10 +2229,18 @@ app.post('/query/stream', lockGate, async (req, res) => {
   } else {
     try {
       const queryVector = await embed(firstRetrievalQuery, embedModel, undefined, controller.signal);
-      // See the matching call in /query above and hybridSearch()'s doc
-      // comment in src/hybridSearch.js — same vector+keyword fusion,
-      // just for this route's first batch.
-      firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK, excludedSourceFiles);
+      if (perDocumentMode) {
+        // See hybridSearchPerDocument()'s doc comment in
+        // src/hybridSearch.js -- topK chunks from EACH included
+        // document, concatenated, rather than topK chunks shared
+        // across all of them.
+        firstMatches = hybridSearchPerDocument(workspaceId, queryVector, firstRetrievalQuery, topK, includedDocuments, excludedSourceFiles);
+      } else {
+        // See the matching call in /query above and hybridSearch()'s doc
+        // comment in src/hybridSearch.js — same vector+keyword fusion,
+        // just for this route's first batch.
+        firstMatches = hybridSearch(workspaceId, queryVector, firstRetrievalQuery, topK, excludedSourceFiles);
+      }
     } catch (err) {
       if (clientGone) {
         // Stopped before retrieval even finished — no one to report back

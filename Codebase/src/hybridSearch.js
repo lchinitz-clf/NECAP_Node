@@ -135,4 +135,52 @@ function hybridSearch(workspaceId, queryVector, queryText, topK = 5, excludeSour
   }));
 }
 
-module.exports = { hybridSearch, RRF_K };
+/**
+ * "Compare across documents" mode: instead of one hybridSearch() call
+ * across the whole included-document pool (where the same fixed topK
+ * is split across however many documents are included — the more
+ * documents, the thinner each one's slice, down to 3-4 chunks per
+ * document with topK=10 and 3 documents), this runs hybridSearch()
+ * once PER document, each time scoped to that one document alone, and
+ * concatenates the results. Every document in documentSourceFiles is
+ * guaranteed its own top topKPerDocument chunks by the same hybrid
+ * (vector + keyword) scoring as the normal path — never a random or
+ * positional slice — regardless of how relevant it is relative to the
+ * others. This is why it's a manual, opt-in mode rather than the
+ * default: for the common case of asking a question against one
+ * document, or against several documents where a single ranked pool is
+ * exactly what you want, today's behavior is still correct.
+ *
+ * @param {string} workspaceId
+ * @param {number[]} queryVector
+ * @param {string} queryText
+ * @param {number} topKPerDocument - chunks to take from EACH document,
+ *   not a total across all of them (see computePerDocumentSuggestion()
+ *   in index.js for the advisory guidance offered around this number).
+ * @param {string[]} documentSourceFiles - the documents to compare
+ *   (see getIncludedSourceFiles() in src/documentMeta.js).
+ * @param {Set<string>} [excludeSourceFiles] - same meaning as in
+ *   hybridSearch() above; merged into each per-document exclude set
+ *   below, not replaced by it.
+ * @returns {Array} same shape as hybridSearch()'s return value, with
+ *   one document's top topKPerDocument chunks followed by the next
+ *   document's, in documentSourceFiles order.
+ */
+function hybridSearchPerDocument(workspaceId, queryVector, queryText, topKPerDocument, documentSourceFiles, excludeSourceFiles) {
+  const baseExclude = excludeSourceFiles || new Set();
+  const results = [];
+  for (const sourceFile of documentSourceFiles) {
+    // Scope this call to just `sourceFile` by excluding every other
+    // document in the comparison set, on top of whatever was already
+    // excluded workspace-wide.
+    const exclude = new Set(baseExclude);
+    for (const other of documentSourceFiles) {
+      if (other !== sourceFile) exclude.add(other);
+    }
+    const docMatches = hybridSearch(workspaceId, queryVector, queryText, topKPerDocument, exclude);
+    results.push(...docMatches);
+  }
+  return results;
+}
+
+module.exports = { hybridSearch, hybridSearchPerDocument, RRF_K };

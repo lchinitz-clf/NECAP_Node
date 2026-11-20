@@ -351,6 +351,130 @@ function updateContextWindowSuggestion() {
   queryAdvancedSettings.open = true;
 }
 
+// Mirrors the "20 total is a soft target, 5 per document is the
+// floor" constants that used to live server-side in index.js (see
+// that file's own comment, still there, for why 20 is arbitrary and
+// could reasonably differ per chat model, and why 5 was picked as a
+// floor below which a document's own slice gets too thin to be a
+// useful comparison). Moved here, client-side, specifically so the
+// "Compare across documents" suggestion can be shown live — as the
+// checkbox, the topK field, or a document's Include checkbox changes
+// — rather than waiting on a round trip to the server, by which point
+// a query would already have run with the OLD topK. If either number
+// ever needs to change, change the matching comment in index.js too,
+// even though that file no longer uses them itself.
+const PER_DOC_SUGGESTED_TOTAL_CHUNKS = 20; // ARBITRARY -- see index.js's comment.
+const PER_DOC_MIN_PER_DOCUMENT_TOPK = 5;
+
+/**
+ * Pure arithmetic, no DOM access — same logic that used to be
+ * index.js's computePerDocumentSuggestion(), just relocated. Returns
+ * null when there's nothing worth suggesting (not enough documents to
+ * matter, or the current total is already at or under the target).
+ * Otherwise one of two shapes:
+ *   - { total, suggestedTopK, floorReached: false } -- a specific,
+ *     lower per-document topK that would bring the total down to (or
+ *     near) PER_DOC_SUGGESTED_TOTAL_CHUNKS, while staying at or above
+ *     PER_DOC_MIN_PER_DOCUMENT_TOPK and actually below the current
+ *     topK (otherwise there's nothing left to recommend — see the
+ *     `naive >= topK` check below).
+ *   - { total, suggestedTopK: null, floorReached: true } -- even
+ *     PER_DOC_MIN_PER_DOCUMENT_TOPK per document would still exceed
+ *     the target, so no number is worth offering.
+ * @param {number} topK
+ * @param {number} documentCount
+ */
+function computePerDocumentSuggestionClient(topK, documentCount) {
+  if (!documentCount || documentCount <= 0) return null;
+  const total = topK * documentCount;
+  if (total <= PER_DOC_SUGGESTED_TOTAL_CHUNKS) return null;
+
+  const naive = Math.ceil(PER_DOC_SUGGESTED_TOTAL_CHUNKS / documentCount);
+
+  if (naive >= topK) {
+    // Current topK is already at or below what we'd otherwise
+    // suggest -- nothing to recommend lowering it to, even though the
+    // total still runs a little over the guideline (that's simply as
+    // close as this document count can get without going under the
+    // floor below).
+    return null;
+  }
+
+  if (naive < PER_DOC_MIN_PER_DOCUMENT_TOPK) {
+    return { total, suggestedTopK: null, floorReached: true };
+  }
+
+  return { total, suggestedTopK: naive, floorReached: false };
+}
+
+// How many documents are CURRENTLY included in the workspace, per the
+// Documents tab's own Include checkboxes — kept up to date by
+// setWorkspaceDocCount() below every time the document list (re)loads
+// or a document's Include checkbox is toggled, so
+// refreshLivePerDocSuggestion() never has to re-fetch it itself. 0
+// until a workspace with documents has actually been loaded.
+let currentIncludedDocumentCount = 0;
+
+/**
+ * Recomputes and shows/hides/populates the "Compare across documents"
+ * advisory box from CURRENT form state — the "Compare across
+ * documents" checkbox, the topK field, and currentIncludedDocumentCount
+ * above — rather than from anything the server sent. Call this on
+ * every change to any of those three inputs (see the wiring in init()
+ * below) so the box reflects what asking NOW would actually do, before
+ * "Ask" is ever clicked — same live-update contract as
+ * updateTemperatureSuggestion()/updateContextWindowSuggestion() above.
+ */
+function refreshLivePerDocSuggestion() {
+  if (!compareDocumentsCheckbox || !compareDocumentsCheckbox.checked) {
+    perDocSuggestionWrap.style.display = 'none';
+    return;
+  }
+  const topKInput = document.getElementById('topK');
+  const topK = Number(topKInput.value) || 5;
+  const suggestion = computePerDocumentSuggestionClient(topK, currentIncludedDocumentCount);
+  updatePerDocSuggestion(suggestion);
+}
+
+/**
+ * Pure rendering — populates and shows, or hides, the "Compare across
+ * documents" advisory box from an already-computed suggestion. Always
+ * called from refreshLivePerDocSuggestion() above, never directly,
+ * so the box is always in sync with current form state.
+ *
+ * @param {null | {total: number, suggestedTopK: number|null, floorReached: boolean}} suggestion
+ *   null: nothing to suggest — hide the box. Otherwise, suggestedTopK
+ *   present: a specific lower per-document count is offered, with an
+ *   Apply button that sets it. floorReached (suggestedTopK null): even
+ *   the floor would still exceed the guideline, so there's no number
+ *   to offer — explain why and let them dismiss it, with no Apply
+ *   action.
+ */
+function updatePerDocSuggestion(suggestion) {
+  if (!suggestion) {
+    perDocSuggestionWrap.style.display = 'none';
+    return;
+  }
+
+  if (suggestion.suggestedTopK) {
+    // Explicit permission to ignore this, per the design this box
+    // implements: a lower number is offered, never required, and
+    // raising it back up (or past it) is always the person's call.
+    // Phrased as what asking NOW would do, since this is computed live
+    // from the current form state, before "Ask" is even clicked.
+    perDocSuggestionText.textContent = `Asking now would pull ${suggestion.total} chunks total ("Compare across documents" multiplies "Blocks to search" by the ${currentIncludedDocumentCount} included document${currentIncludedDocumentCount === 1 ? '' : 's'}). Using ${suggestion.suggestedTopK} per document instead would keep that total closer to a reasonable (but arbitrary, and not a hard limit) guideline. You can choose a larger number but may lose some capability for the model to find all relevant information.`;
+    perDocSuggestionApplyBtn.textContent = `Use ${suggestion.suggestedTopK} per document`;
+    perDocSuggestionApplyBtn.dataset.suggestedTopK = String(suggestion.suggestedTopK);
+    perDocSuggestionApplyBtn.style.display = '';
+  } else {
+    perDocSuggestionText.textContent = `We don't suggest lowering the number of chunks in order to maintain adequate visibility for each document, but with this many documents included, asking now would pull ${suggestion.total} chunks total — well beyond the usual guideline. You can leave it as-is, or reduce how many documents you're comparing at once.`;
+    delete perDocSuggestionApplyBtn.dataset.suggestedTopK;
+    perDocSuggestionApplyBtn.style.display = 'none';
+  }
+  perDocSuggestionWrap.style.display = 'block';
+  queryAdvancedSettings.open = true;
+}
+
 /**
  * Prevents an elevated Request size from silently carrying over to a
  * model it was never verified for. Call this on every chat-model
@@ -550,16 +674,26 @@ let workspaceDocCount;
  * noticeable. Pass no arguments (or anything falsy) to hide it — the
  * "no workspace chosen yet" / "workspace doesn't exist or has no
  * documents" / "lookup failed" cases all do this.
+ * Also keeps currentIncludedDocumentCount (see above, near
+ * refreshLivePerDocSuggestion()) in sync and re-evaluates the
+ * "Compare across documents" suggestion box every time this is
+ * called — i.e. whenever the document list (re)loads for a workspace,
+ * or any document's own Include checkbox is toggled — since M (how
+ * many documents are included) just changed.
  * @param {number} [includedCount]
  * @param {number} [totalCount]
  */
 function setWorkspaceDocCount(includedCount, totalCount) {
   if (totalCount === undefined) {
     workspaceDocCount.style.display = 'none';
+    currentIncludedDocumentCount = 0;
+    refreshLivePerDocSuggestion();
     return;
   }
   workspaceDocCount.textContent = `${includedCount} of ${totalCount} document${totalCount === 1 ? '' : 's'} included`;
   workspaceDocCount.style.display = '';
+  currentIncludedDocumentCount = includedCount;
+  refreshLivePerDocSuggestion();
 }
 
 // Shows what's actually embedded (grouped by source filename) in
@@ -1065,6 +1199,7 @@ let queryForm, statusEl, errorEl, resultEl, answerEl, lengthNote, sourcesBody, c
 let submitBtn, stopBtn, elapsedTimeEl, queryProgressWrap;
 let thinkCheckbox, reasoningWrap, reasoningEl, reasoningSummaryEl, notifyEmailCheckbox, notifyEmailToInput, notifyEmailToError;
 let retryNotAddressedCheckbox;
+let compareDocumentsCheckbox, perDocSuggestionWrap, perDocSuggestionText, perDocSuggestionApplyBtn;
 let attributeResultsWrap, attributeResultsBody, downloadCsvBtn, downloadHtmlBtn;
 
 // queryStartTime/queryTimerHandle track the elapsed-time display next
@@ -3193,7 +3328,7 @@ async function submitRubricForm(e) {
  *   body, since a hand-built request (README.md's "Testing with
  *   PowerShell" section) skips this function, and this one, entirely.
  */
-async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed, onEvent, signal) {
+async function queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed, compareDocuments, onEvent, signal) {
   const res = await fetch('/query/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3221,8 +3356,12 @@ async function queryWithStream(workspaceId, question, topK, chatModel, temperatu
     // default (a deliberate change from its original unchecked-by-
     // default state; see its own `checked` attribute in index.html);
     // omitted entirely would be indistinguishable from false, so it's
-    // always sent too.
-    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed }),
+    // always sent too. `compareDocuments` is the "Compare across
+    // documents" checkbox's plain boolean, same reasoning as
+    // `retryNotAddressed` just above -- always sent, OFF by default
+    // (see its own markup in index.html; this is the one toggle this
+    // whole feature's design insists must never default to on).
+    body: JSON.stringify({ question, workspaceId, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressed, compareDocuments }),
     signal,
   });
 
@@ -3394,6 +3533,36 @@ function init() {
   queryProgressWrap = document.getElementById('queryProgressWrap');
   thinkCheckbox = document.getElementById('thinkEnabled');
   retryNotAddressedCheckbox = document.getElementById('retryNotAddressed');
+  compareDocumentsCheckbox = document.getElementById('compareDocuments');
+  perDocSuggestionWrap = document.getElementById('perDocSuggestion');
+  perDocSuggestionText = document.getElementById('perDocSuggestionText');
+  perDocSuggestionApplyBtn = document.getElementById('perDocSuggestionApply');
+  const perDocSuggestionDismissBtn = document.getElementById('perDocSuggestionDismiss');
+  const topKInput = document.getElementById('topK');
+
+  // Same live-update contract as temperatureSuggestion/
+  // contextWindowSuggestion above: refreshLivePerDocSuggestion() reads
+  // the checkbox, this field, and currentIncludedDocumentCount (kept
+  // current by setWorkspaceDocCount() whenever the document list loads
+  // or an Include checkbox is toggled) directly, so re-running it on
+  // every relevant change keeps the box in sync with what asking NOW
+  // would actually do — never waiting on a round trip to the server.
+  compareDocumentsCheckbox.addEventListener('change', refreshLivePerDocSuggestion);
+  topKInput.addEventListener('input', refreshLivePerDocSuggestion);
+  perDocSuggestionApplyBtn.addEventListener('click', () => {
+    if (perDocSuggestionApplyBtn.dataset.suggestedTopK) {
+      topKInput.value = perDocSuggestionApplyBtn.dataset.suggestedTopK;
+    }
+    // Re-check rather than just hiding directly — same reasoning as
+    // the temperature/context-window Apply handlers above: the field's
+    // new value no longer qualifies for a (further) suggestion, so
+    // this naturally hides the box without a separate "hide" branch to
+    // keep in sync with that logic.
+    refreshLivePerDocSuggestion();
+  });
+  perDocSuggestionDismissBtn.addEventListener('click', () => {
+    perDocSuggestionWrap.style.display = 'none';
+  });
   notifyEmailCheckbox = document.getElementById('notifyEmail');
   notifyEmailToInput = document.getElementById('notifyEmailTo');
   notifyEmailToError = document.getElementById('notifyEmailToError');
@@ -4188,7 +4357,7 @@ function init() {
       event.totalBatches && event.totalBatches > 1 ? ` (batch ${event.batchIndex + 1} of ${event.totalBatches})` : '';
 
     try {
-      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressedCheckbox.checked, (event) => {
+      const finalEvent = await queryWithStream(workspaceId, question, topK, chatModel, temperature, maxTokens, numCtx, repeatPenalty, idealTopicId, attributesPerCall, think, notifyEmail, notifyEmailTo, threshold, retryNotAddressedCheckbox.checked, compareDocumentsCheckbox.checked, (event) => {
         if (event.type === 'sources') {
           // Retrieval is fast — this fires almost immediately, well
           // before the answer is ready, so the sources table (and the
